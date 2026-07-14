@@ -12,8 +12,7 @@ desktop/build/
 *.dll
 *.app
 
-# Demo (not synced to repo)
-demo/
+# Demo previews are tracked in repo for review
 
 # Python
 __pycache__/
