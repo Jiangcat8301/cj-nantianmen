@@ -1,10 +1,38 @@
-# Nantianmen
+# Nantianmen (南天门)
 
-> Multi-protocol LLM proxy gateway for unified multi-provider, multi-model request forwarding and protocol conversion.
+> **One Key to Summon All Models, Protocols Bent to Will**
 
-## Overview
+[![Status](https://img.shields.io/badge/status-v0.1.0--alpha-blueviolet)]()
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Backend](https://img.shields.io/badge/backend-Python%203.11%20%2B%20FastAPI-3776AB)]()
+[![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
+[![CLI](https://img.shields.io/badge/CLI-Go%201.21%2B%20(static)-00ADD8)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-Nantianmen is a locally-run LLM proxy gateway. It receives large model requests from various agents (compatible with both OpenAI and Anthropic protocols), forwards them to the corresponding LLM provider based on the user-selected model, and returns results to the agent. When the agent's protocol differs from the provider's, Nantianmen automatically performs protocol conversion.
+In Chinese mythology, **Nantianmen** (南天门) is the sole gateway between Heaven and the mortal realm--all immortals must pass through this gate when descending to the world of mortals.
+Nantianmen does not judge right or wrong; it does one thing: **verify the identity of those who come, let the worthy pass, and bar the unworthy.**
+
+**This system takes its name from that metaphor.** Every AI Agent arrives at the gate carrying a token issued by Nantianmen (an `skm-` Key),
+declaring which "immortal" (Provider + Model) it wishes to consult. Nantianmen verifies the token, translates the visitor's "language" (protocol conversion),
+forwards the request to the corresponding celestial court, and translates the response back. All the while, it records who sought whom and how much was said.
+
+> In one sentence: **a local gateway that lets any Agent access any LLM using any protocol--it handles all translation and accounting in between.**
+
+---
+
+## ☰ Overview · What is Nantianmen
+
+**Nantianmen (南天门)** is a **local multi-protocol LLM proxy gateway**.
+Any Agent (Hermes / OpenClaw / Codex / scripts) can connect via OpenAI or Anthropic protocol,
+and Nantianmen forwards the request to a registered LLM Provider (OpenAI / Anthropic / Volcengine ARK / any compatible service).
+
+When the Agent's protocol differs from the Provider's, Nantianmen automatically performs **protocol conversion** (4 conversion paths).
+Responses are streamed through (SSE pipe-through) without buffering or truncation.
+
+Two management interfaces:
+
+- **Admin API** (`/api/admin/*`) - CRUD for Providers / API Keys / Stats, consumed by Desktop and CLI
+- **LLM Proxy API** (`/v1/*`) - Agent request entry, compatible with OpenAI Chat Completions and Anthropic Messages
 
 ## Architecture
 

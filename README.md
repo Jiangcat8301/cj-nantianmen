@@ -1,10 +1,40 @@
-# 南天门 Nantianmen
+# 南天门 (NANTIANMEN)
 
-> 多协议 LLM 代理网关，统一管理多 Provider、多模型的请求转发与协议转换。
+> **一钥通万仙，协议自在行**
+>
+> *One Key to Summon All Models, Protocols Bent to Will*
 
-## 项目简介
+[![Status](https://img.shields.io/badge/status-v0.1.0--alpha-blueviolet)]()
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Backend](https://img.shields.io/badge/backend-Python%203.11%20%2B%20FastAPI-3776AB)]()
+[![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
+[![CLI](https://img.shields.io/badge/CLI-Go%201.21%2B%20(static)-00ADD8)]()
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-南天门是一个本地运行的 LLM 代理网关服务。它接收来自不同 Agent 的大模型请求（兼容 OpenAI 和 Anthropic 协议），根据用户选择的模型将请求转发到对应的 LLM Provider，并将结果返回给 Agent。在此过程中，如 Agent 使用协议与 Provider 协议不同，南天门会自动进行协议转换。
+在中国神话中，**南天门**是天界与人间的唯一通道--众仙出入凡间，必经此门。
+南天门不裁断是非，只做一件事：**验明来者身份，放行该放的人，拦住该拦的妖。**
+
+**本系统即以此为喻**：每个 AI Agent 带着南天门签发的令牌（`skm-` Key）来到门前，
+声明要找哪位"仙"（Provider + Model），南天门验明令牌、翻译来者的"语言"（协议转换），
+放行请求到对应仙府，再将回话翻译回来。全程记录谁找了谁、说了多少话。
+
+> 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
+
+---
+
+## ☰ 卷首 · 何谓南天门
+
+**南天门 (NANTIANMEN)** 是一个**本地化多协议 LLM 代理网关**。
+任何 Agent（Hermes / OpenClaw / Codex / 脚本）都可通过 OpenAI 或 Anthropic 协议接入，
+由南天门将请求转发到已注册的 LLM Provider（OpenAI / Anthropic / 火山引擎 / 任何兼容服务）。
+
+当 Agent 使用的协议与 Provider 不一致时，南天门自动进行**协议转换**（4 条转换路径），
+响应以流式透传（SSE pipe-through）原样返回，不缓冲、不截断。
+
+平台提供两种管理入口：
+
+- **Admin API** (`/api/admin/*`) - Provider / API Key / Stats 的 CRUD，供 Desktop 和 CLI 调用
+- **LLM Proxy API** (`/v1/*`) - Agent 请求入口，兼容 OpenAI Chat Completions 与 Anthropic Messages
 
 ## 架构
 
