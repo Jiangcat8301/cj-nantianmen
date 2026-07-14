@@ -1,0 +1,51 @@
+# Dependencies
+server/.venv/
+server/venv/
+desktop/node_modules/
+cli/vendor/
+
+# Build output
+build/
+desktop/dist/
+desktop/build/
+*.exe
+*.dll
+*.app
+
+# Demo (not synced to repo)
+demo/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# Go
+cli/nantianmen
+cli/nantianmen.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
