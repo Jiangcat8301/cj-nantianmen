@@ -24,7 +24,10 @@ def list_providers():
 def create_provider(req: schemas.ProviderCreate):
     if req.protocol not in ("openai", "anthropic"):
         raise HTTPException(400, "protocol must be 'openai' or 'anthropic'")
-    p = provider_service.create_provider(req.name, req.protocol, req.base_url, req.api_key)
+    try:
+        p = provider_service.create_provider(req.name, req.protocol, req.base_url, req.api_key)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     k = p["api_key"]
     p["api_key"] = k[:4] + "..." + k[-4:] if len(k) > 8 else "***"
     return p
@@ -32,10 +35,13 @@ def create_provider(req: schemas.ProviderCreate):
 
 @router.put("/providers/{provider_id}", response_model=schemas.ProviderOut)
 def update_provider(provider_id: int, req: schemas.ProviderUpdate):
-    p = provider_service.update_provider(
-        provider_id,
-        name=req.name, protocol=req.protocol, base_url=req.base_url, api_key=req.api_key,
-    )
+    try:
+        p = provider_service.update_provider(
+            provider_id,
+            name=req.name, protocol=req.protocol, base_url=req.base_url, api_key=req.api_key,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if not p:
         raise HTTPException(404, "Provider not found")
     k = p["api_key"]

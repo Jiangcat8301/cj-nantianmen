@@ -9,6 +9,41 @@ from app.db.database import get_db
 _model_cache: dict[int, dict] = {}
 CACHE_TTL = 300  # 5 minutes
 
+# ponytail: in-memory model map for O(1) resolve, rebuilt on mutations.
+# No lock needed: GIL covers single dict ops, rebuild does full reassignment.
+_model_map: dict[str, tuple[dict, str, str]] = {}
+
+
+def _validate_name(name: str) -> None:
+    if not name or " " in name:
+        raise ValueError("Provider name must not be empty or contain spaces")
+
+
+def rebuild_model_map() -> None:
+    """Build {f"{name}_{protocol}_{model}": (provider_dict, model_name, protocol)} from DB."""
+    global _model_map
+    conn = get_db()
+    try:
+        providers = {p["id"]: dict(p) for p in conn.execute("SELECT * FROM providers").fetchall()}
+        models = conn.execute("SELECT * FROM models").fetchall()
+        new_map = {}
+        for m in models:
+            p = providers.get(m["provider_id"])
+            if not p:
+                continue
+            key = f"{p['name']}_{p['protocol']}_{m['model_name']}"
+            new_map[key] = (p, m["model_name"], p["protocol"])
+        _model_map = new_map
+    finally:
+        conn.close()
+
+
+def get_model_map() -> dict[str, tuple[dict, str, str]]:
+    """Return model map, building on first access."""
+    if not _model_map:
+        rebuild_model_map()
+    return _model_map
+
 
 def _row_to_dict(row) -> dict:
     return dict(row) if row else None
@@ -36,6 +71,7 @@ def get_provider(provider_id: int) -> Optional[dict]:
 
 
 def create_provider(name: str, protocol: str, base_url: str, api_key: str) -> dict:
+    _validate_name(name)
     conn = get_db()
     try:
         conn.execute(
@@ -47,9 +83,12 @@ def create_provider(name: str, protocol: str, base_url: str, api_key: str) -> di
         return dict(row)
     finally:
         conn.close()
+        rebuild_model_map()
 
 
 def update_provider(provider_id: int, **fields) -> Optional[dict]:
+    if fields.get("name"):
+        _validate_name(fields["name"])
     conn = get_db()
     try:
         existing = conn.execute("SELECT * FROM providers WHERE id=?", (provider_id,)).fetchone()
@@ -68,6 +107,7 @@ def update_provider(provider_id: int, **fields) -> Optional[dict]:
         return _row_to_dict(row)
     finally:
         conn.close()
+        rebuild_model_map()
 
 
 def delete_provider(provider_id: int) -> bool:
@@ -78,6 +118,7 @@ def delete_provider(provider_id: int) -> bool:
         return cur.rowcount > 0
     finally:
         conn.close()
+        rebuild_model_map()
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +193,7 @@ async def fetch_provider_models(provider_id: int) -> list[str]:
         conn.commit()
     finally:
         conn.close()
+        rebuild_model_map()
 
     return model_names
 
@@ -191,6 +233,7 @@ def set_default_model(provider_id: int, model_id: int) -> Optional[dict]:
         return _row_to_dict(row)
     finally:
         conn.close()
+        rebuild_model_map()
 
 
 def get_default_model() -> Optional[str]:

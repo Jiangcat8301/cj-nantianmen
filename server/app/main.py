@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.security import acquire_pid_lock, release_pid_lock
 from app.db.init_db import init_db
+from app.services import provider_service
 from app.services.stats_service import start_flush_task, stop_flush_task, flush_to_db
 from app.api import admin_routes, llm_routes
 
@@ -21,12 +22,13 @@ app.include_router(llm_routes.router)
 
 @app.on_event("startup")
 async def on_startup():
-    """Init DB + acquire PID lock + start stats flush."""
+    """Init DB + acquire PID lock + start stats flush + build model map."""
     init_db()
     if not acquire_pid_lock():
         print(f"[ERROR] Another instance is running (PID file: {settings.pid_path})")
         sys.exit(1)
     start_flush_task()
+    provider_service.rebuild_model_map()
     print(f"[Nantianmen] started on {settings.host}:{settings.port}, PID={os.getpid()}")
 
 

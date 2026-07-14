@@ -6,7 +6,6 @@ import httpx
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.db.database import get_db
 from app.services import provider_service, stats_service, protocol_converter
 
 
@@ -19,43 +18,26 @@ def resolve_model(model_field: str) -> tuple[dict, str, str]:
     """
     Parse model field -> (provider_dict, model_name, provider_protocol).
 
-    Model field format: "{provider_protocol}_{model_name}" e.g. "openai_gpt-4o"
+    Model field format: "{provider_name}_{protocol}_{model_name}" e.g. "OpenAI_openai_gpt-4o"
     Or "auto" -> use default model from settings.
     """
     if model_field == "auto" or not model_field:
         default = provider_service.get_default_model()
         if not default:
             raise HTTPException(status_code=503, detail="No default model configured")
-        # default is "provider_id:model_name"
         provider_id_str, model_name = default.split(":", 1)
-        provider_id = int(provider_id_str)
-    else:
-        # Format: "{protocol}_{model_name}" — but model_name itself can contain underscores
-        # We match against the DB: find a provider whose protocol is a prefix
-        conn = get_db()
-        try:
-            providers = conn.execute("SELECT * FROM providers").fetchall()
-        finally:
-            conn.close()
+        provider = provider_service.get_provider(int(provider_id_str))
+        if not provider:
+            raise HTTPException(status_code=503, detail="Default provider not found")
+        return provider, model_name, provider["protocol"]
 
-        matched = None
-        for p in providers:
-            prefix = p["protocol"] + "_"
-            if model_field.startswith(prefix):
-                model_name = model_field[len(prefix):]
-                matched = (dict(p), model_name)
-                break
+    # ponytail: O(1) dict lookup, no DB hit per request
+    model_map = provider_service.get_model_map()
+    entry = model_map.get(model_field)
+    if entry:
+        return entry  # (provider_dict, model_name, protocol)
 
-        if not matched:
-            raise HTTPException(status_code=400, detail=f"Cannot resolve model: {model_field}")
-
-        return matched[0], matched[1], matched[0]["protocol"]
-
-    # For auto/default path
-    provider = provider_service.get_provider(provider_id)
-    if not provider:
-        raise HTTPException(status_code=503, detail="Default provider not found")
-    return provider, model_name, provider["protocol"]
+    raise HTTPException(status_code=400, detail=f"Cannot resolve model: {model_field}")
 
 
 def _build_headers(provider: dict) -> dict:
