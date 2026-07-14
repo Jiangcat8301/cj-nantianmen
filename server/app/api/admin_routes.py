@@ -21,13 +21,15 @@ def list_providers():
 
 
 @router.post("/providers", response_model=schemas.ProviderOut)
-def create_provider(req: schemas.ProviderCreate):
+async def create_provider(req: schemas.ProviderCreate):
     if req.protocol not in ("openai", "anthropic"):
         raise HTTPException(400, "protocol must be 'openai' or 'anthropic'")
     try:
         p = provider_service.create_provider(req.name, req.protocol, req.base_url, req.api_key)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    # Auto-fetch models from provider API
+    await provider_service.fetch_provider_models(p["id"])
     k = p["api_key"]
     p["api_key"] = k[:4] + "..." + k[-4:] if len(k) > 8 else "***"
     return p
@@ -71,6 +73,16 @@ async def fetch_models(provider_id: int):
     # Fetch from upstream + DB
     await provider_service.fetch_provider_models(provider_id)
     return provider_service.list_provider_models(provider_id)
+
+
+@router.post("/providers/{provider_id}/models", response_model=schemas.ModelOut)
+def add_model_manual(provider_id: int, req: schemas.ModelCreate):
+    if not provider_service.get_provider(provider_id):
+        raise HTTPException(404, "Provider not found")
+    if not req.model_name or not req.model_name.strip():
+        raise HTTPException(400, "model_name must not be empty")
+    model = provider_service.add_model_manual(provider_id, req.model_name.strip())
+    return model
 
 
 @router.put("/providers/{provider_id}/models/{model_id}/default")

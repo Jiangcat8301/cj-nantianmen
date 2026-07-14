@@ -33,9 +33,8 @@ async def list_models():
         ).fetchall()
         models = []
         for r in rows:
-            safe_name = r["provider_name"].replace(" ", "_")
             models.append({
-                "id": f"{safe_name}_{r['protocol']}_{r['model_name']}",
+                "id": f"{r['provider_name']}_{r['protocol']}_{r['model_name']}",
                 "object": "model",
                 "created": 0,
                 "owned_by": r["provider_name"],

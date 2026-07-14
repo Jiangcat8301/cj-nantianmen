@@ -14,11 +14,12 @@ def _mask_key(key: str) -> str:
     return key[:4] + "..." + key[-4:] if len(key) > 8 else "***"
 
 
-def resolve_model(model_field: str) -> tuple[dict, str, str]:
+def resolve_model(model_field: str) -> dict:
     """
-    Parse model field -> (provider_dict, model_name, provider_protocol).
+    Parse model field -> entry dict with provider info + pre-computed endpoint + headers.
 
     Model field format: "{provider_name}_{protocol}_{model_name}" e.g. "OpenAI_openai_gpt-4o"
+    Since provider_name can't contain '_', we split on first 2 underscores.
     Or "auto" -> use default model from settings.
     """
     if model_field == "auto" or not model_field:
@@ -29,36 +30,21 @@ def resolve_model(model_field: str) -> tuple[dict, str, str]:
         provider = provider_service.get_provider(int(provider_id_str))
         if not provider:
             raise HTTPException(status_code=503, detail="Default provider not found")
-        return provider, model_name, provider["protocol"]
+        return {
+            "provider": provider,
+            "model_name": model_name,
+            "protocol": provider["protocol"],
+            "endpoint": provider_service._compute_endpoint(provider),
+            "headers": provider_service._compute_headers(provider),
+        }
 
-    # ponytail: O(1) dict lookup, no DB hit per request
+    # O(1) dict lookup, no DB hit per request
     model_map = provider_service.get_model_map()
     entry = model_map.get(model_field)
     if entry:
-        return entry  # (provider_dict, model_name, protocol)
+        return entry
 
     raise HTTPException(status_code=400, detail=f"Cannot resolve model: {model_field}")
-
-
-def _build_headers(provider: dict) -> dict:
-    """Build auth headers for provider."""
-    if provider["protocol"] == "openai":
-        return {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
-    else:  # anthropic
-        return {
-            "x-api-key": provider["api_key"],
-            "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
-        }
-
-
-def _build_url(provider: dict, inbound_protocol: str) -> str:
-    """Build upstream URL based on provider protocol."""
-    base = provider["base_url"].rstrip("/")
-    if provider["protocol"] == "openai":
-        return f"{base}/v1/chat/completions"
-    else:  # anthropic
-        return f"{base}/v1/messages"
 
 
 async def proxy_request(
@@ -68,11 +54,15 @@ async def proxy_request(
 ) -> Any:
     """
     Core proxy logic.
-
     inbound_protocol: "openai" or "anthropic" (what the client sent)
     """
     model_field = body.get("model", "auto")
-    provider, model_name, provider_protocol = resolve_model(model_field)
+    entry = resolve_model(model_field)
+    provider = entry["provider"]
+    model_name = entry["model_name"]
+    provider_protocol = entry["protocol"]
+    headers = entry["headers"]
+    url = entry["endpoint"]
 
     stats_service.acquire_request()
     try:
@@ -86,7 +76,6 @@ async def proxy_request(
 
         # Prepare upstream request
         if inbound_protocol == provider_protocol:
-            # Passthrough - just swap model name to actual model
             upstream_body = dict(body)
             upstream_body["model"] = model_name
         elif inbound_protocol == "openai" and provider_protocol == "anthropic":
@@ -97,9 +86,6 @@ async def proxy_request(
             upstream_body["model"] = model_name
         else:
             raise HTTPException(status_code=400, detail="Unsupported protocol combination")
-
-        headers = _build_headers(provider)
-        url = _build_url(provider, inbound_protocol)
 
         client = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300, write=30, pool=10))
 

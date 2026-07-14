@@ -15,12 +15,39 @@ _model_map: dict[str, tuple[dict, str, str]] = {}
 
 
 def _validate_name(name: str) -> None:
-    if not name or " " in name:
-        raise ValueError("Provider name must not be empty or contain spaces")
+    """Provider name must not be empty, contain spaces, or underscores.
+    Underscore is the separator in model_id format: provider_protocol_model."""
+    if not name or " " in name or "_" in name:
+        raise ValueError("Provider name must not be empty, contain spaces, or underscores")
+
+
+def _compute_endpoint(provider: dict) -> str:
+    """Pre-compute upstream endpoint URL from provider info.
+    OpenAI base_url typically ends with /v1, so append /chat/completions.
+    Anthropic base_url is bare, so append /v1/messages."""
+    base = provider["base_url"].rstrip("/")
+    if provider["protocol"] == "openai":
+        return f"{base}/chat/completions"
+    else:  # anthropic
+        return f"{base}/v1/messages"
+
+
+def _compute_headers(provider: dict) -> dict:
+    """Pre-compute auth headers from provider info."""
+    if provider["protocol"] == "openai":
+        return {"Authorization": f"Bearer {provider['api_key']}", "Content-Type": "application/json"}
+    else:  # anthropic
+        return {
+            "x-api-key": provider["api_key"],
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
 
 
 def rebuild_model_map() -> None:
-    """Build {f"{name}_{protocol}_{model}": (provider_dict, model_name, protocol)} from DB."""
+    """Build {f"{name}_{protocol}_{model}": entry_dict} from DB.
+    Each entry contains provider info + pre-computed endpoint + headers,
+    so request path needs zero DB reads."""
     global _model_map
     conn = get_db()
     try:
@@ -32,13 +59,19 @@ def rebuild_model_map() -> None:
             if not p:
                 continue
             key = f"{p['name']}_{p['protocol']}_{m['model_name']}"
-            new_map[key] = (p, m["model_name"], p["protocol"])
+            new_map[key] = {
+                "provider": p,
+                "model_name": m["model_name"],
+                "protocol": p["protocol"],
+                "endpoint": _compute_endpoint(p),
+                "headers": _compute_headers(p),
+            }
         _model_map = new_map
     finally:
         conn.close()
 
 
-def get_model_map() -> dict[str, tuple[dict, str, str]]:
+def get_model_map() -> dict[str, dict]:
     """Return model map, building on first access."""
     if not _model_map:
         rebuild_model_map()
@@ -207,6 +240,25 @@ def list_provider_models(provider_id: int, include_db: bool = True) -> list[dict
         return [dict(r) for r in rows]
     finally:
         conn.close()
+
+
+def add_model_manual(provider_id: int, model_name: str) -> dict:
+    """Manually add a model to a provider's model list."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO models(provider_id, model_name, is_manual) VALUES (?,?,1)",
+            (provider_id, model_name),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM models WHERE provider_id=? AND model_name=?",
+            (provider_id, model_name),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+        rebuild_model_map()
 
 
 def set_default_model(provider_id: int, model_id: int) -> Optional[dict]:
