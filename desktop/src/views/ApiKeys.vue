@@ -14,25 +14,62 @@
             <th class="text-left px-4 py-3">API Key</th>
             <th class="text-left px-4 py-3">名称</th>
             <th class="text-left px-4 py-3">备注</th>
+            <th class="text-right px-4 py-3">请求</th>
+            <th class="text-right px-4 py-3">输入Token</th>
+            <th class="text-right px-4 py-3">输出Token</th>
+            <th class="text-right px-4 py-3">Cached</th>
             <th class="text-left px-4 py-3">创建时间</th>
             <th class="text-left px-4 py-3">最后使用</th>
             <th class="text-left px-4 py-3">操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="k in keys" :key="k.id" class="border-b border-gray-700/50">
-            <td class="px-4 py-3 font-mono text-gray-400">{{ k.key.slice(0, 12) }}...{{ k.key.slice(-4) }}</td>
-            <td class="px-4 py-3">{{ k.name }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ k.note || '-' }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ k.created_at }}</td>
-            <td class="px-4 py-3 text-gray-500">{{ k.last_used_at || '未使用' }}</td>
-            <td class="px-4 py-3">
-              <div class="flex gap-2">
-                <button @click="copyKey(k.key)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">复制</button>
-                <button @click="deleteKey(k.id)" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded">删除</button>
-              </div>
-            </td>
-          </tr>
+          <template v-for="k in keys" :key="k.id">
+            <tr class="border-b border-gray-700/50">
+              <td class="px-4 py-3 font-mono text-gray-400">{{ k.key.slice(0, 12) }}...{{ k.key.slice(-4) }}</td>
+              <td class="px-4 py-3">{{ k.name }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ k.note || '-' }}</td>
+              <td class="px-4 py-3 text-right text-gray-300">{{ k._stats?.request_count ?? 0 }}</td>
+              <td class="px-4 py-3 text-right text-gray-300">{{ fmt(k._stats?.input_tokens) }}</td>
+              <td class="px-4 py-3 text-right text-gray-300">{{ fmt(k._stats?.output_tokens) }}</td>
+              <td class="px-4 py-3 text-right text-cyan-400">{{ fmt(k._stats?.cached_tokens) }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ k.created_at }}</td>
+              <td class="px-4 py-3 text-gray-500">{{ k.last_used_at || '未使用' }}</td>
+              <td class="px-4 py-3">
+                <div class="flex gap-2">
+                  <button v-if="k._stats?.rows?.length" @click="toggle(k.id)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ expanded === k.id ? '收起' : '详情' }}</button>
+                  <button @click="copyKey(k.key)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">复制</button>
+                  <button @click="deleteKey(k.id)" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded">删除</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="expanded === k.id && k._stats?.rows?.length" class="bg-gray-900/50">
+              <td colspan="10" class="px-8 py-3">
+                <table class="w-full text-xs">
+                  <thead class="text-gray-500">
+                    <tr>
+                      <th class="text-left py-1">Provider ID</th>
+                      <th class="text-left py-1">模型</th>
+                      <th class="text-right py-1">请求</th>
+                      <th class="text-right py-1">输入Token</th>
+                      <th class="text-right py-1">输出Token</th>
+                      <th class="text-right py-1">Cached</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(r, i) in k._stats.rows" :key="i" class="text-gray-400">
+                      <td class="py-1">{{ r.provider_id ?? '-' }}</td>
+                      <td class="py-1 font-mono">{{ r.model_name }}</td>
+                      <td class="py-1 text-right">{{ r.request_count }}</td>
+                      <td class="py-1 text-right">{{ fmt(r.input_tokens) }}</td>
+                      <td class="py-1 text-right">{{ fmt(r.output_tokens) }}</td>
+                      <td class="py-1 text-right text-cyan-400">{{ fmt(r.cached_tokens) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          </template>
         </tbody>
       </table>
       <div v-if="keys.length === 0" class="text-center py-8 text-gray-500">暂无 API Key</div>
@@ -75,11 +112,36 @@ const keys = ref([])
 const showCreate = ref(false)
 const newKey = ref(null)
 const createForm = ref({ name: '', note: '' })
+const expanded = ref(null)
+
+const fmt = (n) => {
+  if (!n) return '0'
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
+}
 
 const load = async () => {
-  try { const { data } = await api.listApiKeys(); keys.value = data } catch {}
+  try {
+    const [{ data: keyList }, { data: stats }] = await Promise.all([
+      api.listApiKeys(),
+      api.getStats(),
+    ])
+    // Group stats by api_key_id
+    const byKey = {}
+    for (const r of stats) {
+      const kid = r.api_key_id
+      if (!byKey[kid]) byKey[kid] = { request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0, rows: [] }
+      byKey[kid].request_count += r.request_count || 0
+      byKey[kid].input_tokens += r.input_tokens || 0
+      byKey[kid].output_tokens += r.output_tokens || 0
+      byKey[kid].cached_tokens += r.cached_tokens || 0
+      byKey[kid].rows.push(r)
+    }
+    keys.value = keyList.map(k => ({ ...k, _stats: byKey[k.id] || null }))
+  } catch {}
 }
 onMounted(load)
+
+const toggle = (id) => { expanded.value = expanded.value === id ? null : id }
 
 const createKey = async () => {
   try {
