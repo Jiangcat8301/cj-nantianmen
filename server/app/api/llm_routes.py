@@ -7,14 +7,18 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.security import verify_api_key
 from app.db.database import get_db
-from app.services import provider_service, llm_proxy
+from app.services import provider_service, llm_proxy, stats_service
 
 router = APIRouter(tags=["llm"])
 
 
 @router.get("/v1/health")
 async def health():
-    return {"status": "ok", "service": "nantianmen"}
+    return {
+        "status": "ok",
+        "service": "nantianmen",
+        "active_requests": stats_service.get_active_count(),
+    }
 
 
 @router.get("/v1/models")

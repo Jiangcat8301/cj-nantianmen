@@ -39,7 +39,10 @@
       "dist/**/*",
       "electron/**/*",
       "nantianmen.ico",
-      "nantianmen-logo.png"
+      "nantianmen-logo.png",
+      "tray-online.png",
+      "tray-offline.png",
+      "tray-active.png"
     ]
   },
   "dependencies": {

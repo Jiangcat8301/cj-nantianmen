@@ -92,45 +92,50 @@ async def proxy_request(
     model_field = body.get("model", "auto")
     provider, model_name, provider_protocol = resolve_model(model_field)
 
-    # Check health
-    health = await provider_service.check_provider_health(provider["id"])
-    if not health.get("healthy"):
-        raise HTTPException(status_code=503, detail=f"Provider '{provider['name']}' is unhealthy")
+    stats_service.acquire_request()
+    try:
+        # Check health
+        health = await provider_service.check_provider_health(provider["id"])
+        if not health.get("healthy"):
+            raise HTTPException(status_code=503, detail=f"Provider '{provider['name']}' is unhealthy")
 
-    # Determine conversion path
-    is_streaming = body.get("stream", False)
+        # Determine conversion path
+        is_streaming = body.get("stream", False)
 
-    # Prepare upstream request
-    if inbound_protocol == provider_protocol:
-        # Passthrough — just swap model name to actual model
-        upstream_body = dict(body)
-        upstream_body["model"] = model_name
-    elif inbound_protocol == "openai" and provider_protocol == "anthropic":
-        upstream_body = protocol_converter.openai_req_to_anthropic(body)
-        upstream_body["model"] = model_name
-    elif inbound_protocol == "anthropic" and provider_protocol == "openai":
-        upstream_body = protocol_converter.anthropic_req_to_openai(body)
-        upstream_body["model"] = model_name
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported protocol combination")
+        # Prepare upstream request
+        if inbound_protocol == provider_protocol:
+            # Passthrough - just swap model name to actual model
+            upstream_body = dict(body)
+            upstream_body["model"] = model_name
+        elif inbound_protocol == "openai" and provider_protocol == "anthropic":
+            upstream_body = protocol_converter.openai_req_to_anthropic(body)
+            upstream_body["model"] = model_name
+        elif inbound_protocol == "anthropic" and provider_protocol == "openai":
+            upstream_body = protocol_converter.anthropic_req_to_openai(body)
+            upstream_body["model"] = model_name
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported protocol combination")
 
-    headers = _build_headers(provider)
-    url = _build_url(provider, inbound_protocol)
+        headers = _build_headers(provider)
+        url = _build_url(provider, inbound_protocol)
 
-    client = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300, write=30, pool=10))
+        client = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300, write=30, pool=10))
 
-    if is_streaming:
-        return await _stream_response(
-            client, url, headers, upstream_body,
-            inbound_protocol, provider_protocol,
-            provider, model_name, api_key_id,
-        )
-    else:
-        return await _non_stream_response(
-            client, url, headers, upstream_body,
-            inbound_protocol, provider_protocol,
-            provider, model_name, api_key_id,
-        )
+        if is_streaming:
+            return await _stream_response(
+                client, url, headers, upstream_body,
+                inbound_protocol, provider_protocol,
+                provider, model_name, api_key_id,
+            )
+        else:
+            return await _non_stream_response(
+                client, url, headers, upstream_body,
+                inbound_protocol, provider_protocol,
+                provider, model_name, api_key_id,
+            )
+    except:
+        stats_service.release_request()
+        raise
 
 
 async def _non_stream_response(
@@ -175,6 +180,7 @@ async def _non_stream_response(
         raise HTTPException(status_code=502, detail=f"Upstream connection error: {str(e)}")
     finally:
         await client.aclose()
+        stats_service.release_request()
 
 
 async def _stream_response(
@@ -232,6 +238,7 @@ async def _stream_response(
                             yield c
         finally:
             await client.aclose()
+            stats_service.release_request()
             stats_service.record_usage(
                 api_key_id=api_key_id,
                 provider_id=provider["id"],

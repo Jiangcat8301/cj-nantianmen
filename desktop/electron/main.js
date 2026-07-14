@@ -104,11 +104,48 @@ app.whenReady().then(async () => {
   await startServer()
   await createWindow()
 
-  // System tray
-  const iconPath = getIcon()
-  const trayIcon = nativeImage.createFromPath(iconPath)
-  tray = new Tray(trayIcon)
+  // System tray with status overlay
+  const iconDir = path.join(__dirname, '..')
+  const icons = {
+    online: nativeImage.createFromPath(path.join(iconDir, 'tray-online.png')),
+    offline: nativeImage.createFromPath(path.join(iconDir, 'tray-offline.png')),
+    active: nativeImage.createFromPath(path.join(iconDir, 'tray-active.png')),
+  }
+  tray = new Tray(icons.offline)
   tray.setToolTip('Nantianmen LLM Proxy Gateway')
+
+  let lastState = null
+  async function updateTray() {
+    let state = 'offline'
+    try {
+      const ok = await checkServerHealth()
+      if (ok) {
+        const resp = await new Promise((resolve) => {
+          const req = http.get(`${SERVER_URL}/v1/health`, (r) => {
+            let d = ''
+            r.on('data', (c) => d += c)
+            r.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve(null) } })
+          })
+          req.on('error', () => resolve(null))
+          req.setTimeout(2000, () => { req.destroy(); resolve(null) })
+        })
+        if (resp && resp.active_requests > 0) state = 'active'
+        else state = 'online'
+      }
+    } catch { state = 'offline' }
+
+    if (state !== lastState) {
+      tray.setImage(icons[state])
+      const labels = { online: 'Online', offline: 'Offline', active: `Active (${resp?.active_requests || '?'})` }
+      tray.setToolTip(`Nantianmen - ${labels[state]}`)
+      lastState = state
+    }
+  }
+
+  // ponytail: poll every 3s
+  setInterval(updateTray, 3000)
+  updateTray()
+
   tray.on('click', () => {
     if (mainWindow) {
       mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()

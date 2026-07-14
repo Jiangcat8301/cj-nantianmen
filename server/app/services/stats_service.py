@@ -15,6 +15,26 @@ _buffer: dict[tuple, dict] = defaultdict(lambda: {
 })
 _flush_task: Optional[asyncio.Task] = None
 
+# ponytail: active request counter for tray status
+_active_requests: int = 0
+
+
+def acquire_request():
+    """Call when an LLM request starts."""
+    global _active_requests
+    _active_requests += 1
+
+
+def release_request():
+    """Call when an LLM request ends."""
+    global _active_requests
+    if _active_requests > 0:
+        _active_requests -= 1
+
+
+def get_active_count() -> int:
+    return _active_requests
+
 
 def record_usage(
     api_key_id: Optional[int],
