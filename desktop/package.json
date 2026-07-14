@@ -26,11 +26,20 @@
         }
       ],
       "artifactName": "Nantianmen-${version}-win32.${ext}",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "icon": "nantianmen.ico"
+    },
+    "mac": {
+      "icon": "nantianmen-logo.png"
+    },
+    "linux": {
+      "icon": "nantianmen-logo.png"
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "nantianmen.ico",
+      "nantianmen-logo.png"
     ]
   },
   "dependencies": {

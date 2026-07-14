@@ -1,13 +1,22 @@
-const { app, BrowserWindow, spawn } = require('electron')
+const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const { spawn: spawnChild } = require('child_process')
 const http = require('http')
 const fs = require('fs')
 
 let mainWindow
+let tray = null
 let serverProcess = null
 const SERVER_PORT = 7300
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`
+
+function getIcon() {
+  // ponytail: .ico on Windows, .png on macOS/Linux
+  if (process.platform === 'win32') {
+    return path.join(__dirname, '..', 'nantianmen.ico')
+  }
+  return path.join(__dirname, '..', 'nantianmen-logo.png')
+}
 
 function getServerPath() {
   // ponytail: bundled server path. In production it's in resources/server.
@@ -80,6 +89,7 @@ async function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    icon: getIcon(),
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   })
 
@@ -93,11 +103,33 @@ async function createWindow() {
 app.whenReady().then(async () => {
   await startServer()
   await createWindow()
+
+  // System tray
+  const iconPath = getIcon()
+  const trayIcon = nativeImage.createFromPath(iconPath)
+  tray = new Tray(trayIcon)
+  tray.setToolTip('Nantianmen LLM Proxy Gateway')
+  tray.on('click', () => {
+    if (mainWindow) {
+      mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()
+    }
+  })
+  const ctxMenu = Menu.buildFromTemplate([
+    { label: 'Show', click: () => mainWindow?.show() },
+    { label: 'Hide', click: () => mainWindow?.hide() },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ])
+  tray.setContextMenu(ctxMenu)
 })
 
 app.on('window-all-closed', () => {
-  stopServer()
-  if (process.platform !== 'darwin') app.quit()
+  // ponytail: keep tray alive on all platforms; quit explicitly via tray menu
+  if (process.platform !== 'darwin') {
+    // On Windows/Linux, hide to tray instead of quitting
+    if (tray) return
+    app.quit()
+  }
 })
 
 app.on('before-quit', () => {
