@@ -40,16 +40,16 @@ export function anthropicReqToOpenai(body) {
 
 export function extractTokensOpenai(usage) {
   return {
-    input: usage?.prompt_tokens ?? 0,
-    output: usage?.completion_tokens ?? 0,
-    cached: usage?.prompt_tokens_details?.cached_tokens ?? 0,
+    input_tokens: usage?.prompt_tokens ?? 0,
+    output_tokens: usage?.completion_tokens ?? 0,
+    cached_tokens: usage?.prompt_tokens_details?.cached_tokens ?? 0,
   }
 }
 
 export function extractTokensAnthropic(usage) {
   return {
-    input: usage?.input_tokens ?? 0,
-    output: usage?.output_tokens ?? 0,
-    cached: (usage?.cache_read_input_tokens ?? 0) + (usage?.cache_creation_input_tokens ?? 0),
+    input_tokens: usage?.input_tokens ?? 0,
+    output_tokens: usage?.output_tokens ?? 0,
+    cached_tokens: (usage?.cache_read_input_tokens ?? 0) + (usage?.cache_creation_input_tokens ?? 0),
   }
 }

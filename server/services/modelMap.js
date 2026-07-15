@@ -27,7 +27,7 @@ export async function rebuildModelMap() {
   for (const m of models) {
     const p = pMap[m.provider_id]
     if (!p) continue
-    const key = `${p.name}_${p.protocol}_${m.model_name}`
+    const key = `${p.name}_${m.model_name}`
     const entry = {
       provider: p,
       model_name: m.model_name,

@@ -1,6 +1,47 @@
 import { getEntry, getDefaultEntry } from './modelMap.js'
 import { openaiReqToAnthropic, anthropicReqToOpenai, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
 import * as stats from './stats.js'
+import * as commlog from './commlog.js'
+import { getDb } from '../db/index.js'
+import crypto from 'node:crypto'
+
+function nowStr() {
+  const d = new Date()
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0') + ' ' +
+    String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0') + ':' +
+    String(d.getSeconds()).padStart(2, '0')
+}
+
+// ponytail: lookup user_name once per log entry.
+async function getUserName(apiKeyId) {
+  if (!apiKeyId) return ''
+  try {
+    const r = await getDb().query('SELECT name FROM api_keys WHERE id=?', [apiKeyId])
+    return r[0]?.name || ''
+  } catch { return '' }
+}
+
+async function logEntry({ apiKeyId, provider, modelName, upstreamBody, responseBody, inputTokens, outputTokens, cachedTokens, error }) {
+  const user_name = await getUserName(apiKeyId)
+  commlog.append({
+    request_id: crypto.randomUUID(),
+    time: nowStr(),
+    user_id: apiKeyId || '',
+    user_name,
+    provider_id: provider.id,
+    provider_name: provider.name,
+    model_name: modelName,
+    tokens_input: inputTokens || 0,
+    tokens_output: outputTokens || 0,
+    tokens_cached: cachedTokens || 0,
+    input: JSON.stringify(upstreamBody),
+    output: responseBody || '',
+    ...(error ? { error } : {}),
+  })
+}
 
 export function resolveModel(modelField) {
   if (modelField === 'auto' || modelField === 'Nantianmen-default' || !modelField) {
@@ -32,17 +73,23 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   try {
     const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(upstreamBody) })
     if (body.stream && resp.ok && resp.body) {
-      return makeStreamingResponse(resp, providerProtocol, model_name, apiKeyId, provider.id, reply)
+      return makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, provider.id, reply, upstreamBody, provider)
     }
     if (!resp.ok) {
       const t = await resp.text()
+      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: t, inputTokens: 0, outputTokens: 0, cachedTokens: 0, error: { code: resp.status, message: t } })
       throw new Error(`Upstream ${resp.status}: ${t}`)
     }
     const data = await resp.json()
     captured = providerProtocol === 'openai' ? extractTokensOpenai(data.usage) : extractTokensAnthropic(data.usage)
+    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: JSON.stringify(data), ...captured })
     return data
+  } catch (e) {
+    if (!e.message?.startsWith('Upstream ')) {
+      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: '', inputTokens: 0, outputTokens: 0, cachedTokens: 0, error: { code: 0, message: e.message } })
+    }
+    throw e
   } finally {
-    // ponytail: streaming path handles release+record inside makeStreamingResponse
     if (!body.stream) {
       stats.release()
       if (captured.input_tokens || captured.output_tokens) {
@@ -52,7 +99,54 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   }
 }
 
-function makeStreamingResponse(resp, providerProtocol, model_name, apiKeyId, providerId, reply) {
+// ponytail: Anthropic SSE → OpenAI SSE streaming converter.
+// Parses complete SSE events (separated by \n\n) and maps to OpenAI format.
+// Keeps partial chunks in a buffer between calls.
+// Returns converted SSE text ready to write to client.
+function anthropicSSEToOpenAI(rawText, buffer, msgId) {
+  buffer.s += rawText
+  const out = []
+  while (true) {
+    const idx = buffer.s.indexOf('\n\n')
+    if (idx === -1) break
+    const event = buffer.s.slice(0, idx)
+    buffer.s = buffer.s.slice(idx + 2)
+    const lines = event.split('\n')
+    let evType = '', dataStr = ''
+    for (const line of lines) {
+      if (line.startsWith('event: ')) evType = line.slice(7)
+      else if (line.startsWith('data: ')) dataStr = line.slice(6)
+    }
+    if (!dataStr) continue
+    let data
+    try { data = JSON.parse(dataStr) } catch { continue }
+
+    const ts = Math.floor(Date.now() / 1000)
+    switch (evType) {
+      case 'message_start':
+        msgId.v = data.message?.id || msgId.v
+        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: data.message?.model || '', choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] })}\n\n`)
+        break
+      case 'content_block_delta':
+        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: data.delta?.text || '' }, finish_reason: null }] })}\n\n`)
+        break
+      case 'message_delta': {
+        const reason = data.delta?.stop_reason === 'end_turn' ? 'stop' : (data.delta?.stop_reason || 'stop')
+        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: {}, finish_reason: reason }] })}\n\n`)
+        break
+      }
+      case 'message_stop':
+        out.push('data: [DONE]\n\n')
+        break
+      // ping, content_block_start, content_block_stop → skip
+    }
+  }
+  if (out.length === 0) return ''
+  if (out.some(s => s.includes('[DONE]'))) buffer.doneSent = true
+  return out.join('')
+}
+
+function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, providerId, reply, upstreamBody, provider) {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -62,6 +156,37 @@ function makeStreamingResponse(resp, providerProtocol, model_name, apiKeyId, pro
   const reader = resp.body.getReader()
   const dec = new TextDecoder()
   let inputTokens = 0, outputTokens = 0, cachedTokens = 0
+  let outputBuf = ''
+  const needConvert = inboundProtocol === 'openai' && providerProtocol === 'anthropic'
+  const sseBuf = { s: '', doneSent: false }
+  const msgId = { v: '' }
+
+  // ponytail: extract token counts from raw upstream SSE text (before conversion)
+  function parseTokens(text) {
+    const ui = text.indexOf('"usage"')
+    if (ui === -1) return
+    const after = text.slice(ui + 7).trimStart()
+    if (after.startsWith(':null') || after.startsWith(': null')) return
+    const start = text.indexOf('{', ui)
+    if (start === -1) return
+    let depth = 0, end = start
+    for (; end < text.length; end++) {
+      if (text[end] === '{') depth++
+      else if (text[end] === '}') { depth--; if (depth === 0) break }
+    }
+    try {
+      const u = JSON.parse(text.slice(start, end + 1))
+      if (providerProtocol === 'openai') {
+        inputTokens = u.prompt_tokens ?? inputTokens
+        outputTokens = u.completion_tokens ?? outputTokens
+        cachedTokens = u.prompt_tokens_details?.cached_tokens ?? cachedTokens
+      } else {
+        inputTokens = u.input_tokens ?? inputTokens
+        outputTokens = u.output_tokens ?? outputTokens
+        cachedTokens = (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
+      }
+    } catch {}
+  }
 
   ;(async () => {
     try {
@@ -69,43 +194,30 @@ function makeStreamingResponse(resp, providerProtocol, model_name, apiKeyId, pro
         const { value, done } = await reader.read()
         if (done) break
         const text = dec.decode(value, { stream: true })
-        reply.raw.write(text)
-        // ponytail: brace-counting parser — handles nested objects like prompt_tokens_details.
-        // Previous regex /\{[^}]+\}/ broke on deepseek usage format.
-        const ui = text.indexOf('"usage"')
-        if (ui !== -1) {
-          // ponytail: skip "usage":null (doubao-style streaming — no token counts in SSE)
-          const after = text.slice(ui + 7).trimStart()
-          if (after.startsWith(':null') || after.startsWith(': null')) continue
-          const start = text.indexOf('{', ui)
-          if (start !== -1) {
-            let depth = 0, end = start
-            for (; end < text.length; end++) {
-              if (text[end] === '{') depth++
-              else if (text[end] === '}') { depth--; if (depth === 0) break }
-            }
-            try {
-              const u = JSON.parse(text.slice(start, end + 1))
-              if (providerProtocol === 'openai') {
-                inputTokens = u.prompt_tokens ?? inputTokens
-                outputTokens = u.completion_tokens ?? outputTokens
-                cachedTokens = u.prompt_tokens_details?.cached_tokens ?? cachedTokens
-              } else {
-                inputTokens = u.input_tokens ?? inputTokens
-                outputTokens = u.output_tokens ?? outputTokens
-                cachedTokens = (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)
-              }
-            } catch {}
-          }
+        outputBuf += text
+        parseTokens(text)
+        if (needConvert) {
+          const converted = anthropicSSEToOpenAI(text, sseBuf, msgId)
+          if (converted) reply.raw.write(converted)
+        } else {
+          reply.raw.write(text)
         }
       }
     } catch (e) {
+      outputBuf += '\n[stop]'
+      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, error: { code: 0, message: e.message } })
       reply.raw.destroy(e)
       return
     }
+    // ponytail: flush remaining buffer
+    if (needConvert && sseBuf.s.trim()) {
+      // try to emit a final [DONE] if nothing was sent
+      if (!sseBuf.doneSent) reply.raw.write('data: [DONE]\n\n')
+    }
+    outputBuf += '\n[stop]'
     reply.raw.end()
-    // ponytail: always record request_count even if provider didn't send usage in SSE
     stats.record({ api_key_id: apiKeyId, provider_id: providerId, model_name, request_count: 1, input_tokens: inputTokens, output_tokens: outputTokens, cached_tokens: cachedTokens })
     stats.release()
+    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens })
   })()
 }

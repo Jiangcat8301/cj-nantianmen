@@ -11,8 +11,12 @@ const WHITELIST = new Set([
 
 function md5(s) { return crypto.createHash('md5').update(s).digest('hex') }
 
+// ponytail: local mode - skip admin auth when Electron launches server directly.
+const LOCAL_MODE = process.env.NANTIANMEN_LOCAL_MODE === '1'
+
 export async function adminAuth(req, reply) {
   if (!req.url.startsWith('/api/admin/')) return
+  if (LOCAL_MODE) return
   // Strip query string for whitelist check
   const path = req.url.split('?')[0]
   if (WHITELIST.has(path)) return

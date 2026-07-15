@@ -60,23 +60,42 @@ export function stopFlushTask() {
   interval = null
 }
 
-export async function query({ provider_id, model_name, api_key_id }) {
-  // ponytail: SUM-based aggregation, 5-table join only if filters are present.
+export async function query({ provider_id, model_name, api_key_id, range }) {
+  // ponytail: time-range filter so Dashboard/Stats show 'today' vs '7d' etc.
   const where = []
   const params = []
-  if (provider_id) { where.push('provider_id=?'); params.push(provider_id) }
-  if (model_name) { where.push('model_name=?'); params.push(model_name) }
-  if (api_key_id) { where.push('api_key_id=?'); params.push(api_key_id) }
+  if (provider_id) { where.push('u.provider_id=?'); params.push(provider_id) }
+  if (model_name) { where.push('u.model_name=?'); params.push(model_name) }
+  if (api_key_id) { where.push('u.api_key_id=?'); params.push(api_key_id) }
+  if (range === 'today') { where.push("u.created_at >= date('now')"); }
+  else if (range === '7d') { where.push("u.created_at >= date('now','-7 days')"); }
+  else if (range === '30d') { where.push("u.created_at >= date('now','-30 days')"); }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : ''
-  return getDb().query(
-    `SELECT provider_id, model_name, api_key_id,
-            SUM(request_count) AS request_count,
-            SUM(input_tokens) AS input_tokens,
-            SUM(output_tokens) AS output_tokens,
-            SUM(cached_tokens) AS cached_tokens
-     FROM usage_stats ${w}
-     GROUP BY provider_id, model_name, api_key_id
+
+  const rows = await getDb().query(
+    `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
+            m.input_price, m.output_price, m.cache_hit_price,
+            SUM(u.request_count) AS request_count,
+            SUM(u.input_tokens) AS input_tokens,
+            SUM(u.output_tokens) AS output_tokens,
+            SUM(u.cached_tokens) AS cached_tokens
+     FROM usage_stats u
+     LEFT JOIN providers p ON u.provider_id = p.id
+     LEFT JOIN api_keys k ON u.api_key_id = k.id
+     LEFT JOIN models m ON u.provider_id = m.provider_id AND u.model_name = m.model_name
+     ${w}
+     GROUP BY u.provider_id, u.model_name, u.api_key_id
      ORDER BY request_count DESC`,
     params,
   )
+
+  // ponytail: aggregate totals from breakdown rows (avoids a second query).
+  let total_requests = 0, total_input_tokens = 0, total_output_tokens = 0, total_cached_tokens = 0
+  for (const r of rows) {
+    total_requests += r.request_count || 0
+    total_input_tokens += r.input_tokens || 0
+    total_output_tokens += r.output_tokens || 0
+    total_cached_tokens += r.cached_tokens || 0
+  }
+  return { total_requests, total_input_tokens, total_output_tokens, total_cached_tokens, breakdown: rows }
 }

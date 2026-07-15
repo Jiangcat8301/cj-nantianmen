@@ -38,23 +38,23 @@ const methodColor = (m) => ({
 const proxyEndpoints = [
   {
     method: 'POST', path: '/v1/chat/completions', desc: 'OpenAI Chat Completions 协议入站',
-    example: `curl http://127.0.0.1:7300/v1/chat/completions \\
+    example: `curl http://127.0.0.1:38271/v1/chat/completions \\
   -H "Authorization: Bearer skm-xxx" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}]}'`
   },
   {
     method: 'POST', path: '/v1/messages', desc: 'Anthropic Messages 协议入站',
-    example: `curl http://127.0.0.1:7300/v1/messages \\
+    example: `curl http://127.0.0.1:38271/v1/messages \\
   -H "x-api-key: skm-xxx" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"max_tokens":1024}'`
   },
   {
-    method: 'GET', path: '/v1/models', desc: '获取可用模型列表', example: `curl http://127.0.0.1:7300/v1/models -H "Authorization: Bearer skm-xxx"`
+    method: 'GET', path: '/v1/models', desc: '获取可用模型列表', example: `curl http://127.0.0.1:38271/v1/models -H "Authorization: Bearer skm-xxx"`
   },
   {
-    method: 'GET', path: '/v1/health', desc: 'Server 健康检查', example: `curl http://127.0.0.1:7300/v1/health`
+    method: 'GET', path: '/v1/health', desc: 'Server 健康检查', example: `curl http://127.0.0.1:38271/v1/health`
   },
 ]
 
@@ -70,5 +70,10 @@ const adminEndpoints = [
   { method: 'POST', path: '/api/admin/api-keys', desc: '生成新 API Key' },
   { method: 'DELETE', path: '/api/admin/api-keys/{id}', desc: '删除 API Key' },
   { method: 'GET', path: '/api/admin/stats', desc: '查询统计数据' },
+  { method: 'GET', path: '/api/admin/default-model', desc: '获取默认路由模型' },
+  { method: 'GET', path: '/api/admin/communication-log', desc: '查询通信日志（支持 ?provider_id=&model_name=&user_id= 过滤）' },
+  { method: 'DELETE', path: '/api/admin/communication-log', desc: '清空通信日志' },
+  { method: 'GET', path: '/api/admin/communication-log/config', desc: '获取日志开关状态' },
+  { method: 'PUT', path: '/api/admin/communication-log/config', desc: '设置日志开关 {log_enabled: true|false}' },
 ]
 </script>

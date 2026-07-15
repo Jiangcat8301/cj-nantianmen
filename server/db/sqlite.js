@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS models (
   model_name TEXT NOT NULL,
   is_default INTEGER NOT NULL DEFAULT 0,
   is_manual INTEGER NOT NULL DEFAULT 0,
+  deleted INTEGER NOT NULL DEFAULT 0,
+  input_price REAL NOT NULL DEFAULT 0,
+  output_price REAL NOT NULL DEFAULT 0,
+  cache_hit_price REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(provider_id, model_name)
 );
@@ -49,6 +53,10 @@ export class SqliteDatabase extends IDatabase {
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('foreign_keys = ON')
     this.db.exec(SCHEMA)
+    // ponytail: migrate existing DBs — add columns if missing (ignore "duplicate column" errors).
+    for (const col of ['deleted','input_price','output_price','cache_hit_price']) {
+      try { this.db.exec(`ALTER TABLE models ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`) } catch {}
+    }
   }
   // better-sqlite3 is sync; we expose async to match the interface.
   async query(sql, params = []) { return this.db.prepare(sql).all(...params) }

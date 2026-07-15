@@ -5,14 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased] — 2026-07-15
+## [v0.2.3] — 2026-07-15
+
+### Added
+
+- **Communication log**: `services/commlog.js` records raw input/output for every request (streaming responses end with `[stop]` marker), stored as JSON in `communication_log.json` (userData dir), capped at 1000 entries.
+  - Log routes: `GET /api/admin/communication-log` (filters: `?provider_id=&model_name=&user_id=`), `DELETE` to clear, `GET/PUT .../config` toggle (`log_enabled` in conf)
+  - Desktop: new "Comm Log" page (📝 in left nav), enable/clear/filter/inline detail expand
+  - CLI: `nantianmen log [ls|clear|enable|disable|config] [--provider ID] [--model NAME] [--user ID]`
+- **SSE protocol conversion**: `llmProxy.js` adds `anthropicSSEToOpenAI()` — when Agent uses OpenAI protocol but Provider is Anthropic, streaming responses are real-time converted from Anthropic SSE to OpenAI SSE format, fixing the `empty stream with no finish_reason` error.
+- **Desktop titlebar version**: `v0.2.3` displayed next to server status
+- **Tray daily stats**: tray context menu shows 📥📤💾💰 today's tokens + cost (15s polling)
+- **Tray i18n**: tray menu supports zh/en/ja, synced with Desktop language setting
+- **CLI feature parity**: `provider models/models-refresh/model-add/model-edit/default`, `stats --range=today|7d|30d`, `settings set --port=N`
+- **API Docs**: added log endpoint documentation
+
+### Changed
+
+- **Model name format**: `{name}_{protocol}_{model}` → `{name}_{model}` (protocol segment removed). In-memory routing and `/v1/models` output are consistent.
+- **Window state persistence**: migrated from standalone `window-state.json` to `nantianmen-conf.json` `window_state` field
+- **Desktop scrollbar**: global custom dark thin scrollbar (WebKit + Firefox)
+- **Desktop log list**: newest first, added "Cached" column, filter labels show "All Providers/All Users"
+- **Desktop protocol tag colors**: Provider list and Dashboard protocol tags — OpenAI blue, Anthropic orange
+- **Desktop model management**: price font size increased, default model description in Chinese, copy format updated
+- **Tray menu**: removed start/stop server options
 
 ### Fixed
 
-- **SSE streaming empty body**: `makeStreamingResponse` now uses `reply.raw.writeHead()` + `reply.raw.write()` to directly write the HTTP response stream, fixing Fastify serializing `Symbol.asyncIterator` objects as `{}` which caused `empty stream with no finish_reason` error.
-- **Default model not taking effect**: `resolveModel()` now uses `getDefaultEntry()` based on `models.is_default=1` instead of picking the first model from the map. `PUT .../default` now calls `await rebuildModelMap()` so the change takes effect in memory immediately.
-- **Model list disappearing after set-default**: `setDefault()` now calls `load()` before `fetchModels()`, preventing `load()` from overwriting the just-populated `models` array.
-- **Streaming stats lost**: SSE token parser skips `"usage":null` (providers that don't return usage in SSE) and always records `request_count` for successful streaming calls.
+- **SSE empty stream** (root cause fix): previous `reply.raw.writeHead/end` solved Fastify serialization but Anthropic SSE format was unparseable by OpenAI clients. v0.2.3 fully resolves via real-time protocol conversion.
+- **Tray start/stop state lag**: click handlers now call `buildTrayMenu()` immediately to refresh the menu
 
 ## [v0.2.0] - 2026-07-15
 
@@ -20,61 +41,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Architecture rewrite: Python → Node.js**. Server now uses Fastify + better-sqlite3; CLI is Node.js (Go removed); Desktop forks Node.js server (no longer spawns Python uvicorn).
 - **Default port 7300 → 38271**, listening on `0.0.0.0`.
-- **Storage format change**: removed `server/data/nantianmen.db` and `requirements.txt`. New `nantianmen-conf.json` lives next to the executable, holds `server_host`, `server_port`, `password`, `salt`, `database`.
-- **First-time setup required**. Only a server that has gone through `POST /api/admin/setup` activates DB-backed routes.
+- **Storage format change**: removed `server/data/nantianmen.db` and `requirements.txt`. New `nantianmen-conf.json` lives next to the executable.
+- **First-time auto-init**: server auto-creates default conf if missing (`password = md5(md5('admin') + salt)`).
 - **Provider name must not contain spaces or underscores** (unchanged from v0.1).
 
 ### Added
 
-- `nantianmen-conf.json`: single-file config + memory-resident; written by setup, not by CRUD. `process.stdin.unref()` shields server from Hermes/CI stdin-close.
-- Admin auth: header `Authorization: Bearer M` (`M = md5(RAWPASSWORD)`); server validates `md5(M + conf.salt)`.
-  - `POST /api/admin/setup` (only when uninitialized)
-  - `POST /api/admin/login`
-  - `POST /api/admin/password/change` (regenerates salt → old password immediately invalid)
-  - `POST /api/admin/database/configure`
-  - `GET/PUT /api/admin/settings`
-  - `POST /api/admin/server/{shutdown,restart}`
-- DB abstraction: `db/interface.js` + `db/sqlite.js` (better-sqlite3, WAL) + `db/mysql.js` (placeholder, throws).
-- Database backend chosen at first-time setup; later switch via `database/configure`.
-- In-memory model map (`services/modelMap.js`): O(1) resolve of `{name}_{protocol}_{model}`; entry holds endpoint + headers; zero DB reads on hot path.
-- Streaming proxy: Node fetch + async iterator; SSE pass-through.
-- Token stats: in-memory buffer + 10s batched INSERT; `/api/admin/stats` returns SUM aggregates.
+- `nantianmen-conf.json`: single-file config + memory-resident.
+- Admin auth: `Bearer M = md5(RAWPASSWORD)`, server validates `md5(M + conf.salt)`.
+- Password change: salt rotation, old password immediately invalid.
+- DB abstraction: SQLite3 (better-sqlite3, WAL) + MySQL placeholder.
+- In-memory model map: `{name}_{protocol}_{model}` O(1) resolve.
+- Streaming proxy: Node fetch + SSE pass-through.
+- Token stats: in-memory buffer + 10s batched INSERT.
+- Desktop: Electron + Vue3 + Vite + Tailwind + frameless titlebar + tray + splash screen.
+- CLI: subcommand system (setup/health/login/database/settings/password/provider/apikey/stats/restart/shutdown).
+- Unified user-data dir `cj-nantianmen/` across all three launchers.
+- `-c/-D` server CLI flags for custom paths.
 
-### CLI
+### Fixed
 
-New `nantianmen` binary:
-
-| Command | Purpose |
-| --- | --- |
-| `setup` | Interactive init (host/port/db/admin password ×2) |
-| `login` | Save admin password to `~/.nantianmen/config.json` |
-| `database` | Switch DB backend (SQLite3 / MySQL) |
-| `settings` | Read live server config |
-| `password` | Change admin password (old / new ×2) |
-| `provider {ls\|add\|rm}` | Provider CRUD |
-| `apikey {new\|ls\|rm}` | API key CRUD |
-| `stats` | Aggregated usage query |
-| `restart` / `shutdown` | Server process control |
-
-Global flags: `-H/--host`, `--port`, `-P/--password` (RAW → internally md5'd). Resolution order: `--flag > $ENV > ~/.nantianmen/config.json > error`.
-
-### Desktop
-
-- `electron/main.js` switched to `fork('./server/index.js')`; removed `getPythonPath`.
-- Port constant `SERVER_PORT = 38271`.
-- Setup wizard / data-storage UI in Desktop deferred to a later release; v0.2 ships a working Server + CLI; Desktop requires running `nantianmen setup` once.
-
-### Removed
-
-- `server/app/`, `server/.venv/`, `server/requirements.txt`, `cli/nantianmen.exe` (Go).
-
-### Tests
-
-- `server/test_setup.js`: 20/20 PASS (setup, restart, login, password change, salt rotation).
-- `tools/run-cli-e2e.js`: 10/10 PASS — password verified end-to-end:
-  - Wrong password → server returns 401
-  - After password change, old md5 + old salt fails
-  - New password + new salt works
+- SSE streaming empty body: `reply.raw.writeHead/write/end` replaces Fastify JSON serialization.
+- Default model routing: `resolveModel()` uses `getDefaultEntry()`.
+- Streaming stats lost on `usage:null`.
+- Model list disappearing after set-default: `load()`/`fetchModels()` order fixed.
+- Provider edit API key overwrite: `??` → `||`.
 
 ---
 
@@ -87,5 +78,5 @@ Global flags: `-H/--host`, `--port`, `-P/--password` (RAW → internally md5'd).
 - Desktop: Electron + Vue3 + Vite + Tailwind CSS skeleton
 - CLI: Go static binary skeleton
 - SQLite schema (providers / api_keys / models / usage_stats / settings)
-- Provider CRUD, user management, LLM proxy, protocol conversion, stats, PID lock
+- Provider CRUD, user management, LLM proxy, protocol conversion, stats
 - Cross-platform: Windows / Linux / macOS

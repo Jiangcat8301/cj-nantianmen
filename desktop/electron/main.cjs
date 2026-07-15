@@ -154,23 +154,30 @@ function createSplash() {
   splashWindow.show()
 }
 
-// ponytail: persist window bounds across restarts (and version upgrades — stored in userData).
-const winStateFile = path.join(app.getPath('userData'), 'window-state.json')
+// ponytail: persist window bounds via nantianmen-conf.json (shared with server).
+// Replaces window-state.json — same physical file, no race in practice.
+const confFile = path.join(app.getPath('userData'), 'nantianmen-conf.json')
+
+function readConf() {
+  try { if (fs.existsSync(confFile)) return JSON.parse(fs.readFileSync(confFile, 'utf-8')) } catch {}
+  return {}
+}
+
+function saveConf(patch) {
+  const c = readConf()
+  Object.assign(c, patch)
+  try { fs.writeFileSync(confFile, JSON.stringify(c, null, 2)) } catch {}
+}
 
 function saveWindowState() {
   if (!mainWindow) return
   const b = mainWindow.getBounds()
-  try { fs.writeFileSync(winStateFile, JSON.stringify({ x: b.x, y: b.y, width: b.width, height: b.height, isMaximized: mainWindow.isMaximized() })) } catch {}
+  saveConf({ window_state: { x: b.x, y: b.y, width: b.width, height: b.height, isMaximized: mainWindow.isMaximized() } })
 }
 
 function restoreWindowState() {
-  try {
-    if (fs.existsSync(winStateFile)) {
-      const s = JSON.parse(fs.readFileSync(winStateFile, 'utf-8'))
-      if (s && typeof s.width === 'number') return s
-    }
-  } catch {}
-  return null
+  const c = readConf()
+  return c.window_state || null
 }
 
 async function createWindow() {
@@ -265,25 +272,58 @@ app.whenReady().then(async () => {
 
   // ponytail: poll every 3s
   setInterval(updateTray, 3000)
+  setInterval(async () => { await fetchDailyStats(); buildTrayMenu() }, 15000)
   updateTray()
+  fetchDailyStats()
 
   tray.on('click', () => {
     if (mainWindow) {
       mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()
     }
   })
-  // ponytail: dynamic tray menu with start/stop
+  // ponytail: dynamic tray menu with start/stop + daily stats + i18n
   let serverOnline = false
+  let trayLang = 'zh'
+  const trayLabels = {
+    zh: { show: '显示窗口', hide: '隐藏窗口', start: '启动服务', stop: '停止服务', quit: '退出' },
+    en: { show: 'Show', hide: 'Hide', start: 'Start Server', stop: 'Stop Server', quit: 'Quit' },
+    ja: { show: '表示', hide: '隠す', start: '起動', stop: '停止', quit: '終了' },
+  }
+  ipcMain.handle('get-tray-lang', () => trayLang)
+  ipcMain.on('set-tray-lang', (_e, lang) => { trayLang = lang; buildTrayMenu() })
+  let dailyStats = { input: 0, output: 0, cached: 0, cost: 0 }
+  async function fetchDailyStats() {
+    try {
+      const s = await new Promise((resolve) => {
+        const req = http.get(`${SERVER_URL}/api/admin/stats?range=today`, (r) => {
+          let d = ''
+          r.on('data', (c) => d += c)
+          r.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve(null) } })
+        })
+        req.on('error', () => resolve(null))
+        req.setTimeout(3000, () => { req.destroy(); resolve(null) })
+      })
+      if (s) {
+        dailyStats = {
+          input: s.total_input_tokens || 0,
+          output: s.total_output_tokens || 0,
+          cached: s.total_cached_tokens || 0,
+          cost: s.breakdown?.reduce((sum, r) => sum + ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1e6, 0) || 0,
+        }
+      }
+    } catch {}
+  }
+  function fmtK(n) { return n >= 1000 ? (n/1000).toFixed(1) + 'k' : String(n) }
   function buildTrayMenu() {
+    const s = dailyStats
+    const L = trayLabels[trayLang] || trayLabels.zh
     const menu = [
-      { label: 'Show', click: () => mainWindow?.show() },
-      { label: 'Hide', click: () => mainWindow?.hide() },
+      { label: L.show, click: () => mainWindow?.show() },
+      { label: L.hide, click: () => mainWindow?.hide() },
       { type: 'separator' },
-      serverOnline
-        ? { label: '停止服务', click: () => { stopServer(); serverOnline = false } }
-        : { label: '启动服务', click: async () => { await startServer(); serverOnline = await checkServerHealth() } },
+      { label: `📥 ${fmtK(s.input)}  📤 ${fmtK(s.output)}  💾 ${fmtK(s.cached)}  💰 $${s.cost.toFixed(3)}`, enabled: false },
       { type: 'separator' },
-      { label: 'Quit', click: () => app.quit() },
+      { label: L.quit, click: () => app.quit() },
     ]
     tray.setContextMenu(Menu.buildFromTemplate(menu))
   }

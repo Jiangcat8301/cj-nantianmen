@@ -4,12 +4,12 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.2.0--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.3--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
-[![CLI](https://img.shields.io/badge/CLI-Node.js%20(no%20deps)-339933)]()
+[![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
 在中国神话中，**南天门**是天界与人间的唯一通道--众仙出入凡间，必经此门。
@@ -29,7 +29,7 @@
 任何 Agent（Hermes / OpenClaw / Codex / 脚本）都可通过 OpenAI 或 Anthropic 协议接入，
 由南天门将请求转发到已注册的 LLM Provider（OpenAI / Anthropic / 火山引擎 / 任何兼容服务）。
 
-当 Agent 使用的协议与 Provider 不一致时，南天门自动进行**协议转换**（4 条转换路径），
+当 Agent 使用的协议与 Provider 不一致时，南天门自动进行**协议转换**（请求体 + 流式 SSE 实时转换），
 响应以流式透传（SSE pipe-through）原样返回，不缓冲、不截断。
 
 两个管理入口：
@@ -37,9 +37,19 @@
 - **Admin API** (`/api/admin/*`) - Provider / API Key / Stats / 设置/认证/数据库切换，供 Desktop 和 CLI 调用
 - **LLM Proxy API** (`/v1/*`) - Agent 请求入口，兼容 OpenAI Chat Completions 与 Anthropic Messages
 
-**首次启动需 setup**：调用 `POST /api/admin/setup` 填入 host、port、数据库类型和管理员密码，server 才启用数据库路由并接受后续管理请求。
+**首次启动**：server 自动创建 `nantianmen-conf.json`（sqlite3 + 本机 host/port + 管理员密码自动设为 `admin`）。改密码走 `POST /api/admin/password/change`。
 
-## 架构（v0.2）
+**共享数据目录**：三端统一写到跨平台 user-data 子目录 `cj-nantianmen`：
+
+| OS | 路径 |
+|---|---|
+| Windows | `%APPDATA%\Roaming\cj-nantianmen\` |
+| macOS | `~/Library/Application Support/cj-nantianmen/` |
+| Linux | `~/.config/cj-nantianmen/` (XDG) |
+
+conf + db 文件在此目录。`-c/-D` 显式指定任意位置仍生效（dev 用法）。
+
+## 架构（v0.2.3）
 
 ```
 cj-nantianmen/
@@ -49,38 +59,41 @@ cj-nantianmen/
 │   ├── index.js          # 入口：监听 + register routes
 │   ├── db/               # Database 抽象层 + SQLite3 实现 + MySQL impl（占位）
 │   ├── routes/           # admin / llm / provider / apikey
-│   └── services/         # provider / modelMap / llmProxy / protocol / stats
+│   └── services/         # provider / modelMap / llmProxy / protocol / stats / commlog
 ├── desktop/        # Electron + Vue3 + Vite + Tailwind 桌面管理
-│   └── electron/main.js  # fork `server/index.js`（v0.2 无需 Python）
+│   └── electron/main.cjs # fork server/index.js（v0.2 无需 Python）
 ├── cli/            # 单文件 Node.js CLI（无第三方依赖）
 │   ├── index.js          # subcommand dispatch + 解析 -P/--password
 │   └── prompt.js         # TTY / piped stdin 两种模式
-└── build/          # 构建产物（不入 repo）
+└── releases/       # 构建产物（不入 repo）
 
-首次 setup 后会创建：
-nantianmen-conf.json          # server 同目录，host/port/password/salt/database
+首次启动会创建（跨平台 user-data 子目录 `cj-nantianmen/`，由 launcher 决定写入；可在 Desktop Settings 改路径）：
+nantianmen-conf.json          # host/port/password/salt/log_enabled/database/window_state
 nantianmen.db                 # SQLite 数据文件（默认）
+communication_log.json        # 通信日志（log_enabled=true 时写入）
 ~/.nantianmen/config.json     # CLI 客户端保存的 host/port/password_md5
 ```
 
 ### 三组件职责
 
-| 组件 | 语言 | 启动方式 |
-|------|------|---------|
-| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js` |
-| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` |
-| **cli** | Node.js (stdlib) | `cd cli && node index.js <command>` |
+| 组件 | 语言 | 启动方式 | conf+db 落点 |
+|------|------|---------|----------|
+| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js [-c conf -D db]` | user-data 子目录 `cj-nantianmen/`，无 flag 时 |
+| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` | 同上（Electron `app.getPath('userData')`） |
+| **cli** | Node.js (stdlib) + Bun compile | `cd cli && node index.js <command>` 或 `nantianmen-cli-*.exe` | 同上（探测 127.0.0.1:38271，未起则 fork） |
+
+**共同规则**：`nantianmen-conf.json` 与 `nantianmen.db` 永远落在跨平台 user-data 子目录 `cj-nantianmen/`，由 server 内 `defaultBaseDir()` 决定（Win %APPDATA%、macOS ~/Library/...、Linux XDG ~/.config）。`-c/-D` 显式传任意位置仍生效。
 
 ### 通信流程
 
 ```
-Agent ──(skm-xxx, Authorization: Bearer skm-xxx)──► Server
+Agent ──(skm-xxx, Authorization: Bearer *** Server
                                                           │
                                             ┌─────────────┴─────────────┐
                                             │ O(1) 内存模型 map          │
                                             │ md5(M+salt) admin auth     │
                                             │ OpenAI ⇄ Anthropic 协议转换 │
-                                            │ SSE 流式透传               │
+                                            │ SSE 流式转换 (Anthropic→OpenAI) │
                                             └─────────────┬─────────────┘
                                                           ▼
                                                   LLM Provider
@@ -103,16 +116,22 @@ CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
 | POST | `/api/admin/database/configure` | Bearer M | 切换 DB 后端（需 restart） |
 | GET/PUT | `/api/admin/settings` | Bearer M | 读/写 host + port |
 | GET/POST/PUT/DELETE | `/api/admin/providers` | Bearer M | Provider CRUD |
-| POST | `/api/admin/providers/:id/refresh-models` | Bearer M | 重新拉取 Provider 模型列表 |
+| PUT | `/api/admin/providers/:id/models/:mid/default` | Bearer M | 设置默认模型 |
+| PUT | `/api/admin/providers/:id/models/:mid` | Bearer M | 编辑模型定价 |
+| POST | `/api/admin/providers/:id/models/refresh` | Bearer M | 重新拉取 Provider 模型列表 |
 | POST | `/api/admin/providers/:id/models` | Bearer M | 手动添加 model 名称 |
-| GET/POST/PUT/DELETE | `/api/admin/api-keys` | Bearer M | API Key CRUD |
-| GET  | `/api/admin/stats` | Bearer M | 用量聚合（SUM） |
+| GET/POST/DELETE | `/api/admin/api-keys` | Bearer M | API Key CRUD |
+| GET  | `/api/admin/stats` | Bearer M | 用量聚合（支持 `?range=today\|7d\|30d`） |
+| GET  | `/api/admin/default-model` | Bearer M | 获取默认路由模型 |
+| GET  | `/api/admin/communication-log` | Bearer M | 查询通信日志（支持 `?provider_id=&model_name=&user_id=`） |
+| DELETE | `/api/admin/communication-log` | Bearer M | 清空通信日志 |
+| GET/PUT | `/api/admin/communication-log/config` | Bearer M | 日志开关 |
 | POST | `/api/admin/server/{shutdown,restart}` | Bearer M | 进程控制 |
 
 管理 API 除白名单外都要求：
 
 ```
-Authorization: Bearer M
+Authorization: Bearer ***
 其中 M = md5(RAWPASSWORD)，server 端校验 md5(M + conf.salt) == conf.password
 ```
 
@@ -121,31 +140,64 @@ Authorization: Bearer M
 | 方法 | 路径 | 鉴权 | 说明 |
 |------|------|------|------|
 | GET  | `/v1/health` | 公开 | 健康检查 + active_requests |
-| GET  | `/v1/models` | Bearer `skm-` | 模型列表（`{name}_{protocol}_{model}` 格式） |
+| GET  | `/v1/models` | Bearer `skm-` | 模型列表（`{name}_{model}` 格式） |
 | POST | `/v1/chat/completions` | Bearer `skm-` | OpenAI Chat Completions 入口 |
 | POST | `/v1/messages` | Bearer `skm-` | Anthropic Messages 入口 |
+
+> 当 Provider 协议与入站协议不一致时，流式响应实时转换格式（Anthropic SSE ↔ OpenAI SSE），无需 Agent 侧适配。
 
 ## CLI
 
 ```bash
-# 首次初始化（交互式）
+# 首次自动启动 server（如未运行），然后保存 host/port/db/admin password
 nantianmen setup
 
-# 健康检查
+# 健康检查（命令前探测；无 server 时 CLI 会自动 fork）
 nantianmen health
 nantianmen -H 127.0.0.1 --port 38271 health
 
 # 改密码（内部 md5 后传 server；old + new ×2）
 nantianmen -P 'oldpass' password
 
-# 管理
+# Provider 与模型管理
 nantianmen provider ls
 nantianmen provider add
+nantianmen provider models <pid>            # 列出模型（含定价）
+nantianmen provider models-refresh <pid>    # 从上游刷新
+nantianmen provider model-add <pid> <name>  # 手动添加
+nantianmen provider model-edit <pid> <mid> --input=0.1 --output=0.5 --cache=0.01
+nantianmen provider default <pid> <mid>     # 设为默认
+
+# API Key
 nantianmen apikey new
-nantianmen stats
+nantianmen apikey ls
+
+# 统计（支持 --range=today|7d|30d）
+nantianmen stats --range=today
+
+# 通信日志
+nantianmen log ls [--provider ID] [--model NAME] [--user ID]
+nantianmen log enable|disable|clear|config
+
+# 系统设置
+nantianmen settings          # 查看
+nantianmen settings set --port=8380  # 修改端口
 
 # 全局 flags 解析顺序：--flag > $NANTIANMEN_* > ~/.nantianmen/config.json > 报错
 ```
+
+**自动启动 server**：除 `help` / `quit` 外，每个子命令执行前先探测 `${HOST}:${PORT}/v1/health`。若未就绪，按 `--server-bin`（或 fallback 到 `../server/index.js`，或 `$NANTIANMEN_SERVER_BIN`）fork 一份子进程，detached 独立存在；CLI 退出不影响 server 寿命。
+
+## 命令行参数
+
+server 接受两个路径 flag：
+
+| Flag | 长名 | 作用 |
+|------|------|------|
+| `-c <path>` | `--config-path=<path>` | conf 文件路径（绝对或相对，相对以 server binary 目录为基准） |
+| `-D <path>` | `--database-path=<path>` | sqlite3 db 文件路径（同上） |
+
+不传：fallback 到跨平台 user-data 子目录 `cj-nantianmen/`（Win `%APPDATA%\Roaming\cj-nantianmen\`、macOS `~/Library/.../cj-nantianmen/`、Linux `~/.config/cj-nantianmen/`）。三端统一，CLI/Desktop/server 默认共享同一份数据。
 
 ## 快速开始
 
@@ -154,25 +206,20 @@ nantianmen stats
 ```bash
 cd server
 npm install
-node index.js
-# 首次启动：仅监听 /v1/health 与 /api/admin/status
-# 通过 CLI 完成 setup（推荐）：
-cd ../cli && node index.js setup
-# 或手动 curl：
-curl -X POST http://127.0.0.1:38271/api/admin/setup \
-  -H 'Content-Type: application/json' \
-  -d '{"host":"0.0.0.0","port":38271,"password_md5":"<md5(管理员密码)>","database":{"type":"sqlite3","path":"./nantianmen.db"}}'
+node index.js [-c conf -D db]    # 默认：conf+db 在 user-data/cj-nantianmen/
+# 启动后监听 http://127.0.0.1:38271，路由全部可用
 ```
-
-Server 默认监听 `http://0.0.0.0:38271`。
 
 ### CLI
 
 ```bash
 cd cli
-node index.js setup           # 写入 host/port/db/admin password
-node index.js health          # 验证 server 状态
+node index.js setup           # 无 server 时自动启动一份；写入 host/port/db/admin password
+node index.js health          # 探测 server（未运行则 fork）
 node index.js provider ls     # 列 provider
+
+# 或使用编译好的 exe
+nantianmen-cli-0.2.3-win-x64.exe setup
 ```
 
 ### Desktop
@@ -180,8 +227,9 @@ node index.js provider ls     # 列 provider
 ```bash
 cd desktop
 npm install
-npm run electron:dev
-# 首次启动 fork server/index.js 并打开管理界面
+npm run electron:dev          # dev：fork ../server，conf+db 写到 user-data/cj-nantianmen/
+npm run electron:build        # 出包到 ../releases/nantianmen-0.2.3-win-x64.exe
+# 双击 Nantianmen.exe，conf+db 落到 %APPDATA%\Roaming\cj-nantianmen\（持久）
 ```
 
 ## 技术栈
@@ -190,7 +238,7 @@ npm run electron:dev
 |----|------|
 | 后端 | Node.js 22+ / Fastify 4 / better-sqlite3 / Node fetch |
 | 前端 | Electron / Vue 3 / Vite / Tailwind CSS |
-| CLI | Node.js (stdlib only) |
+| CLI | Node.js (stdlib) + Bun compile 出 exe |
 | 数据库 | SQLite3 (WAL，better-sqlite3 同步 binding) |
 | 配置 | 单文件 JSON，常驻内存 |
 
@@ -205,7 +253,7 @@ npm run electron:dev
 
 - Provider 名称不允许包含**空格**
 - Provider 名称不允许包含**下划线 `_`**
-- 模型名可包含下划线。模型 ID 格式 `{provider}_{protocol}_{model}`，前两个 `_` 切分（`split('_', 2)` 不足以切三分 -- 前两个 `_` 作 boundary，modelname 可含下划线）。
+- 模型名可包含下划线。模型 ID 格式 `{provider}_{model}`。
 - 端点：OpenAI base_url 末尾含 `/v1`，Anthropic base_url 不含 `/v1`。
 
 ## 测试
@@ -217,13 +265,6 @@ cd server && node test_setup.js
 # CLI 端到端测试（10 步全过，包含 password 全链路验证）
 cd ../tools && node run-cli-e2e.js
 ```
-
-CLI e2e 实测覆盖：
-
-- wrong password 被服务端 401 拒绝
-- 修改密码后旧 md5 + 旧 salt 哈希失效
-- 新 password 在新 salt 下生效
-- 重启后 auth 持久化到 `nantianmen-conf.json`
 
 ## 兼容性
 

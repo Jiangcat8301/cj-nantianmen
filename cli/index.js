@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fork, spawn } from 'node:child_process'
 import { prompt, askSecret } from './prompt.js'
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
@@ -27,6 +28,54 @@ function flagValue(argv, ...names) {
     }
   }
   return null
+}
+
+// ponytail: probe server health; if down, fork it with -c/-D pointing at the server
+// binary's directory (NOT the launcher's dir) — conf+db must live next to server.
+const HEALTH_TIMEOUT_MS = 1500
+async function probeHealth(host, port) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), HEALTH_TIMEOUT_MS)
+    fetch(`http://${host}:${port}/v1/health`).then((r) => {
+      clearTimeout(timer)
+      resolve(r.ok)
+    }).catch(() => { clearTimeout(timer); resolve(false) })
+  })
+}
+
+function resolveServerEntry() {
+  const envOverride = process.env.NANTIANMEN_SERVER_BIN
+  if (envOverride) return envOverride
+  const flagBin = flagValue(process.argv, '--server-bin')
+  if (flagBin) return flagBin
+  // ponytail: dev fallback — ../server/index.js relative to this CLI script.
+  const cliDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ''))
+  const devEntry = path.join(cliDir, '..', 'server', 'index.js')
+  if (fs.existsSync(devEntry)) return devEntry
+  console.error('✗ no server entry found. Pass --server-bin /path/to/server/index.js or set $NANTIANMEN_SERVER_BIN')
+  process.exit(1)
+}
+
+// ponytail: spawn server if not already running. conf+db land in the shared appData
+// dir (server's defaultBaseDir handles platform-specific path) — same as desktop.
+// Don't override with launcher-local paths; the three launchers must share state.
+async function ensureServer(args) {
+  if (await probeHealth(args.host, args.port)) return 'already-up'
+  const serverEntry = resolveServerEntry()
+  console.error(`(launching server from ${serverEntry})`)
+  const nodeBin = process.platform === 'win32' ? 'node.exe' : 'node'
+  const child = spawn(nodeBin, [serverEntry], {  // no -c/-D: server uses its appData default
+    detached: true,
+    stdio: 'ignore',
+    env: { ...process.env, NANTIANMEN_LOCAL_MODE: process.env.NANTIANMEN_LOCAL_MODE || '' },
+  })
+  child.unref()
+  for (let i = 0; i < 30; i++) {
+    if (await probeHealth(args.host, args.port)) return 'launched'
+    await new Promise(r => setTimeout(r, 200))
+  }
+  console.error('✗ failed to start server within 6s')
+  process.exit(1)
 }
 
 export function resolveArgs() {
@@ -143,6 +192,17 @@ async function cmdDatabase() {
 }
 
 async function cmdSettings() {
+  const args = process.argv.slice(3)
+  if (args[0] === 'set') {
+    const pi = args.indexOf('--port')
+    const port = pi !== -1 ? Number(args[pi+1]) : undefined
+    const hi = args.indexOf('--host')
+    const host = hi !== -1 ? args[hi+1] : undefined
+    if (!port && !host) { console.error('usage: nantianmen settings set --port=N [--host=H]'); process.exit(1) }
+    const r = await call('PUT', '/api/admin/settings', { ...(host ? { host } : {}), ...(port ? { port } : {}) })
+    console.log(r.status === 200 ? `✓ updated${r.data.restart_required ? ' (restart required)' : ''}` : `✗ ${r.status}`)
+    return
+  }
   const r = await call('GET', '/api/admin/settings')
   console.log(JSON.stringify(r.data, null, 2))
 }
@@ -191,7 +251,46 @@ async function cmdProviders() {
     console.log(r.status === 200 ? '✓ removed' : `✗ ${r.status} ${JSON.stringify(r.data)}`)
     process.exit(r.status === 200 ? 0 : 1)
   }
-  console.error('usage: nantianmen provider [ls|add|rm]')
+  // ponytail: model subcommands
+  if (sub === 'models' || sub === 'model-ls') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const r = await call('GET', `/api/admin/providers/${pid}/models`)
+    if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
+    for (const m of r.data) console.log(`${m.id}\t${m.model_name}\t${m.is_default ? '★default' : ''}\t${m.is_manual ? 'manual' : ''}\t${m.deleted ? 'DELETED' : ''}\tin:¥${m.input_price||0}\tout:¥${m.output_price||0}\tcache:¥${m.cache_hit_price||0}`)
+    return
+  }
+  if (sub === 'models-refresh') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const r = await call('POST', `/api/admin/providers/${pid}/models/refresh`)
+    console.log(r.status === 200 ? `✓ ${r.data.models?.length ?? 0} models` : `✗ ${r.status}`)
+    return
+  }
+  if (sub === 'model-add') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const name = args[2] || await prompt('Model name: ')
+    const r = await call('POST', `/api/admin/providers/${pid}/models`, { model_name: name })
+    console.log(r.status === 200 ? `✓ added id=${r.data.id}` : `✗ ${r.status}`)
+    return
+  }
+  if (sub === 'model-edit') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const mid = args[2] || await prompt('Model id: ')
+    // ponytail: parse --input/--output/--cache flags from remaining args
+    const flag = (name) => { const i = args.indexOf(name); return i !== -1 ? Number(args[i+1]) : undefined }
+    const r = await call('PUT', `/api/admin/providers/${pid}/models/${mid}`, {
+      input_price: flag('--input'), output_price: flag('--output'), cache_hit_price: flag('--cache'),
+    })
+    console.log(r.status === 200 ? `✓ updated` : `✗ ${r.status}`)
+    return
+  }
+  if (sub === 'default') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const mid = args[2] || await prompt('Model id: ')
+    const r = await call('PUT', `/api/admin/providers/${pid}/models/${mid}/default`)
+    console.log(r.status === 200 ? '✓ set as default' : `✗ ${r.status}`)
+    return
+  }
+  console.error('usage: nantianmen provider [ls|add|rm|models|models-refresh|model-add|model-edit|default]')
 }
 
 async function cmdApikeys() {
@@ -221,16 +320,62 @@ async function cmdApikeys() {
 }
 
 async function cmdStats() {
-  const r = await call('GET', '/api/admin/stats')
+  // ponytail: support --range=today|7d|30d flag
+  const args = process.argv.slice(3)
+  const ri = args.indexOf('--range')
+  const range = ri !== -1 ? args[ri+1] : ''
+  const qs = range ? `?range=${range}` : ''
+  const r = await call('GET', '/api/admin/stats' + qs)
   if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
-  if (r.data.length === 0) { console.log('(no stats yet)'); return }
-  console.log('provider_id\tmodel\tapi_key_id\treqs\tin\tout\tcached')
-  for (const s of r.data) {
-    console.log(`${s.provider_id}\t${s.model_name}\t${s.api_key_id}\t${s.request_count}\t${s.input_tokens}\t${s.output_tokens}\t${s.cached_tokens}`)
+  const d = r.data
+  console.log(`total: ${d.total_requests||0} reqs  in:${d.total_input_tokens||0}  out:${d.total_output_tokens||0}  cached:${d.total_cached_tokens||0}`)
+  if (!d.breakdown || d.breakdown.length === 0) { console.log('(no breakdown)'); return }
+  for (const s of d.breakdown) {
+    const cost = ((s.input_tokens||0)*(s.input_price||0) + (s.output_tokens||0)*(s.output_price||0) + (s.cached_tokens||0)*(s.cache_hit_price||0)) / 1e6
+    console.log(`${s.provider||'-'}\t${s.model_name}\t${s.key_name||s.api_key_id}\treqs:${s.request_count}\tin:${s.input_tokens}\tout:${s.output_tokens}\tcached:${s.cached_tokens}\tcost:$${cost.toFixed(4)}`)
   }
 }
 
 async function cmdQuit() { /* ponytail: alias exit, in case user types quit */ }
+
+async function cmdLog() {
+  const args = process.argv.slice(3)
+  const sub = args[0]
+  if (sub === 'ls' || !sub) {
+    const params = {}
+    if (args[1]) {
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--provider' && args[i+1]) params.provider_id = args[++i]
+        else if (args[i] === '--model' && args[i+1]) params.model_name = args[++i]
+        else if (args[i] === '--user' && args[i+1]) params.user_id = args[++i]
+      }
+    }
+    const qs = Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&')
+    const r = await call('GET', '/api/admin/communication-log' + (qs ? '?' + qs : ''))
+    if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
+    if (!Array.isArray(r.data) || r.data.length === 0) { console.log('(no log entries)'); return }
+    for (const l of r.data) {
+      console.log(`${l.time}\\t${l.user_name||l.user_id}\\t${l.provider_name}\\t${l.model_name}\\tin:${l.tokens_input}\\tout:${l.tokens_output}\\tcached:${l.tokens_cached}\\t${l.error ? '✕'+l.error.code : '✓'}`)
+    }
+    return
+  }
+  if (sub === 'clear') {
+    const r = await call('DELETE', '/api/admin/communication-log')
+    console.log(r.status === 200 ? '✓ cleared' : '✗ ' + r.status)
+    return
+  }
+  if (sub === 'enable' || sub === 'disable') {
+    const r = await call('PUT', '/api/admin/communication-log/config', { log_enabled: sub === 'enable' })
+    console.log(r.status === 200 ? `✓ log ${sub}d` : '✗ ' + r.status)
+    return
+  }
+  if (sub === 'config') {
+    const r = await call('GET', '/api/admin/communication-log/config')
+    console.log(`log_enabled: ${r.data?.log_enabled ?? false}`)
+    return
+  }
+  console.error('usage: nantianmen log [ls|clear|enable|disable|config] [--provider ID] [--model NAME] [--user ID]')
+}
 
 const CMDS = {
   setup: cmdSetup, health: cmdHealth, status: cmdStatus, login: cmdLogin,
@@ -239,22 +384,22 @@ const CMDS = {
   provider: cmdProviders, providers: cmdProviders,
   apikey: cmdApikeys, apikeys: cmdApikeys,
   stats: cmdStats,
+  log: cmdLog,
   quit: cmdQuit,
   help: () => console.log('commands:\n  ' + Object.keys(CMDS).filter(k => !['quit','help'].includes(k)).join('\n  ')),
 }
 
-// ponytail: global flags (-H, --host, --port, -P, --password) may appear before
-// or interspersed with the subcommand. `command.subcommand` style. Walk argv
-// collecting recognized flags, then take the first unrecognized token as the
-// subcommand.
-const GLOBAL_FLAGS = new Set(['-H', '--host', '--port', '-P', '--password'])
+// ponytail: global flags (-H, --host, --port, -P, --password, --server-bin) may appear
+// before or interspersed with the subcommand. `command.subcommand` style. Walk argv
+// collecting recognized flags, then take the first unrecognized token as the subcommand.
+const GLOBAL_FLAGS = new Set(['-H', '--host', '--port', '-P', '--password', '--server-bin'])
 function findSubcommand() {
   const argv = process.argv.slice(2)
   let i = 0
   while (i < argv.length) {
     const a = argv[i]
     if (GLOBAL_FLAGS.has(a)) { i += 2; continue }
-    if (a.startsWith('--host=') || a.startsWith('--port=') || a.startsWith('--password=')) { i++; continue }
+    if (a.startsWith('--host=') || a.startsWith('--port=') || a.startsWith('--password=') || a.startsWith('--server-bin=')) { i++; continue }
     if (a === '-H' || a === '-P') { i += 2; continue }
     return a
   }
@@ -264,4 +409,15 @@ function findSubcommand() {
 const sub = findSubcommand()
 const fn = CMDS[sub]
 if (!fn) { console.error('unknown command:', sub); process.exit(1) }
-fn().catch(e => { console.error(e); process.exit(1) })
+
+// ponytail: every command needs the server reachable. Probe first, launch if down,
+// then dispatch. setup/login/health are tolerated even if server is unreachable
+// (those help you get the server up in the first place).
+const SERVERLESS = new Set(['help', 'quit'])
+;(async () => {
+  const args = resolveArgs()
+  if (!SERVERLESS.has(sub)) {
+    await ensureServer(args)
+  }
+  fn().catch(e => { console.error(e); process.exit(1) })
+})()

@@ -3,8 +3,8 @@
     <div class="flex justify-between items-center mb-6">
       <div>
         <h2 class="text-xl font-bold">{{ t('models') }}</h2>
-        <p class="text-xs text-gray-500 mt-1">默认模型: <code class="text-emerald-400">auto</code> 或 <code class="text-emerald-400">Nantianmen-default</code>
-          <button @click="navigator.clipboard?.writeText('Nantianmen-default')" class="text-gray-600 hover:text-emerald-400 ml-1">📋</button>
+        <p class="text-xs text-gray-500 mt-1">
+          所有 provider 中首个设为 ★ 默认的模型将作为 <code class="text-emerald-400">Nantianmen-default</code> 路由。若未设置，取第一个可用模型。
         </p>
       </div>
       <button @click="showAdd = true" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition">
@@ -20,7 +20,9 @@
             <span class="w-2.5 h-2.5 rounded-full" :class="p.health_status === 'ok' ? 'bg-emerald-500' : 'bg-red-500'"></span>
             <div>
               <span class="font-medium">{{ p.name }}</span>
-              <span class="ml-2 text-xs text-gray-500">{{ p.protocol }} · {{ p.base_url }}</span>
+              <span class="ml-2 px-1.5 py-0.5 text-xs rounded font-mono"
+                :class="p.protocol === 'openai' ? 'bg-blue-500/20 text-blue-300' : 'bg-orange-500/20 text-orange-300'">{{ p.protocol }}</span>
+              <span class="ml-2 text-xs text-gray-500">{{ p.base_url }}</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -42,9 +44,9 @@
               <div class="flex items-center gap-2">
                 <span>{{ m.model_name }}</span>
                 <span v-if="m.deleted" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
-                <button @click="copyModelId(p.name, p.protocol, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs" :title="t('copy')">📋</button>
+                <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs" :title="t('copy')">📋</button>
                 <button @click="openEditModel(p.id, m)" class="text-gray-600 hover:text-amber-400 text-xs" :title="t('edit_model')">💰</button>
-                <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-[10px] text-gray-500">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
+                <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-xs text-gray-400">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <span v-if="m.is_default" class="text-xs text-emerald-400">{{ t('default_badge') }}</span>
@@ -166,7 +168,6 @@ const refreshModels = async (id) => {
   }
 }
 
-// ponytail: prompt() doesn't work in Electron contextIsolation. Use modal instead.
 const openAddModel = (providerId) => {
   modelForm.value = { providerId, model_name: '' }
   showAddModel.value = true
@@ -194,7 +195,6 @@ const checkHealth = async (id) => {
   }
 }
 
-// ponytail: after setDefault, load() first, then re-fetch models so the list stays visible
 const setDefault = async (providerId, modelId) => {
   try {
     await api.setDefaultModel(providerId, modelId)
@@ -253,7 +253,7 @@ const saveEditModel = async () => {
   }
 }
 
-const copyModelId = (providerName, protocol, modelName) => {
-  navigator.clipboard?.writeText(`${providerName}_${protocol}_${modelName}`)
+const copyModelId = (providerName, modelName) => {
+  navigator.clipboard?.writeText(`${providerName}_${modelName}`)
 }
 </script>

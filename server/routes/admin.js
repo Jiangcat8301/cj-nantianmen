@@ -1,7 +1,10 @@
 import crypto from 'node:crypto'
-import { getConf, updateConf, randomSalt } from '../conf.js'
+import fs from 'node:fs'
+import path from 'node:path'
+import { getConfDir, getConf, updateConf, randomSalt } from '../conf.js'
 import { getDb, initDb, closeDb } from '../db/index.js'
 import { rebuildModelMap } from '../services/modelMap.js'
+import * as commlog from '../services/commlog.js'
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
 
@@ -11,7 +14,12 @@ const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
 export default async function adminRoutes(fastify) {
   fastify.get('/api/admin/status', async () => {
     const conf = getConf()
-    return { initialized: !!conf.initialized, host: conf.server_host, port: conf.server_port }
+    return {
+      initialized: !!conf.initialized,
+      host: conf.server_host,
+      port: conf.server_port,
+      database: conf.initialized ? conf.database : undefined,
+    }
   })
 
   fastify.post('/api/admin/setup', async (req, reply) => {
@@ -70,6 +78,54 @@ export default async function adminRoutes(fastify) {
     return { ok: true, restart_required: true }
   })
 
+  // ponytail: resolve user-supplied path against conf dir if relative,
+  // so "./foo.db" means "next to nantianmen-conf.json".
+  // Bare filenames without "./" are also treated as relative.
+  function resolveDbPath(raw) {
+    if (!raw) return raw
+    if (path.isAbsolute(raw)) return raw
+    return path.resolve(getConfDir(), raw)
+  }
+
+  fastify.post('/api/admin/database/move', async (req, reply) => {
+    // ponytail: change DB file path and physically move the file.
+    // Closes current DB, copies old file to new location, updates conf.
+    // Caller triggers server restart to pick up the new DB.
+    const conf = getConf()
+    if (!conf.initialized) return reply.code(503).send({ error: 'not initialized' })
+    if (conf.database?.type !== 'sqlite3') return reply.code(400).send({ error: 'only sqlite3 move supported' })
+    const { path: rawPath } = req.body || {}
+    if (!rawPath || typeof rawPath !== 'string') return reply.code(400).send({ error: 'path required' })
+
+    const oldAbs = conf.database.path
+    const newAbs = resolveDbPath(rawPath)
+    if (newAbs === oldAbs) return { ok: true, changed: false, path: newAbs }
+
+    // ponytail: sanity checks before we touch files
+    if (fs.existsSync(newAbs)) return reply.code(409).send({ error: 'target file already exists' })
+    const newDir = path.dirname(newAbs)
+    try { fs.mkdirSync(newDir, { recursive: true }) } catch (e) {
+      return reply.code(400).send({ error: `cannot create dir: ${e.message}` })
+    }
+
+    // ponytail: close current handle, move file + WAL/SHM sidecars.
+    // Use copy+unlink (works across drives on Windows); rename would EXDEV cross-drive.
+    try { await closeDb() } catch {}
+    try {
+      for (const suffix of ['', '-shm', '-wal']) {
+        const src = oldAbs + suffix
+        if (!fs.existsSync(src)) continue
+        fs.copyFileSync(src, newAbs + suffix)
+        fs.unlinkSync(src)
+      }
+    } catch (e) {
+      return reply.code(500).send({ error: `move failed: ${e.message}` })
+    }
+
+    updateConf({ database: { ...conf.database, path: newAbs } })
+    return { ok: true, changed: true, old_path: oldAbs, path: newAbs, restart_required: true }
+  })
+
   fastify.get('/api/admin/settings', async () => {
     const conf = getConf()
     return {
@@ -97,5 +153,25 @@ export default async function adminRoutes(fastify) {
     reply.send({ ok: true })
     // parent (CLI/desktop) should respawn from outside; server just exits
     setTimeout(() => process.exit(0), 100)
+  })
+
+  // ponytail: communication log — GET with filters, DELETE to clear, PUT to toggle
+  fastify.get('/api/admin/communication-log', async (req) => {
+    return commlog.list(req.query || {})
+  })
+
+  fastify.delete('/api/admin/communication-log', async () => {
+    commlog.clear()
+    return { ok: true }
+  })
+
+  fastify.get('/api/admin/communication-log/config', async () => {
+    return { log_enabled: getConf().log_enabled || false }
+  })
+
+  fastify.put('/api/admin/communication-log/config', async (req) => {
+    const { log_enabled } = req.body || {}
+    updateConf({ log_enabled: !!log_enabled })
+    return { log_enabled: getConf().log_enabled }
   })
 }

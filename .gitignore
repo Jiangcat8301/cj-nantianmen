@@ -7,6 +7,10 @@ cli/node_modules/
 build/
 desktop/dist/
 desktop/build/
+desktop/release/
+desktop/releases/
+releases/
+temp/
 *.exe
 *.dll
 *.app
