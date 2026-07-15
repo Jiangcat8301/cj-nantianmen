@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# ponytail: caller for the staged-shape check. Kept thin so editors and CI
-# can call tools/pre-commit-check.sh directly without a `bash` shell.
-exec bash "$(dirname "$0")/../tools/pre-commit-check.sh"
