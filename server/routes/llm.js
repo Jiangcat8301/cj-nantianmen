@@ -26,22 +26,23 @@ export default async function llmRoutes(fastify) {
 
   fastify.get('/v1/models', async () => {
     const map = getModelMap()
-    const data = Object.entries(map).map(([id, entry]) => ({
+    const data = [{ id: 'Nantianmen-default', object: 'model', created: 0, owned_by: 'Nantianmen' }]
+    data.push(...Object.entries(map).map(([id, entry]) => ({
       id, object: 'model', created: 0, owned_by: entry.provider.name,
-    }))
+    })))
     return { object: 'list', data }
   })
 
   fastify.post('/v1/chat/completions', async (req, reply) => {
     await authApiKey(req, reply)
     if (reply.sent) return
-    return proxyRequest(req.body, 'openai', req.apiKeyId)
+    return proxyRequest(req.body, 'openai', req.apiKeyId, reply)
   })
 
   fastify.post('/v1/messages', async (req, reply) => {
     await authApiKey(req, reply)
     if (reply.sent) return
-    return proxyRequest(req.body, 'anthropic', req.apiKeyId)
+    return proxyRequest(req.body, 'anthropic', req.apiKeyId, reply)
   })
 
   fastify.get('/api/admin/stats', async (req) => {
