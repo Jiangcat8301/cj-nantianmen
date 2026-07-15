@@ -1,8 +1,7 @@
 # Dependencies
-server/.venv/
-server/venv/
+server/node_modules/
 desktop/node_modules/
-cli/vendor/
+cli/node_modules/
 
 # Build output
 build/
@@ -15,16 +14,12 @@ desktop/build/
 # Demo (not synced to repo)
 demo/
 
-# Python
+# Python (legacy v0.1 only; v0.2 is Node.js)
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
 .pytest_cache/
-
-# Go
-cli/nantianmen
-cli/nantianmen.exe
 
 # IDE
 .vscode/

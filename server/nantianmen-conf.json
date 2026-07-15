@@ -1,0 +1,11 @@
+{
+  "initialized": true,
+  "server_host": "0.0.0.0",
+  "server_port": 38271,
+  "password": "cca6538f413e775c19bb2d91532c4b58",
+  "salt": "W3Ikbc",
+  "database": {
+    "type": "sqlite3",
+    "path": "./nantianmen.db"
+  }
+}

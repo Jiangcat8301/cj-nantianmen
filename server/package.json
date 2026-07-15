@@ -1,0 +1,14 @@
+{
+  "name": "nantianmen-server",
+  "version": "0.2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test_setup.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.0",
+    "better-sqlite3": "^11.3.0"
+  }
+}

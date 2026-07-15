@@ -1,13 +1,13 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
-const { spawn: spawnChild } = require('child_process')
+const { fork } = require('child_process')
 const http = require('http')
 const fs = require('fs')
 
 let mainWindow
 let tray = null
 let serverProcess = null
-const SERVER_PORT = 7300
+const SERVER_PORT = 38271
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`
 
 function getIcon() {
@@ -26,19 +26,10 @@ function getServerPath() {
   return fs.existsSync(devPath) ? devPath : prodPath
 }
 
-function getPythonPath() {
-  // ponytail: find python. Check venv first, then system python.
-  const serverPath = getServerPath()
-  const venvPython = path.join(serverPath, '.venv', 'Scripts', 'python.exe')
-  if (fs.existsSync(venvPython)) return venvPython
-  const venvPythonUnix = path.join(serverPath, '.venv', 'bin', 'python')
-  if (fs.existsSync(venvPythonUnix)) return venvPythonUnix
-  return 'python3'
-}
-
 async function checkServerHealth() {
   return new Promise((resolve) => {
     const req = http.get(`${SERVER_URL}/v1/health`, (res) => {
+      res.resume()
       resolve(res.statusCode === 200)
     })
     req.on('error', () => resolve(false))
@@ -47,25 +38,24 @@ async function checkServerHealth() {
 }
 
 async function startServer() {
-  // Check if server already running (PID lock on server side handles this too)
   if (await checkServerHealth()) {
     console.log('Server already running')
     return
   }
 
+  // ponytail: v0.2 — spawn Node.js server directly instead of Python uvicorn.
+  // Bundled node_modules + index.js together with electron-builder extraResources.
   const serverPath = getServerPath()
-  const pythonPath = getPythonPath()
-
-  serverProcess = spawnChild(pythonPath, ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', String(SERVER_PORT)], {
+  serverProcess = fork(path.join(serverPath, 'index.js'), [], {
     cwd: serverPath,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, ELECTRON_HOST: '1' },
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   })
 
   serverProcess.stdout?.on('data', (d) => console.log(`[server] ${d}`))
   serverProcess.stderr?.on('data', (d) => console.error(`[server] ${d}`))
   serverProcess.on('exit', (code) => console.log(`[server] exited with ${code}`))
 
-  // Wait for server to be ready
   for (let i = 0; i < 30; i++) {
     if (await checkServerHealth()) {
       console.log('Server started successfully')
