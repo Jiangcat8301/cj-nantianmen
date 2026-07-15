@@ -4,11 +4,12 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.1.0--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.0--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![Backend](https://img.shields.io/badge/backend-Python%203.11%20%2B%20FastAPI-3776AB)]()
+[![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
+[![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
-[![CLI](https://img.shields.io/badge/CLI-Go%201.21%2B%20(static)-00ADD8)]()
+[![CLI](https://img.shields.io/badge/CLI-Node.js%20(no%20deps)-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
 在中国神话中，**南天门**是天界与人间的唯一通道--众仙出入凡间，必经此门。
@@ -31,74 +32,120 @@
 当 Agent 使用的协议与 Provider 不一致时，南天门自动进行**协议转换**（4 条转换路径），
 响应以流式透传（SSE pipe-through）原样返回，不缓冲、不截断。
 
-平台提供两种管理入口：
+两个管理入口：
 
-- **Admin API** (`/api/admin/*`) - Provider / API Key / Stats 的 CRUD，供 Desktop 和 CLI 调用
+- **Admin API** (`/api/admin/*`) - Provider / API Key / Stats / 设置/认证/数据库切换，供 Desktop 和 CLI 调用
 - **LLM Proxy API** (`/v1/*`) - Agent 请求入口，兼容 OpenAI Chat Completions 与 Anthropic Messages
 
-## 架构
+**首次启动需 setup**：调用 `POST /api/admin/setup` 填入 host、port、数据库类型和管理员密码，server 才启用数据库路由并接受后续管理请求。
+
+## 架构（v0.2）
 
 ```
 cj-nantianmen/
-├── server/       # Python FastAPI 后端，可独立运行
-│   └── app/
-│       ├── api/       # 路由：admin API + LLM 代理
-│       ├── core/      # 配置、安全、PID 锁
-│       ├── db/        # SQLite 初始化 + WAL
-│       ├── models/    # Pydantic schema
-│       └── services/  # Provider 管理、协议转换、统计
-├── desktop/      # Electron + Vue3 + Vite + Tailwind CSS 桌面管理界面
-│   └── src/
-│       ├── components/
-│       ├── views/
-│       └── lib/
-├── cli/          # Go 静态编译 CLI，功能与 UI 对等
-│   └── cmd/
-└── build/        # 构建产物（不入 repo）
+├── server/         # Node.js Fastify 后端，可独立运行；与 desktop 共享一个进程
+│   ├── conf.js           # nantianmen-conf.json 单点配置 + 内存常驻
+│   ├── auth.js           # Bearer M 校验（md5(md5(pwd) + salt)）
+│   ├── index.js          # 入口：监听 + register routes
+│   ├── db/               # Database 抽象层 + SQLite3 实现 + MySQL impl（占位）
+│   ├── routes/           # admin / llm / provider / apikey
+│   └── services/         # provider / modelMap / llmProxy / protocol / stats
+├── desktop/        # Electron + Vue3 + Vite + Tailwind 桌面管理
+│   └── electron/main.js  # fork `server/index.js`（v0.2 无需 Python）
+├── cli/            # 单文件 Node.js CLI（无第三方依赖）
+│   ├── index.js          # subcommand dispatch + 解析 -P/--password
+│   └── prompt.js         # TTY / piped stdin 两种模式
+└── build/          # 构建产物（不入 repo）
+
+首次 setup 后会创建：
+nantianmen-conf.json          # server 同目录，host/port/password/salt/database
+nantianmen.db                 # SQLite 数据文件（默认）
+~/.nantianmen/config.json     # CLI 客户端保存的 host/port/password_md5
 ```
 
 ### 三组件职责
 
-| 组件 | 语言 | 职责 |
-|------|------|------|
-| **server** | Python (FastAPI) | HTTP 代理网关 + 管理 API + SQLite 数据存储 + PID 文件锁 |
-| **desktop** | TypeScript (Electron+Vue3) | 图形化管理界面，通过 Admin API 控制 server |
-| **cli** | Go (stdlib) | 命令行管理工具，功能与 desktop 对等 |
+| 组件 | 语言 | 启动方式 |
+|------|------|---------|
+| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js` |
+| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` |
+| **cli** | Node.js (stdlib) | `cd cli && node index.js <command>` |
 
 ### 通信流程
 
 ```
-Agent ──(skm-xxx key)──► Server ──(provider key)──► LLM Provider
-                         │
-                    ┌────┴────┐
-                    │ 协议转换  │ OpenAI ⇄ Anthropic
-                    │ 流式透传  │ SSE pipe-through
-                    │ 统计计数  │ token / 请求次数
-                    └─────────┘
+Agent ──(skm-xxx, Authorization: Bearer skm-xxx)──► Server
+                                                          │
+                                            ┌─────────────┴─────────────┐
+                                            │ O(1) 内存模型 map          │
+                                            │ md5(M+salt) admin auth     │
+                                            │ OpenAI ⇄ Anthropic 协议转换 │
+                                            │ SSE 流式透传               │
+                                            └─────────────┬─────────────┘
+                                                          ▼
+                                                  LLM Provider
 ```
 
-desktop / cli ──(admin API)──► Server (启动/停止/配置/查询)
+admin 客户端：
 
-## 功能
+```
+CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
+```
 
-- **Provider 管理**：注册多个 LLM Provider（OpenAI / Anthropic / 兼容服务），配置 endpoint、API Key、通讯协议
-- **Health 检测**：通过 `/models` 端点探测 Provider 连通性与 API Key 有效性
-- **模型列表**：自动获取 Provider 可用模型列表，也可手动填写
-- **默认模型**：设置某个 Provider + Model 为默认，Agent 可选 `auto` 使用
-- **用户管理**：生成南天门 API Key（`skm-` 前缀），记录名称与备注
-- **双协议入站**：兼容 OpenAI Chat Completions 和 Anthropic Messages 协议
-- **协议转换**：Agent 与 Provider 协议不同时自动转换（4 条转换路径）
-- **流式透传**：SSE 响应边收边发，不缓冲
-- **统计**：记录模型使用次数、请求次数、上传/下载 Token 数（区分 cached）
+## Admin API 端点
 
-## 技术栈
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| GET  | `/api/admin/status` | 公开 | 返回 `initialized` 标志 |
+| POST | `/api/admin/setup` | 公开（仅未初始化） | 首次启动初始化 |
+| POST | `/api/admin/login` | 公开（仅已初始化） | 验证保存的 md5 是否仍可工作 |
+| POST | `/api/admin/password/change` | Bearer M | 改密码 + 重生成 salt（**旧密码立即失效**） |
+| POST | `/api/admin/database/configure` | Bearer M | 切换 DB 后端（需 restart） |
+| GET/PUT | `/api/admin/settings` | Bearer M | 读/写 host + port |
+| GET/POST/PUT/DELETE | `/api/admin/providers` | Bearer M | Provider CRUD |
+| POST | `/api/admin/providers/:id/refresh-models` | Bearer M | 重新拉取 Provider 模型列表 |
+| POST | `/api/admin/providers/:id/models` | Bearer M | 手动添加 model 名称 |
+| GET/POST/PUT/DELETE | `/api/admin/api-keys` | Bearer M | API Key CRUD |
+| GET  | `/api/admin/stats` | Bearer M | 用量聚合（SUM） |
+| POST | `/api/admin/server/{shutdown,restart}` | Bearer M | 进程控制 |
 
-| 层 | 技术 |
-|----|------|
-| 后端 | Python 3.11+ / FastAPI / uvicorn / httpx / SQLite (WAL) |
-| 前端 | Electron / Vue 3 / Vite / Tailwind CSS |
-| CLI | Go 1.21+ / stdlib (无第三方依赖，CGO_ENABLED=0 静态编译) |
-| 数据库 | SQLite (WAL 模式，跨平台) |
+管理 API 除白名单外都要求：
+
+```
+Authorization: Bearer M
+其中 M = md5(RAWPASSWORD)，server 端校验 md5(M + conf.salt) == conf.password
+```
+
+## LLM Proxy API
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|------|------|------|------|
+| GET  | `/v1/health` | 公开 | 健康检查 + active_requests |
+| GET  | `/v1/models` | Bearer `skm-` | 模型列表（`{name}_{protocol}_{model}` 格式） |
+| POST | `/v1/chat/completions` | Bearer `skm-` | OpenAI Chat Completions 入口 |
+| POST | `/v1/messages` | Bearer `skm-` | Anthropic Messages 入口 |
+
+## CLI
+
+```bash
+# 首次初始化（交互式）
+nantianmen setup
+
+# 健康检查
+nantianmen health
+nantianmen -H 127.0.0.1 --port 38271 health
+
+# 改密码（内部 md5 后传 server；old + new ×2）
+nantianmen -P 'oldpass' password
+
+# 管理
+nantianmen provider ls
+nantianmen provider add
+nantianmen apikey new
+nantianmen stats
+
+# 全局 flags 解析顺序：--flag > $NANTIANMEN_* > ~/.nantianmen/config.json > 报错
+```
 
 ## 快速开始
 
@@ -106,45 +153,83 @@ desktop / cli ──(admin API)──► Server (启动/停止/配置/查询)
 
 ```bash
 cd server
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-# Linux/macOS
-source .venv/bin/activate
-
-pip install -r requirements.txt
-python -m app.main
+npm install
+node index.js
+# 首次启动：仅监听 /v1/health 与 /api/admin/status
+# 通过 CLI 完成 setup（推荐）：
+cd ../cli && node index.js setup
+# 或手动 curl：
+curl -X POST http://127.0.0.1:38271/api/admin/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"host":"0.0.0.0","port":38271,"password_md5":"<md5(管理员密码)>","database":{"type":"sqlite3","path":"./nantianmen.db"}}'
 ```
 
-Server 默认监听 `http://127.0.0.1:7300`。
+Server 默认监听 `http://0.0.0.0:38271`。
+
+### CLI
+
+```bash
+cd cli
+node index.js setup           # 写入 host/port/db/admin password
+node index.js health          # 验证 server 状态
+node index.js provider ls     # 列 provider
+```
 
 ### Desktop
 
 ```bash
 cd desktop
 npm install
-npm run dev
+npm run electron:dev
+# 首次启动 fork server/index.js 并打开管理界面
 ```
 
-### CLI
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 后端 | Node.js 22+ / Fastify 4 / better-sqlite3 / Node fetch |
+| 前端 | Electron / Vue 3 / Vite / Tailwind CSS |
+| CLI | Node.js (stdlib only) |
+| 数据库 | SQLite3 (WAL，better-sqlite3 同步 binding) |
+| 配置 | 单文件 JSON，常驻内存 |
+
+## 安全性
+
+- 管理 API 用 `Bearer M` 认证，`M = md5(RAWPASSWORD)`。server 不存原始密码。
+- 管理员密码 server 侧存储为 `md5(md5(RAWPASSWORD) + salt)`。salt 是首次启动随机生成的 6 位 `[A-Za-z0-9]`，每次改密码都重生成，旧 md5 立刻失效。
+- 服务监听 `0.0.0.0` 时所有 `/api/admin/*` 与 `/v1/chat/*` 都要求带 Token（无 Token 直接 401）。`/v1/health` 公开。
+- Provider 的 API Key 仅 server 端使用，admin API 列表时做 `1234...efgh` 遮盖。
+
+## Provider 命名约束
+
+- Provider 名称不允许包含**空格**
+- Provider 名称不允许包含**下划线 `_`**
+- 模型名可包含下划线。模型 ID 格式 `{provider}_{protocol}_{model}`，前两个 `_` 切分（`split('_', 2)` 不足以切三分 -- 前两个 `_` 作 boundary，modelname 可含下划线）。
+- 端点：OpenAI base_url 末尾含 `/v1`，Anthropic base_url 不含 `/v1`。
+
+## 测试
 
 ```bash
-cd cli
-go build -o nantianmen .
-./nantianmen help
+# server 单元测试（20 步全过）
+cd server && node test_setup.js
+
+# CLI 端到端测试（10 步全过，包含 password 全链路验证）
+cd ../tools && node run-cli-e2e.js
 ```
 
-## API Key
+CLI e2e 实测覆盖：
 
-Agent 使用南天门 API Key 与 Server 通信，格式为 `skm-` 前缀。Provider 的 API Key 仅存储在 Server 端，不会暴露给 Agent。
+- wrong password 被服务端 401 拒绝
+- 修改密码后旧 md5 + 旧 salt 哈希失效
+- 新 password 在新 salt 下生效
+- 重启后 auth 持久化到 `nantianmen-conf.json`
 
 ## 兼容性
 
-- Windows / Linux / macOS 全平台支持
-- Go CLI 静态编译，无外部依赖
-- Python Server 需 Python 3.11+
-- Electron Desktop 需 Node.js 18+
+- Windows / Linux / macOS
+- Node.js 22+（必需；Server 与 CLI 都用 fetch API）
+- Electron 33+（Desktop）
 
 ## License
 

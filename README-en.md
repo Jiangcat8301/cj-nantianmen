@@ -2,11 +2,12 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.1.0--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.0--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![Backend](https://img.shields.io/badge/backend-Python%203.11%20%2B%20FastAPI-3776AB)]()
+[![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
+[![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
-[![CLI](https://img.shields.io/badge/CLI-Go%201.21%2B%20(static)-00ADD8)]()
+[![CLI](https://img.shields.io/badge/CLI-Node.js%20(no%20deps)-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
 In Chinese mythology, **Nantianmen** (南天门) is the sole gateway between Heaven and the mortal realm--all immortals must pass through this gate when descending to the world of mortals.
@@ -31,73 +32,118 @@ Responses are streamed through (SSE pipe-through) without buffering or truncatio
 
 Two management interfaces:
 
-- **Admin API** (`/api/admin/*`) - CRUD for Providers / API Keys / Stats, consumed by Desktop and CLI
+- **Admin API** (`/api/admin/*`) - Provider / API Key / Stats / settings / database switch, consumed by Desktop and CLI
 - **LLM Proxy API** (`/v1/*`) - Agent request entry, compatible with OpenAI Chat Completions and Anthropic Messages
 
-## Architecture
+**First-time setup required**: call `POST /api/admin/setup` with host, port, database backend, and admin password. Only after that does the server enable DB-backed routes.
+
+## Architecture (v0.2)
 
 ```
 cj-nantianmen/
-├── server/       # Python FastAPI backend, runs independently
-│   └── app/
-│       ├── api/       # Routes: admin API + LLM proxy
-│       ├── core/      # Config, security, PID lock
-│       ├── db/        # SQLite init + WAL
-│       ├── models/    # Pydantic schema
-│       └── services/  # Provider management, protocol conversion, stats
-├── desktop/      # Electron + Vue3 + Vite + Tailwind CSS desktop UI
-│   └── src/
-│       ├── components/
-│       ├── views/
-│       └── lib/
-├── cli/          # Go static-compiled CLI, feature-parity with UI
-│   └── cmd/
-└── build/        # Build artifacts (not in repo)
+├── server/         # Node.js Fastify backend, runs independently; shared with desktop
+│   ├── conf.js           # nantianmen-conf.json single-file config + memory-resident
+│   ├── auth.js           # Bearer M check: md5(md5(pwd) + salt)
+│   ├── index.js          # entry: listen + register routes
+│   ├── db/               # Database abstraction + SQLite3 impl + MySQL impl (placeholder)
+│   ├── routes/           # admin / llm / provider / apikey
+│   └── services/         # provider / modelMap / llmProxy / protocol / stats
+├── desktop/        # Electron + Vue3 + Vite + Tailwind desktop UI
+│   └── electron/main.js  # fork server/index.js (v0.2 dropped Python)
+├── cli/            # Single-file Node.js CLI (no third-party deps)
+│   ├── index.js          # subcommand dispatch + parse -P/--password
+│   └── prompt.js         # TTY / piped stdin modes
+└── build/          # Build artifacts (not in repo)
+
+After first setup, created files:
+nantianmen-conf.json          # next to server exe: host/port/password/salt/database
+nantianmen.db                 # SQLite file (default)
+~/.nantianmen/config.json     # CLI client-side state
 ```
 
 ### Three Components
 
-| Component | Language | Responsibility |
-|-----------|----------|---------------|
-| **server** | Python (FastAPI) | HTTP proxy gateway + admin API + SQLite storage + PID file lock |
-| **desktop** | TypeScript (Electron+Vue3) | GUI management, controls server via Admin API |
-| **cli** | Go (stdlib) | CLI management tool, feature-parity with desktop |
+| Component | Language | Startup |
+|-----------|----------|---------|
+| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js` |
+| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` |
+| **cli** | Node.js (stdlib) | `cd cli && node index.js <command>` |
 
 ### Communication Flow
 
 ```
-Agent ──(skm-xxx key)──► Server ──(provider key)──► LLM Provider
-                         │
-                    ┌────┴────┐
-                    │ Protocol  │ OpenAI ⇄ Anthropic
-                    │ Conversion│
-                    │ Streaming │ SSE pipe-through
-                    │ Stats     │ token / request count
-                    └─────────┘
+Agent ──(skm-xxx, Authorization: Bearer skm-xxx)──► Server
+                                                     │
+                                       ┌─────────────┴─────────────┐
+                                       │ O(1) in-memory model map   │
+                                       │ md5(M+salt) admin auth     │
+                                       │ OpenAI ⇄ Anthropic convert │
+                                       │ SSE streaming passthrough  │
+                                       └─────────────┬─────────────┘
+                                                     ▼
+                                             LLM Provider
 ```
 
-desktop / cli ──(admin API)──► Server (start/stop/config/query)
+Admin client:
 
-## Features
+```
+CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
+```
 
-- **Provider Management**: Register multiple LLM providers (OpenAI / Anthropic / compatible services), configure endpoint, API key, protocol
-- **Health Check**: Probe provider connectivity and API key validity via `/models` endpoint
-- **Model Listing**: Auto-fetch available models from provider, or manually add model names
-- **Default Model**: Set a provider+model as default; agents can select `auto` to use it
-- **User Management**: Generate Nantianmen API keys (`skm-` prefix) with name and notes
-- **Dual-Protocol Inbound**: Compatible with OpenAI Chat Completions and Anthropic Messages
-- **Protocol Conversion**: Auto-convert when agent and provider protocols differ (4 conversion paths)
-- **Streaming Passthrough**: SSE responses piped through without buffering
-- **Statistics**: Track model usage count, request count, upload/download token count (cached tokens distinguished)
+## Admin API Endpoints
 
-## Tech Stack
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/api/admin/status` | public | Returns `initialized` flag |
+| POST | `/api/admin/setup` | public (uninitialized only) | First-time initialization |
+| POST | `/api/admin/login` | public (initialized only) | Verify saved md5 still works |
+| POST | `/api/admin/password/change` | Bearer M | Change password + regenerate salt (**old password immediately invalid**) |
+| POST | `/api/admin/database/configure` | Bearer M | Switch DB backend (restart required) |
+| GET/PUT | `/api/admin/settings` | Bearer M | Read/write host + port |
+| GET/POST/PUT/DELETE | `/api/admin/providers` | Bearer M | Provider CRUD |
+| POST | `/api/admin/providers/:id/refresh-models` | Bearer M | Re-fetch provider model list |
+| POST | `/api/admin/providers/:id/models` | Bearer M | Manually add a model name |
+| GET/POST/PUT/DELETE | `/api/admin/api-keys` | Bearer M | API key CRUD |
+| GET | `/api/admin/stats` | Bearer M | Usage aggregation (SUM) |
+| POST | `/api/admin/server/{shutdown,restart}` | Bearer M | Process control |
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.11+ / FastAPI / uvicorn / httpx / SQLite (WAL) |
-| Frontend | Electron / Vue 3 / Vite / Tailwind CSS |
-| CLI | Go 1.21+ / stdlib (no third-party deps, CGO_ENABLED=0 static build) |
-| Database | SQLite (WAL mode, cross-platform) |
+All admin endpoints except the whitelist require:
+
+```
+Authorization: Bearer M
+where M = md5(RAWPASSWORD); server checks md5(M + conf.salt) == conf.password
+```
+
+## LLM Proxy API
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/v1/health` | public | Health check + active_requests |
+| GET | `/v1/models` | Bearer `skm-` | Model list (`{name}_{protocol}_{model}`) |
+| POST | `/v1/chat/completions` | Bearer `skm-` | OpenAI Chat Completions entry |
+| POST | `/v1/messages` | Bearer `skm-` | Anthropic Messages entry |
+
+## CLI
+
+```bash
+# First-time setup (interactive)
+nantianmen setup
+
+# Health check
+nantianmen health
+nantianmen -H 127.0.0.1 --port 38271 health
+
+# Change password (md5'd internally before sending; interactive old + new ×2)
+nantianmen -P 'oldpass' password
+
+# Management
+nantianmen provider ls
+nantianmen provider add
+nantianmen apikey new
+nantianmen stats
+
+# Global flag resolution: --flag > $NANTIANMEN_* > ~/.nantianmen/config.json > error
+```
 
 ## Quick Start
 
@@ -105,45 +151,83 @@ desktop / cli ──(admin API)──► Server (start/stop/config/query)
 
 ```bash
 cd server
-python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-# Linux/macOS
-source .venv/bin/activate
-
-pip install -r requirements.txt
-python -m app.main
+npm install
+node index.js
+# First start: only /v1/health and /api/admin/status are live
+# Complete setup via CLI (recommended):
+cd ../cli && node index.js setup
+# or manual curl:
+curl -X POST http://127.0.0.1:38271/api/admin/setup \
+  -H 'Content-Type: application/json' \
+  -d '{"host":"0.0.0.0","port":38271,"password_md5":"<md5(admin password)>","database":{"type":"sqlite3","path":"./nantianmen.db"}}'
 ```
 
-Server listens on `http://127.0.0.1:7300` by default.
+Server default: `http://0.0.0.0:38271`.
+
+### CLI
+
+```bash
+cd cli
+node index.js setup           # writes host/port/db/admin password
+node index.js health          # check server status
+node index.js provider ls     # list providers
+```
 
 ### Desktop
 
 ```bash
 cd desktop
 npm install
-npm run dev
+npm run electron:dev
+# First launch forks server/index.js and opens the GUI
 ```
 
-### CLI
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js 22+ / Fastify 4 / better-sqlite3 / Node fetch |
+| Frontend | Electron / Vue 3 / Vite / Tailwind CSS |
+| CLI | Node.js (stdlib only) |
+| Database | SQLite3 (WAL, better-sqlite3 sync binding) |
+| Config | Single JSON file, memory-resident |
+
+## Security
+
+- Admin API uses `Bearer M` where `M = md5(RAWPASSWORD)`; raw password never reaches server.
+- Admin password is stored as `md5(md5(RAWPASSWORD) + salt)`. Salt is a 6-char `[A-Za-z0-9]` random string generated on first setup. Password change regenerates the salt, immediately invalidating the old md5.
+- Server listens on `0.0.0.0`; all `/api/admin/*` and `/v1/chat/*` require a Token (no Token → 401). `/v1/health` is public.
+- Provider API keys are server-side only; admin API list responses mask them as `1234...efgh`.
+
+## Provider Naming Constraints
+
+- Provider name must not contain **spaces**
+- Provider name must not contain **underscores `_`**
+- Model name may contain underscores. Model ID format `{provider}_{protocol}_{model}`; the first two `_` are the boundary (since `split('_', 2)` doesn't give three parts, the model name may freely include `_`).
+- Endpoint layout: OpenAI base_url ends with `/v1`; Anthropic base_url does not.
+
+## Tests
 
 ```bash
-cd cli
-go build -o nantianmen .
-./nantianmen help
+# Server unit tests (20/20 PASS)
+cd server && node test_setup.js
+
+# CLI end-to-end (10/10 PASS, covers password chain)
+cd ../tools && node run-cli-e2e.js
 ```
 
-## API Key
+CLI e2e verifies:
 
-Agents authenticate with Nantianmen API keys (prefixed `skm-`). Provider API keys are stored server-side only and never exposed to agents.
+- Wrong password rejected with 401
+- After password change, old md5 + old salt hash fails
+- New password + new salt works
+- Restart preserves auth (persisted to `nantianmen-conf.json`)
 
 ## Compatibility
 
-- Windows / Linux / macOS fully supported
-- Go CLI is statically compiled with no external dependencies
-- Python Server requires Python 3.11+
-- Electron Desktop requires Node.js 18+
+- Windows / Linux / macOS
+- Node.js 22+ (required; both Server and CLI use native fetch)
+- Electron 33+ (Desktop)
 
 ## License
 
