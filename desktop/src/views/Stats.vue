@@ -168,16 +168,35 @@ const onProviderChange = async () => {
     } catch {}
   }
   load()
+  saveFilters()
 }
 
-onMounted(() => {
-  loadProviders()
-  load()
+onMounted(async () => {
+  // ponytail: restore saved filters from conf
+  try {
+    const { data } = await api.getUiFilters()
+    if (data?.stats) {
+      if (data.stats.provider) filters.value.provider = data.stats.provider
+      if (data.stats.model) filters.value.model = data.stats.model
+      if (data.stats.range) filters.value.range = data.stats.range
+    }
+  } catch {}
+  await loadProviders()
+  if (filters.value.provider) await onProviderChange()
+  else load()
   poll = setInterval(load, 10000)
 })
 onUnmounted(() => { if (poll) clearInterval(poll) })
-watch(() => filters.value.range, load)
-watch(() => filters.value.model, load)
+watch(() => filters.value.range, () => { load(); saveFilters() })
+watch(() => filters.value.model, () => { load(); saveFilters() })
+
+// ponytail: persist filters so they survive page navigation
+async function saveFilters() {
+  try {
+    const { data: current } = await api.getUiFilters()
+    await api.saveUiFilters({ ...current, stats: { provider: filters.value.provider, model: filters.value.model, range: filters.value.range } })
+  } catch {}
+}
 
 // ponytail: aggregate total cost from breakdown
 const totalCost = computed(() => {

@@ -11,7 +11,7 @@
         <div class="flex items-center gap-1.5 px-3 text-xs">
           <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
           <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.4</span>
+          <span class="text-gray-600">v0.2.6</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">

@@ -58,7 +58,9 @@ function getServerPath() {
   // In dev it's ../server relative to desktop/
   const devPath = path.join(__dirname, '..', '..', 'server')
   const prodPath = path.join(process.resourcesPath, 'server')
-  return fs.existsSync(devPath) ? devPath : prodPath
+  const chosen = fs.existsSync(devPath) ? devPath : prodPath
+  console.log('[ntm] getServerPath: devPath=', devPath, 'prodPath=', prodPath, 'chosen=', chosen, 'existsDev=', fs.existsSync(devPath), 'existsProd=', fs.existsSync(prodPath))
+  return chosen
 }
 
 async function checkServerHealth() {
@@ -98,13 +100,16 @@ async function startServer() {
     NANTIANMEN_LOCAL_MODE: '1',
   }
   try {
+    const serverEntry = path.join(serverPath, 'index.js')
+    console.log('[ntm] forking:', serverEntry, 'cwd:', serverPath)
     serverProcess = fork(
-      path.join(serverPath, 'index.js'),
+      serverEntry,
       ['-c', confPath, '-D', dbPath],
       { cwd: serverPath, env: confEnv, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] },
     )
+    console.log('[ntm] fork pid:', serverProcess?.pid)
   } catch (e) {
-    console.error('Failed to fork server:', e)
+    console.error('[ntm] fork failed:', e)
     throw e
   }
 
@@ -230,14 +235,10 @@ app.whenReady().then(async () => {
   createSplash()
   await createWindow()
   startServer().catch(e => console.error('Server start failed:', e))
-  // System tray with status overlay
+  // System tray — use existing nantianmen.ico (tray-*.png don't exist)
   const iconDir = path.join(__dirname, '..')
-  const icons = {
-    online: nativeImage.createFromPath(path.join(iconDir, 'tray-online.png')),
-    offline: nativeImage.createFromPath(path.join(iconDir, 'tray-offline.png')),
-    active: nativeImage.createFromPath(path.join(iconDir, 'tray-active.png')),
-  }
-  tray = new Tray(icons.offline)
+  const trayIcon = nativeImage.createFromPath(path.join(iconDir, 'nantianmen.ico'))
+  tray = new Tray(trayIcon)
   tray.setToolTip('Nantianmen LLM Proxy Gateway')
 
   let lastState = null
@@ -261,7 +262,6 @@ app.whenReady().then(async () => {
     } catch { state = 'offline' }
 
     if (state !== lastState) {
-      tray.setImage(icons[state])
       const labels = { online: 'Online', offline: 'Offline', active: `Active (${resp?.active_requests || '?'})` }
       tray.setToolTip(`Nantianmen - ${labels[state]}`)
       lastState = state

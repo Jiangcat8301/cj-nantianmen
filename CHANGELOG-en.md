@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.6] — 2026-07-16
+
+### Fixed
+
+- **Non-streaming response protocol conversion missing**: streaming path had `anthropicSSEToOpenAI()` for response conversion, non-streaming path returned raw upstream `data` as-is. MiniMax-CodingPlan returns Anthropic format (`content: [{text,...}]`) not OpenAI (`choices: [...]`) → Hindsight client received no `choices`. Added `anthropicRespToOpenAI()` / `openaiRespToAnthropic()` bidirectional non-streaming response converters.
+- **Comm log token stats always zero**: `extractTokensOpenai`/`extractTokensAnthropic` return `{input_tokens, ...}` (snake_case), but `logEntry` destructures `{inputTokens, ...}` (camelCase) → `...captured` spread key mismatch → all `undefined` → all zero. `logEntry` now accepts both conventions: `inputTokens = inputTokens ?? input_tokens ?? 0`. Stats DB unaffected (`stats.record` uses `r.input_tokens`, matching extract return keys).
+
+## [v0.2.5] — 2026-07-16
+
+### Fixed
+
+- **Stats timezone (deep fix)**: `u.created_at >= date('now','localtime')` → `datetime(u.created_at,'localtime') >= date('now','localtime')`. Previous fix only adjusted the reference side; UTC timestamps in DB were never converted to local → records from Beijing 00:00-08:00 slipped through because their UTC date was still the previous day. Applies to today/7d/30d.
+- **API Key datetime display**: `created_at` and `last_used_at` now use `datetime(col,'localtime')` on read, displayed directly in local time.
+- **Tray icon missing**: `main.cjs` referenced three non-existent `tray-online/offline/active.png` files → switched to existing `nantianmen.ico`.
+
+### Added
+
+- **UI filter persistence**: Stats and Logs page filters (provider/model/range) now saved to `ui_filters` in `nantianmen-conf.json`, surviving page navigation.
+
 ## [v0.2.4] — 2026-07-15
 
 ### Added

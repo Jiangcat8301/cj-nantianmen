@@ -36,7 +36,50 @@ export function anthropicReqToOpenai(body) {
   return out
 }
 
-// ponytail: response shaping is inlined in llmProxy for v0.2.
+// ponytail: non-streaming response format converters.
+// Anthropic Messages API → OpenAI chat.completion shape.
+
+export function anthropicRespToOpenAI(data) {
+  const text = (data.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('\n')
+  const finishReason = data.stop_reason === 'end_turn' ? 'stop' : (data.stop_reason || 'stop')
+  return {
+    id: data.id || '',
+    object: 'chat.completion',
+    created: Math.floor(Date.now() / 1000),
+    model: data.model || '',
+    choices: [{
+      index: 0,
+      message: { role: 'assistant', content: text },
+      finish_reason: finishReason,
+    }],
+    usage: data.usage ? {
+      prompt_tokens: data.usage.input_tokens || 0,
+      completion_tokens: data.usage.output_tokens || 0,
+      total_tokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0),
+    } : undefined,
+  }
+}
+
+// OpenAI chat.completion → Anthropic Messages API shape.
+export function openaiRespToAnthropic(data) {
+  const choice = (data.choices || [])[0]
+  const msg = choice?.message || {}
+  return {
+    id: data.id || '',
+    type: 'message',
+    role: 'assistant',
+    model: data.model || '',
+    content: [{ type: 'text', text: msg.content || '' }],
+    stop_reason: choice?.finish_reason === 'stop' ? 'end_turn' : (choice?.finish_reason || 'end_turn'),
+    usage: data.usage ? {
+      input_tokens: data.usage.prompt_tokens || 0,
+      output_tokens: data.usage.completion_tokens || 0,
+    } : undefined,
+  }
+}
 
 export function extractTokensOpenai(usage) {
   return {

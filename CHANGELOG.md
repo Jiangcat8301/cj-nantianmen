@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.6] — 2026-07-16
+
+### Fixed
+
+- **非流式响应协议转换缺失**：流式路径有 `anthropicSSEToOpenAI()` 做响应转换，非流式路径直接 `return data` 原样返回上游格式。MiniMax-CodingPlan 返回 Anthropic 格式 (`content: [{text,...}]`) 而非 OpenAI 格式 (`choices: [...]`) → 客户端（Hindsight）收不到 `choices` 报错。新增 `anthropicRespToOpenAI()` / `openaiRespToAnthropic()` 双向非流式响应转换。
+- **通信日志 Token 统计全零**：`extractTokensOpenai`/`extractTokensAnthropic` 返回 `{input_tokens, ...}` (snake_case)，`logEntry` 解构 `{inputTokens, ...}` (camelCase) → `...captured` 展开后 key 不匹配 → 全 `undefined` → `|| 0` → 全零。`logEntry` 改为双收 snake/camel + 归一化：`inputTokens = inputTokens ?? input_tokens ?? 0`。统计 DB 不受影响（`stats.record` 用 `r.input_tokens` 与 extract 返回值一致）。
+
+## [v0.2.5] — 2026-07-16
+
+### Fixed
+
+- **统计时区彻底修复**：`u.created_at >= date('now','localtime')` → `datetime(u.created_at,'localtime') >= date('now','localtime')`。此前只转了比较参照侧，DB 存的 UTC 时间未转本地 → 北京时间 00:00-08:00 记录因 UTC 日期仍为前一天而漏统计。同时覆盖 today/7d/30d 三档。
+- **API Key 时间显示**：`created_at` 和 `last_used_at` 查询时加 `datetime(col,'localtime')` 转换，前端直显本地时间。
+- **托盘图标消失**：`main.cjs` 引用的 `tray-online/offline/active.png` 三个文件不存在 → 改用已有的 `nantianmen.ico`。
+
+### Added
+
+- **UI 过滤条件持久化**：数据统计和日志管理的 provider/model/range 等 filter 存入 `nantianmen-conf.json` 的 `ui_filters` 字段，页面切换不丢状态。
+
 ## [v0.2.4] — 2026-07-15
 
 ### Added

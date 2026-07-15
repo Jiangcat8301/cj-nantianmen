@@ -155,11 +155,28 @@ async function clearLogs() {
   } catch {}
 }
 
-async function applyFilter() { load() }
+async function applyFilter() { await load(); await saveFilters() }
+
+// ponytail: persist filters so they survive page navigation
+async function saveFilters() {
+  try {
+    const { data: current } = await api.getUiFilters()
+    await api.saveUiFilters({ ...current, logs: { provider_id: filters.value.provider_id, model_name: filters.value.model_name, user_id: filters.value.user_id } })
+  } catch {}
+}
 
 onMounted(async () => {
   await loadConfig()
   await loadFilters()
+  // ponytail: restore saved filters from conf
+  try {
+    const { data } = await api.getUiFilters()
+    if (data?.logs) {
+      if (data.logs.provider_id) filters.value.provider_id = data.logs.provider_id
+      if (data.logs.model_name) filters.value.model_name = data.logs.model_name
+      if (data.logs.user_id) filters.value.user_id = data.logs.user_id
+    }
+  } catch {}
   await load()
 })
 </script>

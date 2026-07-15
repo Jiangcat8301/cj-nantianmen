@@ -155,6 +155,15 @@ export default async function adminRoutes(fastify) {
     setTimeout(() => process.exit(0), 100)
   })
 
+  // ponytail: UI filter state persistence — save per-page filters so they survive navigation
+  fastify.get('/api/admin/ui-filters', async () => {
+    return getConf().ui_filters || {}
+  })
+  fastify.put('/api/admin/ui-filters', async (req) => {
+    updateConf({ ui_filters: req.body || {} })
+    return getConf().ui_filters
+  })
+
   // ponytail: communication log — GET with filters, DELETE to clear, PUT to toggle
   fastify.get('/api/admin/communication-log', async (req) => {
     return commlog.list(req.query || {})

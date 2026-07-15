@@ -8,13 +8,13 @@ function genKey() {
 }
 
 export default async function apikeyRoutes(fastify) {
-  fastify.get('/api/admin/api-keys', async () => getDb().query('SELECT id, key, name, note, created_at, last_used_at FROM api_keys ORDER BY id'))
+  fastify.get('/api/admin/api-keys', async () => getDb().query(`SELECT id, key, name, note, datetime(created_at,'localtime') as created_at, datetime(last_used_at,'localtime') as last_used_at FROM api_keys ORDER BY id`))
 
   fastify.post('/api/admin/api-keys', async (req) => {
     const { name = '', note = '' } = req.body || {}
     const key = genKey()
     const r = await getDb().run('INSERT INTO api_keys(key, name, note) VALUES (?,?,?)', [key, name, note])
-    const rows = await getDb().query('SELECT id, key, name, note, created_at FROM api_keys WHERE id=?', [r.lastInsertRowid])
+    const rows = await getDb().query(`SELECT id, key, name, note, datetime(created_at,'localtime') as created_at FROM api_keys WHERE id=?`, [r.lastInsertRowid])
     return rows[0]
   })
 

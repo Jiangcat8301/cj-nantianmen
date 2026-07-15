@@ -1,5 +1,5 @@
 import { getEntry, getDefaultEntry } from './modelMap.js'
-import { openaiReqToAnthropic, anthropicReqToOpenai, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
+import { openaiReqToAnthropic, anthropicReqToOpenai, anthropicRespToOpenAI, openaiRespToAnthropic, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
 import * as stats from './stats.js'
 import * as commlog from './commlog.js'
 import { getDb } from '../db/index.js'
@@ -24,7 +24,12 @@ async function getUserName(apiKeyId) {
   } catch { return '' }
 }
 
-async function logEntry({ apiKeyId, provider, modelName, upstreamBody, responseBody, inputTokens, outputTokens, cachedTokens, error }) {
+// ponytail: extract functions return snake_case (matches stats.record), streaming
+// passes camelCase shorthand. Normalize here so both callers just work.
+async function logEntry({ apiKeyId, provider, modelName, upstreamBody, responseBody, inputTokens, outputTokens, cachedTokens, error, input_tokens, output_tokens, cached_tokens }) {
+  inputTokens = inputTokens ?? input_tokens ?? 0
+  outputTokens = outputTokens ?? output_tokens ?? 0
+  cachedTokens = cachedTokens ?? cached_tokens ?? 0
   const user_name = await getUserName(apiKeyId)
   commlog.append({
     request_id: crypto.randomUUID(),
@@ -82,8 +87,15 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
     }
     const data = await resp.json()
     captured = providerProtocol === 'openai' ? extractTokensOpenai(data.usage) : extractTokensAnthropic(data.usage)
-    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: JSON.stringify(data), ...captured })
-    return data
+    // ponytail: convert response format when protocols differ
+    let out = data
+    if (inboundProtocol === 'openai' && providerProtocol === 'anthropic') {
+      out = anthropicRespToOpenAI(data)
+    } else if (inboundProtocol === 'anthropic' && providerProtocol === 'openai') {
+      out = openaiRespToAnthropic(data)
+    }
+    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: JSON.stringify(out), ...captured })
+    return out
   } catch (e) {
     if (!e.message?.startsWith('Upstream ')) {
       await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: '', inputTokens: 0, outputTokens: 0, cachedTokens: 0, error: { code: 0, message: e.message } })
