@@ -35,3 +35,14 @@ export function list(filters = {}) {
 export function clear() {
   try { fs.writeFileSync(logPath(), '[]') } catch {}
 }
+
+// ponytail: rename user in all log entries — called when api key name is edited
+export function renameUser(oldName, newName) {
+  if (!oldName || oldName === newName) return
+  const logs = readAll()
+  let changed = false
+  for (const l of logs) {
+    if (l.user_name === oldName) { l.user_name = newName; changed = true }
+  }
+  if (changed) fs.writeFileSync(logPath(), JSON.stringify(logs, null, 2))
+}

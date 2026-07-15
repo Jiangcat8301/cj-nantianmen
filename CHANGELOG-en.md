@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.4] — 2026-07-15
+
+### Added
+
+- **API Key editing**: Desktop user management now has edit button for name and note; comm log entries auto-rename on edit
+- **CLI API Key editing**: `nantianmen apikey edit <id> <name> <note> [oldName]`
+
+### Fixed
+
+- **Stats timezone**: `date('now')` → `date('now','localtime')` — Dashboard/Stats/Tray "today" now starts at local 00:00
+- **Stats empty dropdowns**: provider/model selects now populated from registered data
+
+### Changed
+
+- Nav label: "统计" → "数据统计"
+
 ## [v0.2.3] — 2026-07-15
 
 ### Added

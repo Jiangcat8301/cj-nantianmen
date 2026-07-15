@@ -49,7 +49,11 @@ function resolveServerEntry() {
   const flagBin = flagValue(process.argv, '--server-bin')
   if (flagBin) return flagBin
   // ponytail: dev fallback — ../server/index.js relative to this CLI script.
-  const cliDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ''))
+  // Bun-compiled exe: look next to the exe.
+  const exeDir = path.dirname(process.execPath)
+  const bundledEntry = path.join(exeDir, 'server', 'index.js')
+  if (fs.existsSync(bundledEntry)) return bundledEntry
+  const cliDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\\//, ''))
   const devEntry = path.join(cliDir, '..', 'server', 'index.js')
   if (fs.existsSync(devEntry)) return devEntry
   console.error('✗ no server entry found. Pass --server-bin /path/to/server/index.js or set $NANTIANMEN_SERVER_BIN')
@@ -316,6 +320,15 @@ async function cmdApikeys() {
     const r = await call('DELETE', `/api/admin/api-keys/${id}`)
     console.log(r.status === 200 ? '✓ removed' : `✗ ${r.status}`)
     process.exit(r.status === 200 ? 0 : 1)
+  }
+  if (sub === 'edit') {
+    const id = args[1] || await prompt('Key id: ')
+    const name = args[2] || await prompt('New name: ')
+    const note = args[3] !== undefined ? args[3] : await prompt('New note: ')
+    const oldName = args[4] || ''
+    const r = await call('PUT', `/api/admin/api-keys/${id}`, { name, note, old_name: oldName })
+    console.log(r.status === 200 ? '✓ updated' : `✗ ${r.status}`)
+    return
   }
 }
 

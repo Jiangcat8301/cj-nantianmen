@@ -62,14 +62,15 @@ export function stopFlushTask() {
 
 export async function query({ provider_id, model_name, api_key_id, range }) {
   // ponytail: time-range filter so Dashboard/Stats show 'today' vs '7d' etc.
+  // Use localtime to respect user timezone (SQLite date('now') is UTC).
   const where = []
   const params = []
   if (provider_id) { where.push('u.provider_id=?'); params.push(provider_id) }
   if (model_name) { where.push('u.model_name=?'); params.push(model_name) }
   if (api_key_id) { where.push('u.api_key_id=?'); params.push(api_key_id) }
-  if (range === 'today') { where.push("u.created_at >= date('now')"); }
-  else if (range === '7d') { where.push("u.created_at >= date('now','-7 days')"); }
-  else if (range === '30d') { where.push("u.created_at >= date('now','-30 days')"); }
+  if (range === 'today') { where.push("u.created_at >= date('now','localtime')"); }
+  else if (range === '7d') { where.push("u.created_at >= date('now','-7 days','localtime')"); }
+  else if (range === '30d') { where.push("u.created_at >= date('now','-30 days','localtime')"); }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
   const rows = await getDb().query(

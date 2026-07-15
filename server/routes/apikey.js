@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { getDb } from '../db/index.js'
+import * as commlog from '../services/commlog.js'
 
 function genKey() {
   // skm- + 40 hex chars
@@ -18,7 +19,9 @@ export default async function apikeyRoutes(fastify) {
   })
 
   fastify.put('/api/admin/api-keys/:id', async (req, reply) => {
-    const { name, note } = req.body || {}
+    const { name, note, old_name } = req.body || {}
+    // ponytail: if name changed, update all log entries with the old name
+    if (name && old_name && name !== old_name) commlog.renameUser(old_name, name)
     await getDb().run('UPDATE api_keys SET name=COALESCE(?, name), note=COALESCE(?, note) WHERE id=?', [name, note, req.params.id])
     const rows = await getDb().query('SELECT * FROM api_keys WHERE id=?', [req.params.id])
     return rows[0] || reply.code(404).send({ error: 'not found' })

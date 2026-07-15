@@ -11,7 +11,7 @@
         <div class="flex items-center gap-1.5 px-3 text-xs">
           <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
           <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.3</span>
+          <span class="text-gray-600">v0.2.4</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">
@@ -73,7 +73,7 @@ const win = typeof window !== 'undefined' ? window.win : null
 // ponytail: nav labels do NOT include emoji here - emoji is in navItems[].icon to avoid double icon.
 const i18n = {
   zh: {
-    dashboard: '概览', models: '模型管理', users: '用户管理', stats: '统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置',
+    dashboard: '概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置',
     server: 'Server', online: '在线', offline: '离线',
     minimize: '最小化', maximize: '最大化', restore: '还原', close: '关闭',
     add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动',

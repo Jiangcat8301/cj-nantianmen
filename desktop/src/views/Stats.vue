@@ -9,17 +9,19 @@
 
     <!-- Filter -->
     <div class="flex gap-3 mb-6">
-      <select v-model="filters.provider" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
-        <option value="">{{ t('stats_all_providers') }}</option>
+      <select v-model="filters.provider" @change="onProviderChange" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
+        <option value="">全部供应商</option>
+        <option v-for="p in providerList" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
       <select v-model="filters.model" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
-        <option value="">{{ t('stats_all_models') }}</option>
+        <option value="">全部模型</option>
+        <option v-for="m in modelList" :key="m" :value="m">{{ m }}</option>
       </select>
       <select v-model="filters.range" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
         <option value="today">{{ t('stats_today') }}</option>
         <option value="7d">{{ t('stats_7d') }}</option>
         <option value="30d">{{ t('stats_30d') }}</option>
-        <option value="all">{{ t('stats_all') }}</option>
+        <option value="">{{ t('stats_all') }}</option>
       </select>
     </div>
 
@@ -135,17 +137,47 @@ import api from '../lib/api'
 const t = inject('t')
 const filters = ref({ provider: '', model: '', range: '7d' })
 const stats = ref({})
+const providerList = ref([])
+const modelList = ref([])
 let poll = null
 
 const load = async () => {
-  try { const { data } = await api.getStats(filters.value); stats.value = data } catch {}
+  try {
+    const p = {}
+    if (filters.value.provider) p.provider_id = filters.value.provider
+    if (filters.value.model) p.model_name = filters.value.model
+    if (filters.value.range) p.range = filters.value.range
+    const { data } = await api.getStats(p)
+    stats.value = data
+  } catch {}
 }
+
+const loadProviders = async () => {
+  try {
+    const { data } = await api.listProviders()
+    providerList.value = data || []
+  } catch {}
+}
+
+const onProviderChange = async () => {
+  modelList.value = []
+  if (filters.value.provider) {
+    try {
+      const { data } = await api.getModels(filters.value.provider)
+      modelList.value = (data || []).filter(m => !m.deleted).map(m => m.model_name)
+    } catch {}
+  }
+  load()
+}
+
 onMounted(() => {
+  loadProviders()
   load()
   poll = setInterval(load, 10000)
 })
 onUnmounted(() => { if (poll) clearInterval(poll) })
-watch(filters, load, { deep: true })
+watch(() => filters.value.range, load)
+watch(() => filters.value.model, load)
 
 // ponytail: aggregate total cost from breakdown
 const totalCost = computed(() => {
@@ -156,13 +188,11 @@ const totalCost = computed(() => {
   return c
 })
 
-// ponytail: compute cost per row from token * price / 1M
 const costForRow = (r) => {
   const c = ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000
   return '¥' + c.toFixed(4)
 }
 
-// ponytail: top 5 models by request count, with token sums for dual-layer bar
 const topModels = computed(() => {
   return (stats.value.breakdown || [])
     .map(r => ({
@@ -177,7 +207,6 @@ const maxModelTokens = computed(() => Math.max(1, ...topModels.value.map(m => m.
 const maxModelReqs = computed(() => Math.max(1, ...topModels.value.map(m => m.requests)))
 const maxModelCost = computed(() => Math.max(0.0001, ...topModels.value.map(m => m.cost)))
 
-// ponytail: top 5 users aggregated from breakdown, with token sums
 const topUsers = computed(() => {
   const byKey = {}
   for (const r of (stats.value.breakdown || [])) {

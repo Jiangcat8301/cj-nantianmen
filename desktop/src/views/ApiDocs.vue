@@ -68,6 +68,7 @@ const adminEndpoints = [
   { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}/default', desc: '设置默认模型' },
   { method: 'GET', path: '/api/admin/api-keys', desc: '列出所有 API Key' },
   { method: 'POST', path: '/api/admin/api-keys', desc: '生成新 API Key' },
+  { method: 'PUT', path: '/api/admin/api-keys/{id}', desc: '编辑 API Key 名称/备注' },
   { method: 'DELETE', path: '/api/admin/api-keys/{id}', desc: '删除 API Key' },
   { method: 'GET', path: '/api/admin/stats', desc: '查询统计数据' },
   { method: 'GET', path: '/api/admin/default-model', desc: '获取默认路由模型' },

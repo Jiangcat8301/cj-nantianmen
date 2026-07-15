@@ -24,6 +24,7 @@ export default {
   // API Keys
   listApiKeys: () => api.get('/api-keys'),
   createApiKey: (data) => api.post('/api-keys', data),
+  updateApiKey: (id, data) => api.put(`/api-keys/${id}`, data),
   deleteApiKey: (id) => api.delete(`/api-keys/${id}`),
 
   // Stats

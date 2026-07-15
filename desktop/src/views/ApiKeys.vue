@@ -43,13 +43,14 @@
               <td class="px-4 py-3 text-gray-500">{{ k.last_used_at || t('not_used') }}</td>
               <td class="px-4 py-3">
                 <div class="flex gap-2">
-                  <button v-if="k._stats?.rows?.length" @click="toggle(k.id)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ expanded === k.id ? t('collapse') : t('details') }}</button>
+                  <button v-if="k._stats?.rows?.length" @click="toggleDetail(k.id)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ expandedId === k.id ? t('collapse') : t('details') }}</button>
+                  <button @click="openEdit(k)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('edit') }}</button>
                   <button @click="copyKey(k.key)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('copy') }}</button>
                   <button @click="deleteKey(k.id)" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded">{{ t('delete') }}</button>
                 </div>
               </td>
             </tr>
-            <tr v-if="expanded === k.id && k._stats?.rows?.length" class="bg-gray-900/50">
+            <tr v-if="expandedId === k.id && k._stats?.rows?.length" class="bg-gray-900/50">
               <td colspan="10" class="px-8 py-3">
                 <table class="w-full text-xs">
                   <thead class="text-gray-500">
@@ -97,6 +98,21 @@
         </div>
       </div>
     </div>
+
+    <!-- Edit Modal -->
+    <div v-if="showEdit" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showEdit = false">
+      <div class="bg-gray-800 rounded-lg p-6 w-96 border border-gray-700">
+        <h3 class="text-lg font-bold mb-4">{{ t('edit') }}: {{ editForm.name }}</h3>
+        <div class="space-y-3">
+          <input v-model="editForm.name" :placeholder="t('fld_key_name')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
+          <input v-model="editForm.note" :placeholder="t('fld_key_note')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button @click="showEdit = false" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
+          <button @click="saveEdit" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded">{{ t('btn_confirm') }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -108,7 +124,9 @@ const t = inject('t')
 const keys = ref([])
 const showCreate = ref(false)
 const createForm = ref({ name: '', note: '' })
-const expanded = ref(null)
+const showEdit = ref(false)
+const editForm = ref({ id: null, name: '', note: '', oldName: '' })
+const expandedId = ref(null)
 
 const fmt = (n) => {
   if (!n) return '0'
@@ -143,7 +161,7 @@ const load = async () => {
 }
 onMounted(load)
 
-const toggle = (id) => { expanded.value = expanded.value === id ? null : id }
+const toggleDetail = (id) => { expandedId.value = expandedId.value === id ? null : id }
 const toggleReveal = (id) => {
   const k = keys.value.find(x => x.id === id)
   if (k) k._revealed = !k._revealed
@@ -154,6 +172,21 @@ const createKey = async () => {
     await api.createApiKey(createForm.value)
     showCreate.value = false
     createForm.value = { name: '', note: '' }
+    await load()
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
+}
+
+const openEdit = (k) => {
+  editForm.value = { id: k.id, name: k.name, note: k.note || '', oldName: k.name }
+  showEdit.value = true
+}
+
+const saveEdit = async () => {
+  try {
+    await api.updateApiKey(editForm.value.id, { name: editForm.value.name, note: editForm.value.note, old_name: editForm.value.oldName })
+    showEdit.value = false
     await load()
   } catch (e) {
     alert('Error: ' + (e.response?.data?.error || e.message))

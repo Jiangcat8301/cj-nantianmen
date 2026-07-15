@@ -72,7 +72,7 @@ const port = conf.initialized ? conf.server_port : 38271
 
 try {
   await fastify.listen({ host, port })
-  fastify.log.info(`Nantianmen v0.2.3 on http://${host}:${port} (init=${conf.initialized})`)
+  fastify.log.info(`Nantianmen v0.2.4 on http://${host}:${port} (init=${conf.initialized})`)
   console.error('[MARKER] listen complete')
 } catch (e) {
   fastify.log.error(e)

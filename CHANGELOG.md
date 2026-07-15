@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.4] — 2026-07-15
+
+### Added
+
+- **API Key 编辑**：Desktop 用户管理页新增编辑按钮，支持修改名称和备注；编辑后自动全量替换日志文件中的旧用户名
+- **CLI API Key 编辑**：`nantianmen apikey edit <id> <name> <note> [oldName]`
+
+### Fixed
+
+- **统计时区修正**：`stats.query()` 从 `date('now')` (UTC) 改为 `date('now','localtime')`，确保 Dashboard / Stats / Tray 的"今日"以本地 00:00 为起点
+- **统计页下拉列表空白**：provider/model 下拉列表现在正确填充已注册的供应商和模型
+
+### Changed
+
+- 导航标签「统计」→「数据统计」
+
 ## [v0.2.3] — 2026-07-15
 
 ### Added
