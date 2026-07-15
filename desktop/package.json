@@ -1,20 +1,21 @@
 {
-  "name": "nantianmen-desktop",
-  "version": "0.1.0",
+  "name": "cj-nantianmen",
+  "version": "0.2.1",
   "description": "Nantianmen LLM Proxy Gateway - Desktop UI",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build && npx @electron/rebuild -m ../server -w better-sqlite3 -f && npx electron-builder --win --x64 && node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync('../releases',{recursive:true});fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')&&(f.endsWith('.exe')||f.endsWith('.7z'))).forEach(f=>fs.copyFileSync(p.join('../temp',f),p.join('../releases',f)));fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')).forEach(f=>fs.unlinkSync(p.join('../temp',f)));fs.rmSync('../temp/win-unpacked',{recursive:true,force:true})\""
   },
   "build": {
     "appId": "com.jiangcat.nantianmen",
     "productName": "Nantianmen",
     "directories": {
-      "output": "../build"
+      "output": "../temp",
+      "buildResources": "."
     },
     "win": {
       "target": [
@@ -25,7 +26,7 @@
           ]
         }
       ],
-      "artifactName": "Nantianmen-${version}-win32.${ext}",
+      "artifactName": "nantianmen-${version}-win-${arch}.${ext}",
       "signAndEditExecutable": false,
       "icon": "nantianmen.ico"
     },
@@ -43,6 +44,17 @@
       "tray-online.png",
       "tray-offline.png",
       "tray-active.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!**/.venv/**",
+          "!**/node_modules/.cache/**"
+        ]
+      }
     ]
   },
   "dependencies": {

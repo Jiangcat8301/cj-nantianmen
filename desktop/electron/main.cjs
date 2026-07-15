@@ -154,15 +154,37 @@ function createSplash() {
   splashWindow.show()
 }
 
+// ponytail: persist window bounds across restarts (and version upgrades — stored in userData).
+const winStateFile = path.join(app.getPath('userData'), 'window-state.json')
+
+function saveWindowState() {
+  if (!mainWindow) return
+  const b = mainWindow.getBounds()
+  try { fs.writeFileSync(winStateFile, JSON.stringify({ x: b.x, y: b.y, width: b.width, height: b.height, isMaximized: mainWindow.isMaximized() })) } catch {}
+}
+
+function restoreWindowState() {
+  try {
+    if (fs.existsSync(winStateFile)) {
+      const s = JSON.parse(fs.readFileSync(winStateFile, 'utf-8'))
+      if (s && typeof s.width === 'number') return s
+    }
+  } catch {}
+  return null
+}
+
 async function createWindow() {
+  const saved = restoreWindowState()
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: saved?.width || 1200,
+    height: saved?.height || 800,
+    x: saved?.x,
+    y: saved?.y,
     minWidth: 900,
     minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
-    show: false,  // ponytail: don't show blank window during Vue boot; ready-to-show will flip it
+    show: false,
     backgroundColor: '#0d1117',
     icon: getIcon(),
     webPreferences: {
@@ -172,6 +194,8 @@ async function createWindow() {
     },
   })
 
+  if (saved?.isMaximized) mainWindow.maximize()
+
   // ponytail: close splash when main window is ready.
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
@@ -180,6 +204,7 @@ async function createWindow() {
 
   // ponytail: minimize to tray instead of closing. Re-create only on app quit.
   mainWindow.on('close', (e) => {
+    saveWindowState()
     if (!app.isQuitting) {
       e.preventDefault()
       mainWindow.hide()
