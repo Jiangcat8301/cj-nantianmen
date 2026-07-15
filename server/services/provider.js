@@ -31,7 +31,7 @@ async function updateProvider(id, { name, protocol, base_url, api_key }) {
   if (name !== undefined) validateName(name)
   const existing = await getProvider(id)
   if (!existing) return null
-  const merged = { ...existing, name: name ?? existing.name, protocol: protocol ?? existing.protocol, base_url: base_url ?? existing.base_url, api_key: api_key ?? existing.api_key }
+  const merged = { ...existing, name: name ?? existing.name, protocol: protocol ?? existing.protocol, base_url: base_url ?? existing.base_url, api_key: api_key || existing.api_key }
   await getDb().run(
     "UPDATE providers SET name=?, protocol=?, base_url=?, api_key=?, updated_at=datetime('now') WHERE id=?",
     [merged.name, merged.protocol, merged.base_url, merged.api_key, id],
