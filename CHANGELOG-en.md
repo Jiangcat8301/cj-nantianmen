@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — 2026-07-15
+
+### Fixed
+
+- **SSE streaming empty body**: `makeStreamingResponse` now uses `reply.raw.writeHead()` + `reply.raw.write()` to directly write the HTTP response stream, fixing Fastify serializing `Symbol.asyncIterator` objects as `{}` which caused `empty stream with no finish_reason` error.
+- **Default model not taking effect**: `resolveModel()` now uses `getDefaultEntry()` based on `models.is_default=1` instead of picking the first model from the map. `PUT .../default` now calls `await rebuildModelMap()` so the change takes effect in memory immediately.
+- **Model list disappearing after set-default**: `setDefault()` now calls `load()` before `fetchModels()`, preventing `load()` from overwriting the just-populated `models` array.
+- **Streaming stats lost**: SSE token parser skips `"usage":null` (providers that don't return usage in SSE) and always records `request_count` for successful streaming calls.
+
 ## [v0.2.0] - 2026-07-15
 
 ### ⚠ Breaking

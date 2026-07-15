@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased] — 2026-07-15
+
+### Added
+
+- **Server CLI flags** `-c/--config-path` / `-D/--database-path`：conf 与 db 文件路径由启动方传入。不传则 server fallback 到跨平台 user-data 子目录 `cj-nantianmen/`（见下条）。
+- **`POST /api/admin/database/move`**：Settings 页可在线改 db 文件路径，server 关闭句柄 → 物理移动 `db / db-shm / db-wal` → 落 conf。要求手动重启 server 应用（CLI 端可 `nantianmen restart`）。
+- **Desktop Settings DB 编辑框**：表单输入 → 相对路径以 conf 同目录为基准解析 → 走 move endpoint。新增 `moveDatabase()` API client。
+- **CLI 自动启动 server**：`nantianmen <cmd>` 执行前先探测 `127.0.0.1:38271/v1/health`，未就绪则按 `--server-bin`（fallback 到 `../server/index.js` 或 `$NANTIANMEN_SERVER_BIN`）fork 一份 detached 子进程；CLI 退出不影响 server 寿命。
+- **首次启动自动 init**：conf 文件不存在时 server 自动写默认 conf（`initialized:true`、`salt` 随机生成、`password = md5(md5('admin') + salt)`、database = sqlite3）。不再要求先跑 `setup`。
+- **Build 路径规范化**：`electron:build` 修复中间产物到 `<repo>/temp/`，成品 exe 到 `<repo>/releases/`。
+- **应用启动优化**：`main.cjs` `createWindow()` 先 await + `startServer()` fire-and-forget；Win 加 `disable-gpu-sandbox`；`show:false` + `ready-to-show` 消除 Vue 启动期白/黑屏。
+
+### Fixed
+
+- **SSE 流式响应空体**：`makeStreamingResponse` 改用 `reply.raw.writeHead()` + `reply.raw.write()` 直接写 HTTP 响应流，修复 Fastify 将 `Symbol.asyncIterator` 对象序列化为 `{}` 导致 Hermes Agent 报 `empty stream with no finish_reason`。
+- **默认模型不生效**：`resolveModel()` 改用 `getDefaultEntry()` 基于 `models.is_default=1` 路由，替代原先取 map 首个模型的逻辑。`PUT .../default` 增加 `await rebuildModelMap()` 使设定立即在内存生效。
+- **模型列表设默认后消失**：`setDefault()` 调用顺序改为先 `load()` 再 `fetchModels()`，避免 `load()` 返回的不含 `models` 字段覆盖已加载列表。
+- **流式 stats 丢失**：SSE token parser 跳过 `"usage":null`（doubao 等 provider SSE 不返回 usage），且流式请求成功后始终记录 `request_count`（即使 token 为 0）。
+
+### Changed
+
+- **conf+db 跨端统一写到 user-data 子目录 `cj-nantianmen/`**：
+  - Windows `%APPDATA%\Roaming\cj-nantianmen\`
+  - macOS `~/Library/Application Support/cj-nantianmen/`
+  - Linux `~/.config/cj-nantianmen/` （XDG）
+  - desktop packaged → Electron `app.getPath('appData')`（`package.json#name=cj-nantianmen`）
+  - cli / server fallback → `server/conf.js` 的 `defaultBaseDir()`，平台分支写入同一路径
+  - 三端共一份 conf + db，desktop / cli / server 看到一致的 provider 列表与设置
+  - `-c/-D` 显式传任意位置仍生效（dev / 多实例隔离）
+  - NSIS portable 切到 appData 后不再被 `%TEMP%` 临时目录坑（之前用 `app.getPath('exe')` 会在 NSIS self-extract 时落到 temp）
+
 ## [v0.2.0] - 2026-07-15
 
 ### ⚠ Breaking
