@@ -1,6 +1,6 @@
 {
   "name": "nantianmen-cli",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "Nantianmen CLI - node-only command line tool",
   "type": "module",
   "bin": { "nantianmen": "./index.js" },

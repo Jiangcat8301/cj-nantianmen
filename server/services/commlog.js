@@ -117,7 +117,7 @@ export async function list(filters = {}, page = 1, perPage = 0) {
       [...params, perPage, offset]
     )
     return { total, rows: rows.map(r => ({
-      request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
+      id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
       provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
       tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
       input: r.input, output: r.output,
@@ -130,7 +130,7 @@ export async function list(filters = {}, page = 1, perPage = 0) {
     params
   )
   return rows.map(r => ({
-    request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
+    id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
     provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
     tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
     input: r.input, output: r.output,

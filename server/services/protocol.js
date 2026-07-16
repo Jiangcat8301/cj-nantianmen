@@ -71,6 +71,11 @@ export function anthropicRespToOpenAI(data) {
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('\n') || null
+  // ponytail: Minimax puts tool calls as XML in text blocks. Strip.
+  const cleanText = text ? text
+    .replace(/<\]minimax\[>\[/g, '')
+    .replace(/<\/?(?:tool_call|tool_calls|invoke|query|parameter)[^>]*>/g, '')
+    .trim() || null : null
   const toolCalls = blocks
     .map(blockToToolCall)
     .filter(Boolean)
@@ -85,7 +90,7 @@ export function anthropicRespToOpenAI(data) {
       index: 0,
       message: {
         role: 'assistant',
-        content: text,
+        content: cleanText,
         ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
       },
       finish_reason: finishReason,
@@ -132,6 +137,21 @@ export function extractTokensAnthropic(usage) {
   }
 }
 
+// ponytail: emit clean prefix from minimax-buffered text, keeping 100-char tail
+function emitMinimaxClean(textDelta, buf, out, msgId, ts) {
+  buf.t = (buf.t || '') + (textDelta || '')
+  // ponytail: strip known complete Minmax XML blocks from buffer
+  const cleaned = buf.t
+    .replace(/<\]minimax\[>\[/g, '')
+    .replace(/<(\/)?(?:tool_call|tool_calls|invoke|query|parameter)[^>]*>/g, '')
+  // ponytail: keep last 100 chars (may be partial tag), emit the rest
+  const cutoff = Math.max(0, cleaned.length - 100)
+  if (cutoff > 0) {
+    out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: cleaned.slice(0, cutoff) }, finish_reason: null }] })}\n\n`)
+  }
+  buf.t = cleaned.slice(cutoff)
+}
+
 // ponytail: Anthropic SSE → OpenAI SSE streaming converter.
 // Parses complete SSE events (separated by \n\n) and maps to OpenAI format.
 // toolBlockByIndex tracks which content_block indices belong to tool calls.
@@ -175,7 +195,7 @@ export function anthropicSSEToOpenAI(rawText, buffer, msgId, toolBlockByIndex) {
         if (delta?.type === 'input_json_delta' && toolBlockByIndex[tcIndex]) {
           out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { tool_calls: [{ index: tcIndex, function: { arguments: delta.partial_json } }] }, finish_reason: null }] })}\n\n`)
         } else if (delta?.type === 'text_delta') {
-          out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: delta.text || '' }, finish_reason: null }] })}\n\n`)
+          emitMinimaxClean(delta.text || '', buffer, out, msgId, ts)
         }
         break
       }
@@ -187,6 +207,11 @@ export function anthropicSSEToOpenAI(rawText, buffer, msgId, toolBlockByIndex) {
         break
       }
       case 'message_stop':
+        // ponytail: flush remaining minimax text buffer
+        if (buffer.t?.trim()) {
+          out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: buffer.t }, finish_reason: null }] })}\n\n`)
+          buffer.t = ''
+        }
         out.push('data: [DONE]\n\n')
         buffer.doneSent = true
         break

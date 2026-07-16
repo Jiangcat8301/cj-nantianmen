@@ -45,6 +45,7 @@
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-gray-400 border-b border-gray-700">
+            <th class="py-2 px-2 whitespace-nowrap w-10">#</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_time') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_user') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_provider') }}</th>
@@ -59,6 +60,7 @@
         <tbody>
           <template v-for="(l, i) in logs" :key="l.request_id || i">
             <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+              <td class="py-2 px-2 text-gray-500 text-xs font-mono text-right">{{ l.id }}</td>
               <td class="py-2 px-2 text-gray-400 text-xs font-mono whitespace-nowrap">{{ l.time }}</td>
               <td class="py-2 px-2">{{ l.user_name || l.user_id || '-' }}</td>
               <td class="py-2 px-2">{{ l.provider_name }}</td>
@@ -78,14 +80,20 @@
             </tr>
             <!-- Inline detail panel -->
             <tr v-if="selected.has(l.request_id||i)">
-              <td colspan="9" class="bg-gray-800/50 border-b border-gray-700 p-4">
+              <td colspan="10" class="bg-gray-800/50 border-b border-gray-700 p-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 class="text-xs text-gray-500 mb-1">📥 Input</h4>
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-xs text-gray-500">📥 Input</h4>
+                      <button @click="copy(l.input)" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200">📋</button>
+                    </div>
                     <pre class="text-xs text-gray-300 whitespace-pre-wrap max-h-64 overflow-auto bg-gray-900 p-2 rounded">{{ pretty(l.input) }}</pre>
                   </div>
                   <div>
-                    <h4 class="text-xs text-gray-500 mb-1">📤 Output</h4>
+                    <div class="flex items-center justify-between mb-1">
+                      <h4 class="text-xs text-gray-500">📤 Output</h4>
+                      <button @click="copy(l.output)" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200">📋</button>
+                    </div>
                     <pre class="text-xs text-gray-300 whitespace-pre-wrap max-h-64 overflow-auto bg-gray-900 p-2 rounded">{{ pretty(l.output) }}</pre>
                   </div>
                 </div>
@@ -126,6 +134,7 @@ const total = ref(0)
 
 const fmt = (n) => n ? n.toLocaleString() : '0'
 const pretty = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
+const copy = (text) => { navigator.clipboard?.writeText(typeof text === 'string' ? text : '') }
 
 async function load() {
   try {
