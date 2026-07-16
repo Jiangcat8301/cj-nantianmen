@@ -10,8 +10,9 @@ export function openaiReqToAnthropic(body) {
     let sys = null
     const msgs = []
     for (const m of body.messages) {
-      if (m.role === 'system') { sys = (sys ? sys + '\n' : '') + m.content; continue }
-      msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })
+      const c = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+      if (m.role === 'system') { sys = (sys ? sys + '\n' : '') + c; continue }
+      msgs.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: c })
     }
     if (sys) out.system = sys
     out.messages = msgs
