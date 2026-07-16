@@ -84,15 +84,11 @@
       </div>
     </div>
 
-    <!-- DB Volume + Commlog count -->
-    <div class="grid grid-cols-2 gap-4 mb-6">
-      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+    <!-- DB Volume -->
+    <div class="mb-6">
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 max-w-xs">
         <p class="text-xs text-gray-500 mb-2">{{ t('db_volume') }}</p>
         <p class="text-3xl font-bold text-emerald-400">{{ dbSize }}</p>
-      </div>
-      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('log_count') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ formatNum(dbLogCount) }}</p>
       </div>
     </div>
   </div>
