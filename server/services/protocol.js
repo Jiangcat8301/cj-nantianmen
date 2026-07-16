@@ -89,6 +89,24 @@ function parseMinimaxToolCalls(text) {
       : null
     return { cleanText: finalText, toolCalls }
   }
+  // ponytail: try XML v2 format — <actions><action tool="..."><param name="...">...</param></action></actions>
+  const actsMatch = cleaned.match(/<actions>(.*?)<\/actions>/s)
+  if (actsMatch) {
+    const toolCalls = []
+    let callId = 0
+    const actionRe = /<action\s+tool="([^"]+)">(.*?)<\/action>/gs
+    let am
+    while ((am = actionRe.exec(actsMatch[1])) !== null) {
+      const name = am[1], body = am[2]
+      const args = {}
+      const paramRe = /<param\s+name="([^"]+)">(.*?)<\/param>/gs
+      let pm
+      while ((pm = paramRe.exec(body)) !== null) args[pm[1]] = pm[2].trim()
+      toolCalls.push({ id: `minimax_${++callId}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+    }
+    const clean = cleaned.replace(/<actions>.*?<\/actions>/s, '').trim() || null
+    return { cleanText: clean, toolCalls }
+  }
   // ponytail: try inline JSON — {"name":"...","arguments":{...}} per line
   const jsonRe = /\{"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{)/g
   let jm = jsonRe.exec(cleaned)
