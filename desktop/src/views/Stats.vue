@@ -133,6 +133,7 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted, watch, computed } from 'vue'
 import api from '../lib/api'
+import { calcCost } from '../lib/format.js'
 
 const t = inject('t')
 const filters = ref({ provider: '', model: '', range: '7d' })
@@ -198,19 +199,14 @@ async function saveFilters() {
   } catch {}
 }
 
-// ponytail: aggregate total cost from breakdown
+// ponytail: cost = (input-cached)*input_price + output*output_price + cached*cache_hit_price
 const totalCost = computed(() => {
   let c = 0
-  for (const r of (stats.value.breakdown || [])) {
-    c += ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000
-  }
+  for (const r of (stats.value.breakdown || [])) c += calcCost(r)
   return c
 })
 
-const costForRow = (r) => {
-  const c = ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000
-  return '¥' + c.toFixed(4)
-}
+const costForRow = (r) => '¥' + calcCost(r).toFixed(4)
 
 const topModels = computed(() => {
   return (stats.value.breakdown || [])

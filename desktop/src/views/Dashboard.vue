@@ -63,24 +63,24 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-5 gap-4 mb-6">
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('provider_count') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ providerCount }}</p>
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('provider_count') }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ providerCount }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('apikey_count') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ keyCount }}</p>
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('apikey_count') }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ keyCount }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('today_requests') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ todayReqs }}</p>
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_requests') }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ todayReqs }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('today_tokens') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ formatNum(todayTokens) }}</p>
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_tokens') }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ formatNum(todayTokens) }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
-        <p class="text-xs text-gray-500 mb-2">{{ t('today_cost') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">¥{{ todayCost.toFixed(4) }}</p>
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_cost') }}</p>
+        <p class="text-2xl font-bold text-emerald-400">¥{{ todayCost.toFixed(4) }}</p>
       </div>
     </div>
 
@@ -97,6 +97,7 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
+import { calcCost } from '../lib/format.js'
 
 const t = inject('t')
 const win = typeof window !== 'undefined' ? window.win : null
@@ -134,9 +135,7 @@ const loadStats = async () => {
     todayReqs.value = stats.total_requests || 0
     todayTokens.value = (stats.total_input_tokens || 0) + (stats.total_output_tokens || 0)
     let cost = 0
-    for (const r of (stats.breakdown || [])) {
-      cost += ((r.input_tokens || 0) * (r.input_price || 0) + (r.output_tokens || 0) * (r.output_price || 0) + (r.cached_tokens || 0) * (r.cache_hit_price || 0)) / 1_000_000
-    }
+    for (const r of (stats.breakdown || [])) cost += calcCost(r)
     todayCost.value = cost
     defaultModel.value = dm
     // ponytail: also load DB info
@@ -178,10 +177,11 @@ const formatNum = (n) => {
 const formatBytes = (bytes) => {
   if (!bytes) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
-  let i = 0
-  let s = bytes
+  let i = 0, s = bytes
   while (s >= 1024 && i < units.length - 1) { s /= 1024; i++ }
-  return s.toFixed(i > 0 ? 2 : 0) + ' ' + units[i]
+  // ponytail: strip trailing zeros, keep 0-2 decimals
+  const fixed = s % 1 === 0 ? s.toFixed(0) : parseFloat(s.toFixed(2)).toString()
+  return fixed + ' ' + units[i]
 }
 
 onMounted(async () => {
