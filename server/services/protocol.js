@@ -128,6 +128,24 @@ function parseMinimaxToolCalls(text) {
     clean = clean ? clean.replace(/<(\/)?(?:invoke|parameter)[^>]*>/gs, '').trim() || null : null
     return { cleanText: clean, toolCalls }
   }
+  // ponytail: try format v5 — <tools>\nname({"key":"val"})\n...</tools> (function-call syntax)
+  const toolsRe5 = /<tools>(.*?)<\/tools>/s
+  const tmMatch = cleaned.match(toolsRe5)
+  if (tmMatch) {
+    const toolCalls = []
+    let callId = 0
+    const lines = tmMatch[1].split('\n').filter(l => l.trim())
+    for (const line of lines) {
+      const m2 = line.match(/(\w+)\((\{.*?\})\)/)
+      if (!m2) continue
+      try {
+        const args = JSON.parse(m2[2])
+        toolCalls.push({ id: `minimax_${++callId}`, type: 'function', function: { name: m2[1], arguments: JSON.stringify(args) } })
+      } catch {}
+    }
+    const clean = cleaned.replace(toolsRe5, '').replace(/\]<tool_call>/g, '').trim() || null
+    return { cleanText: clean, toolCalls }
+  }
   // ponytail: try inline JSON — {"name":"...","arguments":{...}} per line
   const jsonRe = /\{"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{)/g
   let jm = jsonRe.exec(cleaned)
@@ -171,16 +189,17 @@ const STOP_REASON_MAP = {
   refusal: 'content_filter',
 }
 
-export function anthropicRespToOpenAI(data) {
+export function anthropicRespToOpenAI(data, providerName = '') {
   const blocks = data.content || []
   const rawText = blocks
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('\n') || null
-  // ponytail: parse Minimax inline tool_call XML → OpenAI tool_calls
-  const { cleanText, toolCalls: minimaxToolCalls } = rawText
+  // ponytail: Minimax-specific inline tool_call parsing
+  const isMinimax = providerName.toLowerCase().includes('minimax')
+  const { cleanText, toolCalls: minimaxToolCalls } = (rawText && isMinimax)
     ? parseMinimaxToolCalls(rawText)
-    : { cleanText: null, toolCalls: [] }
+    : { cleanText: rawText, toolCalls: [] }
   // ponytail: also extract any standard Anthropic tool_use blocks
   const standardToolCalls = blocks
     .map(blockToToolCall)

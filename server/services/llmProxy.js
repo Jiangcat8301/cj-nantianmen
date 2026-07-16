@@ -90,7 +90,7 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
     // ponytail: convert response format when protocols differ
     let out = data
     if (inboundProtocol === 'openai' && providerProtocol === 'anthropic') {
-      out = anthropicRespToOpenAI(data)
+      out = anthropicRespToOpenAI(data, provider.name || '')
     } else if (inboundProtocol === 'anthropic' && providerProtocol === 'openai') {
       out = openaiRespToAnthropic(data)
     }
