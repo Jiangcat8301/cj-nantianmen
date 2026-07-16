@@ -43,6 +43,25 @@ CREATE TABLE IF NOT EXISTS usage_stats (
   cached_tokens INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS communication_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id TEXT NOT NULL,
+  time TEXT NOT NULL,
+  user_id TEXT NOT NULL DEFAULT '',
+  user_name TEXT NOT NULL DEFAULT '',
+  provider_id INTEGER NOT NULL,
+  provider_name TEXT NOT NULL DEFAULT '',
+  model_name TEXT NOT NULL DEFAULT '',
+  tokens_input INTEGER NOT NULL DEFAULT 0,
+  tokens_output INTEGER NOT NULL DEFAULT 0,
+  tokens_cached INTEGER NOT NULL DEFAULT 0,
+  input TEXT NOT NULL DEFAULT '',
+  output TEXT NOT NULL DEFAULT '',
+  error_code INTEGER,
+  error_message TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_commlog_time ON communication_log(time DESC);
 `
 
 export class SqliteDatabase extends IDatabase {

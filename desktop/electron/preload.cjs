@@ -13,4 +13,7 @@ contextBridge.exposeInMainWorld('win', {
   // tray language
   getTrayLang: () => ipcRenderer.invoke('get-tray-lang'),
   setTrayLang: (lang) => ipcRenderer.send('set-tray-lang', lang),
+  // auto-start
+  autostartGet: () => ipcRenderer.invoke('autostart:get'),
+  autostartSet: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
 })

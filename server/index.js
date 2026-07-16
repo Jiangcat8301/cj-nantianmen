@@ -5,6 +5,7 @@ import { initDb, getDb } from './db/index.js'
 import { adminAuth } from './auth.js'
 import { rebuildModelMap } from './services/modelMap.js'
 import * as stats from './services/stats.js'
+import * as commlog from './services/commlog.js'
 import adminRoutes from './routes/admin.js'
 import llmRoutes from './routes/llm.js'
 import apikeyRoutes from './routes/apikey.js'
@@ -47,6 +48,7 @@ async function ensureDb() {
   dbReady = true
   await rebuildModelMap()
   stats.startFlushTask()
+  commlog.initBuffer()
 }
 // ponytail: imports kept at the top of the file
 

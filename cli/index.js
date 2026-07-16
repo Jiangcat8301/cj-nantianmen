@@ -355,21 +355,26 @@ async function cmdLog() {
   const args = process.argv.slice(3)
   const sub = args[0]
   if (sub === 'ls' || !sub) {
-    const params = {}
-    if (args[1]) {
-      for (let i = 1; i < args.length; i++) {
-        if (args[i] === '--provider' && args[i+1]) params.provider_id = args[++i]
-        else if (args[i] === '--model' && args[i+1]) params.model_name = args[++i]
-        else if (args[i] === '--user' && args[i+1]) params.user_id = args[++i]
-      }
+    // ponytail: parse --lines/-L, default 20. Also support --page for multi-page view.
+    let lines = 20, p = 1
+    const params = { page: 1, per_page: 20 }
+    for (let i = 1; i < args.length; i++) {
+      if ((args[i] === '--lines' || args[i] === '-L') && args[i+1]) { lines = parseInt(args[++i]); params.per_page = lines }
+      else if (args[i] === '--page' && args[i+1]) { p = parseInt(args[++i]); params.page = p }
+      else if (args[i] === '--provider' && args[i+1]) params.provider_id = args[++i]
+      else if (args[i] === '--model' && args[i+1]) params.model_name = args[++i]
+      else if (args[i] === '--user' && args[i+1]) params.user_id = args[++i]
     }
-    const qs = Object.entries(params).map(([k,v]) => `${k}=${v}`).join('&')
+    const qs = Object.entries(params).filter(([,v]) => v !== undefined && v !== '').map(([k,v]) => `${k}=${v}`).join('&')
     const r = await call('GET', '/api/admin/communication-log' + (qs ? '?' + qs : ''))
     if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
-    if (!Array.isArray(r.data) || r.data.length === 0) { console.log('(no log entries)'); return }
-    for (const l of r.data) {
-      console.log(`${l.time}\\t${l.user_name||l.user_id}\\t${l.provider_name}\\t${l.model_name}\\tin:${l.tokens_input}\\tout:${l.tokens_output}\\tcached:${l.tokens_cached}\\t${l.error ? '✕'+l.error.code : '✓'}`)
+    const data = r.data.rows || r.data  // ponytail: paginated returns {rows, total}; legacy returns array
+    if (!Array.isArray(data) || data.length === 0) { console.log('(no log entries)'); return }
+    for (const l of data) {
+      console.log(`${l.time}\t${l.user_name||l.user_id}\t${l.provider_name}\t${l.model_name}\tin:${l.tokens_input}\tout:${l.tokens_output}\tcached:${l.tokens_cached}\t${l.error ? '✕'+l.error.code : '✓'}`)
     }
+    const tot = r.data.total
+    if (tot && tot > data.length) console.log(`\n(page ${r.data.page || p}, ${data.length} of ${tot} total)`)
     return
   }
   if (sub === 'clear') {
@@ -377,17 +382,37 @@ async function cmdLog() {
     console.log(r.status === 200 ? '✓ cleared' : '✗ ' + r.status)
     return
   }
+  if (sub === 'config') {
+    const r = await call('GET', '/api/admin/communication-log/config')
+    console.log(`log_enabled:          ${r.data?.log_enabled ?? false}`)
+    console.log(`log_rotation_enabled: ${r.data?.log_rotation_enabled ?? false}`)
+    console.log(`log_rotation_max:     ${r.data?.log_rotation_max ?? 1000}`)
+    return
+  }
+  if (sub === 'rotation') {
+    const args2 = args.slice(1)
+    const body = {}
+    for (let i = 0; i < args2.length; i++) {
+      if (args2[i] === '--on' || args2[i] === '--enable') body.log_rotation_enabled = true
+      else if (args2[i] === '--off' || args2[i] === '--disable') body.log_rotation_enabled = false
+      else if (args2[i] === '--max' && args2[i+1]) { body.log_rotation_max = parseInt(args2[++i]) || 1000 }
+    }
+    if (Object.keys(body).length === 0) {
+      const r = await call('GET', '/api/admin/communication-log/config')
+      console.log(`log_rotation_enabled: ${r.data?.log_rotation_enabled ?? false}`)
+      console.log(`log_rotation_max:     ${r.data?.log_rotation_max ?? 1000}`)
+      return
+    }
+    const r = await call('PUT', '/api/admin/communication-log/config', body)
+    console.log(r.status === 200 ? '✓ rotation updated' : '✗ ' + r.status)
+    return
+  }
   if (sub === 'enable' || sub === 'disable') {
     const r = await call('PUT', '/api/admin/communication-log/config', { log_enabled: sub === 'enable' })
     console.log(r.status === 200 ? `✓ log ${sub}d` : '✗ ' + r.status)
     return
   }
-  if (sub === 'config') {
-    const r = await call('GET', '/api/admin/communication-log/config')
-    console.log(`log_enabled: ${r.data?.log_enabled ?? false}`)
-    return
-  }
-  console.error('usage: nantianmen log [ls|clear|enable|disable|config] [--provider ID] [--model NAME] [--user ID]')
+  console.error('usage: nantianmen log [ls|clear|enable|disable|config|rotation] [--provider ID] [--model NAME] [--user ID]')
 }
 
 const CMDS = {

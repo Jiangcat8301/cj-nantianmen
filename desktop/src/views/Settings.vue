@@ -75,13 +75,26 @@ const dbInfo = ref({})
 const dbPathInput = ref('')
 const dbSaving = ref(false)
 
-const toggleAutostart = () => { autostart.value = !autostart.value }
+const toggleAutostart = async () => {
+  const next = !autostart.value
+  if (win && win.autostartSet) {
+    try {
+      await win.autostartSet(next)
+      autostart.value = next
+    } catch {}
+  } else {
+    autostart.value = next
+  }
+}
 
 const save = () => {
+  if (autostart.value) {
+    // ponytail: persist on every save click
+    if (win && win.autostartSet) win.autostartSet(true).catch(() => {})
+  }
   alert(t('set_save') + ' ✓')
 }
 
-// ponytail: relative/absolute DB path → server moves file + restarts handle.
 const saveDbPath = async () => {
   const newPath = dbPathInput.value.trim()
   if (!newPath) return alert('路径不能为空')
@@ -116,5 +129,9 @@ onMounted(async () => {
       dbInfo.value = data.database || { type: 'sqlite3', path: './nantianmen.db' }
     }
   } catch {}
+  // ponytail: read current auto-start state from Electron
+  if (win && win.autostartGet) {
+    try { autostart.value = await win.autostartGet() } catch {}
+  }
 })
 </script>

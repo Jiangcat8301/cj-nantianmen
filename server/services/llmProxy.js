@@ -1,5 +1,5 @@
 import { getEntry, getDefaultEntry } from './modelMap.js'
-import { openaiReqToAnthropic, anthropicReqToOpenai, anthropicRespToOpenAI, openaiRespToAnthropic, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
+import { openaiReqToAnthropic, anthropicReqToOpenai, anthropicRespToOpenAI, openaiRespToAnthropic, anthropicSSEToOpenAI, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
 import * as stats from './stats.js'
 import * as commlog from './commlog.js'
 import { getDb } from '../db/index.js'
@@ -111,53 +111,6 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   }
 }
 
-// ponytail: Anthropic SSE → OpenAI SSE streaming converter.
-// Parses complete SSE events (separated by \n\n) and maps to OpenAI format.
-// Keeps partial chunks in a buffer between calls.
-// Returns converted SSE text ready to write to client.
-function anthropicSSEToOpenAI(rawText, buffer, msgId) {
-  buffer.s += rawText
-  const out = []
-  while (true) {
-    const idx = buffer.s.indexOf('\n\n')
-    if (idx === -1) break
-    const event = buffer.s.slice(0, idx)
-    buffer.s = buffer.s.slice(idx + 2)
-    const lines = event.split('\n')
-    let evType = '', dataStr = ''
-    for (const line of lines) {
-      if (line.startsWith('event: ')) evType = line.slice(7)
-      else if (line.startsWith('data: ')) dataStr = line.slice(6)
-    }
-    if (!dataStr) continue
-    let data
-    try { data = JSON.parse(dataStr) } catch { continue }
-
-    const ts = Math.floor(Date.now() / 1000)
-    switch (evType) {
-      case 'message_start':
-        msgId.v = data.message?.id || msgId.v
-        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: data.message?.model || '', choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] })}\n\n`)
-        break
-      case 'content_block_delta':
-        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: data.delta?.text || '' }, finish_reason: null }] })}\n\n`)
-        break
-      case 'message_delta': {
-        const reason = data.delta?.stop_reason === 'end_turn' ? 'stop' : (data.delta?.stop_reason || 'stop')
-        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: {}, finish_reason: reason }] })}\n\n`)
-        break
-      }
-      case 'message_stop':
-        out.push('data: [DONE]\n\n')
-        break
-      // ping, content_block_start, content_block_stop → skip
-    }
-  }
-  if (out.length === 0) return ''
-  if (out.some(s => s.includes('[DONE]'))) buffer.doneSent = true
-  return out.join('')
-}
-
 function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, providerId, reply, upstreamBody, provider) {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -172,6 +125,7 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
   const needConvert = inboundProtocol === 'openai' && providerProtocol === 'anthropic'
   const sseBuf = { s: '', doneSent: false }
   const msgId = { v: '' }
+  const toolBlockByIndex = {}  // ponytail: track which content_block indices are tool calls
 
   // ponytail: extract token counts from raw upstream SSE text (before conversion)
   function parseTokens(text) {
@@ -209,7 +163,7 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
         outputBuf += text
         parseTokens(text)
         if (needConvert) {
-          const converted = anthropicSSEToOpenAI(text, sseBuf, msgId)
+          const converted = anthropicSSEToOpenAI(text, sseBuf, msgId, toolBlockByIndex)
           if (converted) reply.raw.write(converted)
         } else {
           reply.raw.write(text)
@@ -223,7 +177,6 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
     }
     // ponytail: flush remaining buffer
     if (needConvert && sseBuf.s.trim()) {
-      // try to emit a final [DONE] if nothing was sent
       if (!sseBuf.doneSent) reply.raw.write('data: [DONE]\n\n')
     }
     outputBuf += '\n[stop]'

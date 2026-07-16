@@ -18,9 +18,24 @@
       </div>
     </div>
 
+    <!-- Rotation settings -->
+    <div class="flex items-center gap-4 mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" v-model="rotationEnabled" @change="toggleRotation" class="sr-only" />
+        <span class="w-3 h-3 rounded-full" :class="rotationEnabled ? 'bg-amber-500' : 'bg-gray-600'"></span>
+        <span class="text-gray-400">{{ t('log_rotation') || 'Log Rotation' }}</span>
+      </label>
+      <template v-if="rotationEnabled">
+        <span class="text-xs text-gray-500">{{ t('log_rotation_keep') || '保留最近' }}</span>
+        <input v-model.number="rotationMax" type="number" min="10" max="100000" @change="saveRotationMax"
+          class="w-24 px-2 py-1 bg-gray-900 rounded border border-gray-700 text-xs font-mono text-amber-400 focus:border-amber-500 focus:outline-none" />
+        <span class="text-xs text-gray-500">{{ t('log_rotation_entries') || '条' }}</span>
+      </template>
+    </div>
+
     <div class="flex gap-3 mb-4">
       <select v-model="filters.provider_id" @change="applyFilter" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
-        <option value="">全部供应商</option>
+        <option value="">{{ t('stats_all_providers') || '全部供应商' }}</option>
         <option v-for="p in providers" :key="p.id" :value="p.id">{{ p.name }}</option>
       </select>
       <select v-model="filters.model_name" @change="applyFilter" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
@@ -28,12 +43,13 @@
         <option v-for="m in models" :key="m" :value="m">{{ m }}</option>
       </select>
       <select v-model="filters.user_id" @change="applyFilter" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
-        <option value="">全部用户</option>
+        <option value="">{{ t('stats_all_users') || '全部用户' }}</option>
         <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
       </select>
     </div>
 
-    <div class="text-xs text-gray-500 mb-2">{{ t('log_count') }}: {{ logs.length }} / 1000</div>
+    <!-- Top pagination -->
+    <Pagination v-if="totalPages > 1" :page="page" :totalPages="totalPages" @go="goPage" />
 
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -45,13 +61,13 @@
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_model') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_in') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_out') }}</th>
-            <th class="py-2 px-2 whitespace-nowrap text-right">缓存命中</th>
+            <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_cached') || '缓存命中' }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_status') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('th_actions') }}</th>
           </tr>
         </thead>
         <tbody>
-          <template v-for="(l, i) in logs" :key="i">
+          <template v-for="(l, i) in logs" :key="l.request_id || i">
             <tr class="border-b border-gray-800 hover:bg-gray-800/50">
               <td class="py-2 px-2 text-gray-400 text-xs font-mono whitespace-nowrap">{{ l.time }}</td>
               <td class="py-2 px-2">{{ l.user_name || l.user_id || '-' }}</td>
@@ -65,13 +81,13 @@
                 <span v-else class="text-emerald-400 text-xs">✓</span>
               </td>
               <td class="py-2 px-2">
-                <button @click="selected.delete(i) ? selected.delete(i) : selected.add(i)" class="text-xs text-blue-400 hover:underline">
-                  {{ selected.has(i) ? t('collapse') : t('details') }}
+                <button @click="selected.has(l.request_id||i) ? selected.delete(l.request_id||i) : selected.add(l.request_id||i)" class="text-xs text-blue-400 hover:underline">
+                  {{ selected.has(l.request_id||i) ? t('collapse') : t('details') }}
                 </button>
               </td>
             </tr>
             <!-- Inline detail panel -->
-            <tr v-if="selected.has(i)">
+            <tr v-if="selected.has(l.request_id||i)">
               <td colspan="9" class="bg-gray-800/50 border-b border-gray-700 p-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div>
@@ -92,6 +108,9 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Bottom pagination -->
+    <Pagination v-if="totalPages > 1" :page="page" :totalPages="totalPages" @go="goPage" />
   </div>
 </template>
 
@@ -102,31 +121,45 @@ import api from '../lib/api'
 const t = inject('t')
 const logs = ref([])
 const logEnabled = ref(false)
+const rotationEnabled = ref(false)
+const rotationMax = ref(1000)
 const selected = ref(new Set())
 const providers = ref([])
 const models = ref([])
 const users = ref([])
 const filters = ref({ provider_id: '', model_name: '', user_id: '' })
+const page = ref(1)
+const totalPages = ref(1)
+const total = ref(0)
 
 const fmt = (n) => n ? n.toLocaleString() : '0'
 const pretty = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
 
 async function load() {
   try {
-    const p = {}
+    const p = { page: page.value, per_page: 20 }
     if (filters.value.provider_id) p.provider_id = filters.value.provider_id
     if (filters.value.model_name) p.model_name = filters.value.model_name
     if (filters.value.user_id) p.user_id = filters.value.user_id
-    const data = (await api.getCommLog(p)).data || []
-    logs.value = data.reverse()
+    const { data } = await api.getCommLog(p)
+    logs.value = data.rows || []
+    total.value = data.total || 0
+    totalPages.value = Math.max(1, Math.ceil(total.value / 20))
   } catch {}
+}
+
+function goPage(n) {
+  page.value = n
+  load()
 }
 
 async function loadFilters() {
   try {
     const pr = await api.listProviders()
     providers.value = pr.data || []
-    const all = (await api.getCommLog({})).data || []
+    // ponytail: for filter dropdowns, fetch full unfiltered list
+    const { data: full } = await api.getCommLog({})
+    const all = full.rows || full || []
     models.value = [...new Set(all.map(l => l.model_name).filter(Boolean))].sort()
     const userMap = new Map()
     all.forEach(l => { if (l.user_id) userMap.set(l.user_id, { id: l.user_id, name: l.user_name || l.user_id }) })
@@ -138,13 +171,28 @@ async function loadConfig() {
   try {
     const r = await api.getCommLogConfig()
     logEnabled.value = r.data.log_enabled
+    rotationEnabled.value = r.data.log_rotation_enabled || false
+    rotationMax.value = r.data.log_rotation_max || 1000
   } catch {}
 }
 
 async function toggleLog() {
   try {
-    await api.setCommLogConfig(logEnabled.value)
+    await api.setCommLogConfig({ log_enabled: logEnabled.value })
   } catch { logEnabled.value = !logEnabled.value }
+}
+
+async function toggleRotation() {
+  try {
+    await api.setCommLogConfig({ log_rotation_enabled: rotationEnabled.value })
+  } catch { rotationEnabled.value = !rotationEnabled.value }
+}
+
+async function saveRotationMax() {
+  if (rotationMax.value < 10) rotationMax.value = 10
+  try {
+    await api.setCommLogConfig({ log_rotation_max: rotationMax.value })
+  } catch {}
 }
 
 async function clearLogs() {
@@ -152,12 +200,13 @@ async function clearLogs() {
   try {
     await api.clearCommLog()
     logs.value = []
+    total.value = 0
+    totalPages.value = 1
   } catch {}
 }
 
-async function applyFilter() { await load(); await saveFilters() }
+async function applyFilter() { page.value = 1; await load(); await saveFilters() }
 
-// ponytail: persist filters so they survive page navigation
 async function saveFilters() {
   try {
     const { data: current } = await api.getUiFilters()
@@ -168,7 +217,6 @@ async function saveFilters() {
 onMounted(async () => {
   await loadConfig()
   await loadFilters()
-  // ponytail: restore saved filters from conf
   try {
     const { data } = await api.getUiFilters()
     if (data?.logs) {
@@ -179,4 +227,34 @@ onMounted(async () => {
   } catch {}
   await load()
 })
+</script>
+
+<script>
+// ponytail: inline Pagination component — top + bottom reuse, no extra import
+import { h } from 'vue'
+const Pagination = {
+  props: { page: Number, totalPages: Number },
+  emits: ['go'],
+  setup(props, { emit }) {
+    return () => {
+      const p = props.page, tp = props.totalPages
+      // ponytail: show first / prev / ... / next / last
+      const btns = []
+      if (p > 1) btns.push(
+        h('button', { onClick: () => emit('go', 1), class: 'px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded' }, '«'),
+        h('button', { onClick: () => emit('go', p-1), class: 'px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded' }, '‹'),
+      )
+      btns.push(h('span', { class: 'px-3 py-1 text-xs text-gray-400' }, `${p}/${tp}`))
+      if (p < tp) btns.push(
+        h('button', { onClick: () => emit('go', p+1), class: 'px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded' }, '›'),
+        h('button', { onClick: () => emit('go', tp), class: 'px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded' }, '»'),
+      )
+      return h('div', { class: 'flex items-center justify-center gap-1 my-3' }, [
+        h('span', { class: 'text-xs text-gray-500 mr-3' }, `共 ${props.totalPages} 页`),
+        ...btns
+      ])
+    }
+  }
+}
+export default { components: { Pagination } }
 </script>

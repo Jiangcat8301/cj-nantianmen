@@ -36,15 +36,46 @@ export function anthropicReqToOpenai(body) {
   return out
 }
 
-// ponytail: non-streaming response format converters.
-// Anthropic Messages API → OpenAI chat.completion shape.
+// ponytail: Anthropic content block → OpenAI tool_calls entry.
+// tool_use (custom client tools) → type:'function'
+// server_tool_use (web_search, code_execution, etc.) → type:'custom'
+function blockToToolCall(block) {
+  if (block.type === 'tool_use') {
+    return {
+      id: block.id,
+      type: 'function',
+      function: { name: block.name, arguments: JSON.stringify(block.input) },
+    }
+  }
+  if (block.type === 'server_tool_use') {
+    return {
+      id: block.id,
+      type: 'custom',
+      custom: { name: block.name, input: JSON.stringify(block.input) },
+    }
+  }
+  return null
+}
+
+// ponytail: stop_reason mapping
+const STOP_REASON_MAP = {
+  end_turn: 'stop',
+  max_tokens: 'length',
+  tool_use: 'tool_calls',
+  refusal: 'content_filter',
+}
 
 export function anthropicRespToOpenAI(data) {
-  const text = (data.content || [])
+  const blocks = data.content || []
+  const text = blocks
     .filter(b => b.type === 'text')
     .map(b => b.text)
-    .join('\n')
-  const finishReason = data.stop_reason === 'end_turn' ? 'stop' : (data.stop_reason || 'stop')
+    .join('\n') || null
+  const toolCalls = blocks
+    .map(blockToToolCall)
+    .filter(Boolean)
+  const stopReason = STOP_REASON_MAP[data.stop_reason] || 'stop'
+  const finishReason = toolCalls.length > 0 ? 'tool_calls' : stopReason
   return {
     id: data.id || '',
     object: 'chat.completion',
@@ -52,7 +83,11 @@ export function anthropicRespToOpenAI(data) {
     model: data.model || '',
     choices: [{
       index: 0,
-      message: { role: 'assistant', content: text },
+      message: {
+        role: 'assistant',
+        content: text,
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      },
       finish_reason: finishReason,
     }],
     usage: data.usage ? {
@@ -95,4 +130,69 @@ export function extractTokensAnthropic(usage) {
     output_tokens: usage?.output_tokens ?? 0,
     cached_tokens: (usage?.cache_read_input_tokens ?? 0) + (usage?.cache_creation_input_tokens ?? 0),
   }
+}
+
+// ponytail: Anthropic SSE → OpenAI SSE streaming converter.
+// Parses complete SSE events (separated by \n\n) and maps to OpenAI format.
+// toolBlockByIndex tracks which content_block indices belong to tool calls.
+export function anthropicSSEToOpenAI(rawText, buffer, msgId, toolBlockByIndex) {
+  buffer.s += rawText
+  const out = []
+  while (true) {
+    const idx = buffer.s.indexOf('\n\n')
+    if (idx === -1) break
+    const event = buffer.s.slice(0, idx)
+    buffer.s = buffer.s.slice(idx + 2)
+    const lines = event.split('\n')
+    let evType = '', dataStr = ''
+    for (const line of lines) {
+      if (line.startsWith('event: ')) evType = line.slice(7)
+      else if (line.startsWith('data: ')) dataStr = line.slice(6)
+    }
+    if (!dataStr) continue
+    let data
+    try { data = JSON.parse(dataStr) } catch { continue }
+
+    const ts = Math.floor(Date.now() / 1000)
+    switch (evType) {
+      case 'message_start':
+        msgId.v = data.message?.id || msgId.v
+        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: data.message?.model || '', choices: [{ index: 0, delta: { role: 'assistant', content: '' }, finish_reason: null }] })}\n\n`)
+        break
+      case 'content_block_start': {
+        const block = data.content_block
+        if (block && (block.type === 'tool_use' || block.type === 'server_tool_use')) {
+          const toolType = block.type === 'server_tool_use' ? 'custom' : 'function'
+          const tcIndex = data.index
+          toolBlockByIndex[tcIndex] = { id: block.id, name: block.name, type: toolType }
+          out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { tool_calls: [{ index: tcIndex, id: block.id, type: toolType, function: { name: block.name, arguments: '' } }] }, finish_reason: null }] })}\n\n`)
+        }
+        break
+      }
+      case 'content_block_delta': {
+        const delta = data.delta
+        const tcIndex = data.index
+        if (delta?.type === 'input_json_delta' && toolBlockByIndex[tcIndex]) {
+          out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { tool_calls: [{ index: tcIndex, function: { arguments: delta.partial_json } }] }, finish_reason: null }] })}\n\n`)
+        } else if (delta?.type === 'text_delta') {
+          out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: delta.text || '' }, finish_reason: null }] })}\n\n`)
+        }
+        break
+      }
+      case 'content_block_stop':
+        break
+      case 'message_delta': {
+        const reason = STOP_REASON_MAP[data.delta?.stop_reason] || 'stop'
+        out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: {}, finish_reason: reason }] })}\n\n`)
+        break
+      }
+      case 'message_stop':
+        out.push('data: [DONE]\n\n')
+        buffer.doneSent = true
+        break
+    }
+  }
+  if (out.length === 0) return ''
+  if (out.some(s => s.includes('[DONE]'))) buffer.doneSent = true
+  return out.join('')
 }

@@ -25,6 +25,15 @@ ipcMain.on('win:maximize', () => {
 ipcMain.on('win:close', () => mainWindow?.close())
 ipcMain.handle('win:isMaximized', () => mainWindow?.isMaximized() ?? false)
 
+// ponytail: auto-start — uses Electron's setLoginItemSettings (cross-platform, Registry on Windows)
+ipcMain.handle('autostart:get', () => {
+  return app.getLoginItemSettings().openAtLogin
+})
+ipcMain.handle('autostart:set', (_e, enabled) => {
+  app.setLoginItemSettings({ openAtLogin: !!enabled })
+  return app.getLoginItemSettings().openAtLogin
+})
+
 // ponytail: server control IPC for Dashboard
 ipcMain.handle('server:status', async () => {
   return { online: await checkServerHealth() }

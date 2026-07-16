@@ -164,23 +164,39 @@ export default async function adminRoutes(fastify) {
     return getConf().ui_filters
   })
 
-  // ponytail: communication log — GET with filters, DELETE to clear, PUT to toggle
+  // ponytail: communication log — paginated GET with filters, DELETE to clear, PUT to toggle
   fastify.get('/api/admin/communication-log', async (req) => {
-    return commlog.list(req.query || {})
+    const query = req.query || {}
+    const page = parseInt(query.page) || null
+    const perPage = page ? (parseInt(query.per_page) || 20) : 0
+    return await commlog.list(query, page || 1, perPage)
   })
 
   fastify.delete('/api/admin/communication-log', async () => {
-    commlog.clear()
+    await commlog.clear()
     return { ok: true }
   })
 
   fastify.get('/api/admin/communication-log/config', async () => {
-    return { log_enabled: getConf().log_enabled || false }
+    const c = getConf()
+    return {
+      log_enabled: c.log_enabled || false,
+      log_rotation_enabled: c.log_rotation_enabled || false,
+      log_rotation_max: c.log_rotation_max || 1000,
+    }
   })
 
   fastify.put('/api/admin/communication-log/config', async (req) => {
-    const { log_enabled } = req.body || {}
-    updateConf({ log_enabled: !!log_enabled })
-    return { log_enabled: getConf().log_enabled }
+    const patch = {}
+    if (req.body.log_enabled !== undefined) patch.log_enabled = !!req.body.log_enabled
+    if (req.body.log_rotation_enabled !== undefined) patch.log_rotation_enabled = !!req.body.log_rotation_enabled
+    if (req.body.log_rotation_max !== undefined) patch.log_rotation_max = parseInt(req.body.log_rotation_max) || 1000
+    if (Object.keys(patch).length > 0) updateConf(patch)
+    const c = getConf()
+    return {
+      log_enabled: c.log_enabled || false,
+      log_rotation_enabled: c.log_rotation_enabled || false,
+      log_rotation_max: c.log_rotation_max || 1000,
+    }
   })
 }

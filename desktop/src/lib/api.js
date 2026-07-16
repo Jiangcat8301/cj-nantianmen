@@ -42,7 +42,7 @@ export default {
   getCommLog: (params) => api.get('/communication-log', { params }),
   clearCommLog: () => api.delete('/communication-log'),
   getCommLogConfig: () => api.get('/communication-log/config'),
-  setCommLogConfig: (log_enabled) => api.put('/communication-log/config', { log_enabled }),
+  setCommLogConfig: (data) => api.put('/communication-log/config', data),
 
   // UI filter persistence
   getUiFilters: () => api.get('/ui-filters'),
