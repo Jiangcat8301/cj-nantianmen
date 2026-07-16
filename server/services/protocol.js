@@ -57,7 +57,39 @@ function blockToToolCall(block) {
   return null
 }
 
-// ponytail: stop_reason mapping
+// ponytail: parse Minimax non-standard tool_call XML into OpenAI tool_calls
+function parseMinimaxToolCalls(text) {
+  const cleaned = text.replace(/<\]minimax\[>\[/g, '')
+  const tcMatch = cleaned.match(/<tool_call>(.*?)<\/tool_call>/s)
+  if (!tcMatch) return { cleanText: cleaned.trim() || null, toolCalls: [] }
+  const toolCalls = []
+  let callId = 0
+  const invokeRe = /<invoke\s+name="([^"]+)">(.*?)<\/invoke>/gs
+  let m
+  while ((m = invokeRe.exec(tcMatch[1])) !== null) {
+    const name = m[1]
+    const body = m[2]
+    const args = {}
+    // extract <query>text</query> or <parameter name="k">v</parameter>
+    const paramRe = /<(query|parameter)(?:\s+name="([^"]*)")?>(.*?)<\/\1>/gs
+    let pm
+    while ((pm = paramRe.exec(body)) !== null) {
+      const key = pm[1] === 'parameter' ? (pm[2] || 'value') : 'query'
+      args[key] = pm[3].trim()
+    }
+    toolCalls.push({
+      id: `minimax_${++callId}`,
+      type: 'function',
+      function: { name, arguments: JSON.stringify(args) },
+    })
+  }
+  const cleanText = cleaned.replace(/<tool_call>.*?<\/tool_call>/s, '').trim() || null
+  // also strip dangling XML tags
+  const finalText = cleanText
+    ? cleanText.replace(/<(\/)?(?:invoke|query|parameter)[^>]*>/g, '').trim() || null
+    : null
+  return { cleanText: finalText, toolCalls }
+}
 const STOP_REASON_MAP = {
   end_turn: 'stop',
   max_tokens: 'length',
@@ -67,18 +99,19 @@ const STOP_REASON_MAP = {
 
 export function anthropicRespToOpenAI(data) {
   const blocks = data.content || []
-  const text = blocks
+  const rawText = blocks
     .filter(b => b.type === 'text')
     .map(b => b.text)
     .join('\n') || null
-  // ponytail: Minimax puts tool calls as XML in text blocks. Strip.
-  const cleanText = text ? text
-    .replace(/<\]minimax\[>\[/g, '')
-    .replace(/<\/?(?:tool_call|tool_calls|invoke|query|parameter)[^>]*>/g, '')
-    .trim() || null : null
-  const toolCalls = blocks
+  // ponytail: parse Minimax inline tool_call XML → OpenAI tool_calls
+  const { cleanText, toolCalls: minimaxToolCalls } = rawText
+    ? parseMinimaxToolCalls(rawText)
+    : { cleanText: null, toolCalls: [] }
+  // ponytail: also extract any standard Anthropic tool_use blocks
+  const standardToolCalls = blocks
     .map(blockToToolCall)
     .filter(Boolean)
+  const toolCalls = [...standardToolCalls, ...minimaxToolCalls]
   const stopReason = STOP_REASON_MAP[data.stop_reason] || 'stop'
   const finishReason = toolCalls.length > 0 ? 'tool_calls' : stopReason
   return {
@@ -137,14 +170,28 @@ export function extractTokensAnthropic(usage) {
   }
 }
 
-// ponytail: emit clean prefix from minimax-buffered text, keeping 100-char tail
+// ponytail: buffer text, detect complete Minimax tool_call XML blocks, parse to tool_calls
 function emitMinimaxClean(textDelta, buf, out, msgId, ts) {
   buf.t = (buf.t || '') + (textDelta || '')
-  // ponytail: strip known complete Minmax XML blocks from buffer
+  // ponytail: detect complete </tool_call> → parse into tool_calls + clean text
+  const tcEnd = buf.t.indexOf('</tool_call>')
+  if (tcEnd !== -1) {
+    // extract the full tool_call block
+    const afterEnd = tcEnd + '</tool_call>'.length
+    const fullChunk = buf.t.slice(0, afterEnd)
+    const remainder = buf.t.slice(afterEnd)
+    const { cleanText, toolCalls } = parseMinimaxToolCalls(fullChunk)
+    // emit parsed tool calls as deltas
+    if (toolCalls.length > 0) {
+      out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { tool_calls: toolCalls.map((tc, i) => ({ index: i, id: tc.id, type: tc.type, function: { name: tc.function.name, arguments: tc.function.arguments } })) }, finish_reason: null }] })}\n\n`)
+    }
+    buf.t = cleanText ? (cleanText + '\n' + remainder) : remainder
+    return
+  }
+  // ponytail: no complete block yet — emit safe prefix, keep 100-char tail
   const cleaned = buf.t
     .replace(/<\]minimax\[>\[/g, '')
     .replace(/<(\/)?(?:tool_call|tool_calls|invoke|query|parameter)[^>]*>/g, '')
-  // ponytail: keep last 100 chars (may be partial tag), emit the rest
   const cutoff = Math.max(0, cleaned.length - 100)
   if (cutoff > 0) {
     out.push(`data: ${JSON.stringify({ id: msgId.v, object: 'chat.completion.chunk', created: ts, model: '', choices: [{ index: 0, delta: { content: cleaned.slice(0, cutoff) }, finish_reason: null }] })}\n\n`)
