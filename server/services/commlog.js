@@ -24,7 +24,7 @@ function rotationMax() {
   return parseInt(c.log_rotation_max) || ROTATION_DEFAULT_MAX
 }
 
-async function flushBuffer() {
+export async function flushBuffer() {
   if (_buf.length === 0) return
   const batch = _buf
   _buf = []
@@ -56,12 +56,9 @@ async function flushBuffer() {
 export function initBuffer() {
   if (_flushTimer) return
   _flushTimer = setInterval(flushBuffer, FLUSH_INTERVAL_MS)
-  // ponytail: final flush on process exit
   process.on('beforeExit', () => flushBuffer())
-  process.on('exit', () => {
-    // sync flush via db directly (getDb is sqlite sync)
-    try { flushBuffer() } catch {}
-  })
+  // ponytail: graceful shutdown on SIGTERM (tray quit → main.cjs kill SIGTERM)
+  process.on('SIGTERM', async () => { await flushBuffer(); process.exit(0) })
   console.log(`[commlog] buffer init, flush every ${FLUSH_INTERVAL_MS / 1000}s`)
 }
 

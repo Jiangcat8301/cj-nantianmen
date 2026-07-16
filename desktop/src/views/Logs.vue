@@ -9,6 +9,11 @@
           <span class="w-3 h-3 rounded-full" :class="logEnabled ? 'bg-emerald-500' : 'bg-gray-600'"></span>
           {{ t('log_toggle') }}
         </label>
+        <button v-if="logEnabled" @click="openRotationModal"
+          class="px-3 py-1.5 text-sm rounded-lg border transition"
+          :class="rotationEnabled ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-red-500/10 border-red-500/50 text-red-400'">
+          {{ rotationEnabled ? `${rotationCount}/${rotationMax}` : t('log_rotation_off') }}
+        </button>
         <button @click="clearLogs" class="px-3 py-1.5 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition">
           {{ t('log_clear') }}
         </button>
@@ -16,21 +21,6 @@
           ↻ {{ t('refresh') }}
         </button>
       </div>
-    </div>
-
-    <!-- Rotation settings -->
-    <div class="flex items-center gap-4 mb-4 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
-      <label class="flex items-center gap-2 text-sm cursor-pointer">
-        <input type="checkbox" v-model="rotationEnabled" @change="toggleRotation" class="sr-only" />
-        <span class="w-3 h-3 rounded-full" :class="rotationEnabled ? 'bg-amber-500' : 'bg-gray-600'"></span>
-        <span class="text-gray-400">{{ t('log_rotation') || 'Log Rotation' }}</span>
-      </label>
-      <template v-if="rotationEnabled">
-        <span class="text-xs text-gray-500">{{ t('log_rotation_keep') || '保留最近' }}</span>
-        <input v-model.number="rotationMax" type="number" min="10" max="100000" @change="saveRotationMax"
-          class="w-24 px-2 py-1 bg-gray-900 rounded border border-gray-700 text-xs font-mono text-amber-400 focus:border-amber-500 focus:outline-none" />
-        <span class="text-xs text-gray-500">{{ t('log_rotation_entries') || '条' }}</span>
-      </template>
     </div>
 
     <div class="flex gap-3 mb-4">
@@ -119,10 +109,12 @@ import { ref, onMounted, inject } from 'vue'
 import api from '../lib/api'
 
 const t = inject('t')
+const modalRef = inject('modal')
 const logs = ref([])
 const logEnabled = ref(false)
 const rotationEnabled = ref(false)
 const rotationMax = ref(1000)
+const rotationCount = ref(0)
 const selected = ref(new Set())
 const providers = ref([])
 const models = ref([])
@@ -173,6 +165,11 @@ async function loadConfig() {
     logEnabled.value = r.data.log_enabled
     rotationEnabled.value = r.data.log_rotation_enabled || false
     rotationMax.value = r.data.log_rotation_max || 1000
+    // ponytail: also load total count for rotation display
+    if (logEnabled.value) {
+      const { data: cnt } = await api.getCommLog({ page: 1, per_page: 1 })
+      rotationCount.value = cnt.total || 0
+    }
   } catch {}
 }
 
@@ -182,21 +179,37 @@ async function toggleLog() {
   } catch { logEnabled.value = !logEnabled.value }
 }
 
-async function toggleRotation() {
+async function openRotationModal() {
+  if (!modalRef?.value) return
+  const result = await modalRef.value.show({
+    mode: 'prompt',
+    title: t('log_rotation') || 'Log Rotation',
+    message: (t('log_rotation_hint') || '保留最新') + ' N ' + (t('log_rotation_unit') || '条') + '（0=' + (t('log_rotation_off') || '关闭') + '）',
+    placeholder: String(rotationMax.value),
+    value: String(rotationMax.value),
+    okText: t('btn_confirm'),
+    cancelText: t('btn_cancel'),
+  })
+  if (result === null) return
+  const n = parseInt(result) || 0
+  const enabled = n > 0
   try {
-    await api.setCommLogConfig({ log_rotation_enabled: rotationEnabled.value })
-  } catch { rotationEnabled.value = !rotationEnabled.value }
-}
-
-async function saveRotationMax() {
-  if (rotationMax.value < 10) rotationMax.value = 10
-  try {
-    await api.setCommLogConfig({ log_rotation_max: rotationMax.value })
+    await api.setCommLogConfig({ log_rotation_enabled: enabled, log_rotation_max: enabled ? n : rotationMax.value })
+    rotationEnabled.value = enabled
+    if (enabled) rotationMax.value = n
   } catch {}
 }
 
 async function clearLogs() {
-  if (!confirm(t('log_clear_confirm') || '确认清空所有日志?')) return
+  if (!modalRef?.value) return
+  const confirmed = await modalRef.value.show({
+    mode: 'confirm',
+    title: t('log_clear'),
+    message: t('log_clear_confirm') || '确认清空所有通信日志?',
+    okText: t('log_clear'),
+    cancelText: t('btn_cancel'),
+  })
+  if (!confirmed) return
   try {
     await api.clearCommLog()
     logs.value = []

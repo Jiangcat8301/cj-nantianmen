@@ -83,6 +83,18 @@
         <p class="text-3xl font-bold text-emerald-400">¥{{ todayCost.toFixed(4) }}</p>
       </div>
     </div>
+
+    <!-- DB Volume + Commlog count -->
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+        <p class="text-xs text-gray-500 mb-2">{{ t('db_volume') }}</p>
+        <p class="text-3xl font-bold text-emerald-400">{{ dbSize }}</p>
+      </div>
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+        <p class="text-xs text-gray-500 mb-2">{{ t('log_count') }}</p>
+        <p class="text-3xl font-bold text-emerald-400">{{ fmtNum(dbLogCount) }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -99,6 +111,8 @@ const todayReqs = ref(0)
 const todayTokens = ref(0)
 const todayCost = ref(0)
 const defaultModel = ref(null)
+const dbSize = ref('—')
+const dbLogCount = ref(0)
 let statsPoll = null
 
 const endpoints = [
@@ -123,13 +137,16 @@ const loadStats = async () => {
     keyCount.value = keys.length
     todayReqs.value = stats.total_requests || 0
     todayTokens.value = (stats.total_input_tokens || 0) + (stats.total_output_tokens || 0)
-    // ponytail: compute cost from breakdown rows (price per 1M tokens)
     let cost = 0
     for (const r of (stats.breakdown || [])) {
       cost += ((r.input_tokens || 0) * (r.input_price || 0) + (r.output_tokens || 0) * (r.output_price || 0) + (r.cached_tokens || 0) * (r.cache_hit_price || 0)) / 1_000_000
     }
     todayCost.value = cost
     defaultModel.value = dm
+    // ponytail: also load DB info
+    const { data: db } = await api.getDbInfo()
+    dbSize.value = formatBytes(db.size)
+    dbLogCount.value = db.log_count || 0
   } catch {}
 }
 
@@ -160,6 +177,15 @@ const formatNum = (n) => {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
   if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
   return n.toString()
+}
+
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let s = bytes
+  while (s >= 1024 && i < units.length - 1) { s /= 1024; i++ }
+  return s.toFixed(i > 0 ? 2 : 0) + ' ' + units[i]
 }
 
 onMounted(async () => {

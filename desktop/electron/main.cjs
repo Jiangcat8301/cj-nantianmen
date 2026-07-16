@@ -322,7 +322,7 @@ app.whenReady().then(async () => {
       }
     } catch {}
   }
-  function fmtK(n) { return n >= 1000 ? (n/1000).toFixed(1) + 'k' : String(n) }
+  function fmtK(n) { if (n >= 1024*1024) return (n/(1024*1024)).toFixed(2)+'M'; if (n >= 1024) return (n/1024).toFixed(1)+'K'; return String(n) }
   function buildTrayMenu() {
     const s = dailyStats
     const L = trayLabels[trayLang] || trayLabels.zh

@@ -68,6 +68,7 @@ import { ref, inject, onMounted } from 'vue'
 import api from '../lib/api'
 
 const t = inject('t')
+const modalRef = inject('modal')
 const win = typeof window !== 'undefined' ? window.win : null
 const port = ref(38271)
 const autostart = ref(false)
@@ -87,35 +88,41 @@ const toggleAutostart = async () => {
   }
 }
 
-const save = () => {
+const save = async () => {
   if (autostart.value) {
-    // ponytail: persist on every save click
     if (win && win.autostartSet) win.autostartSet(true).catch(() => {})
   }
-  alert(t('set_save') + ' ✓')
+  if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: t('settings_title'), message: t('set_save') + ' ✓' })
 }
 
 const saveDbPath = async () => {
   const newPath = dbPathInput.value.trim()
-  if (!newPath) return alert('路径不能为空')
+  if (!newPath) {
+    if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: 'Error', message: '路径不能为空' })
+    return
+  }
   const oldPath = dbInfo.value.path || ''
   if (newPath === oldPath || (newPath === './nantianmen.db' && !oldPath)) {
-    return alert('路径未变化')
+    if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: 'Info', message: '路径未变化' })
+    return
   }
-  if (!confirm(`将数据库挪到: ${newPath}\n\n继续?`)) return
+  if (modalRef?.value) {
+    const ok = await modalRef.value.show({ mode: 'confirm', title: 'Database', message: `将数据库挪到: ${newPath}`, okText: '继续', cancelText: '取消' })
+    if (!ok) return
+  }
   dbSaving.value = true
   try {
     const { data } = await api.moveDatabase(newPath)
     if (data.changed) {
-      alert(`✓ 已挪到 ${data.path}\n\n请重启服务以加载新数据库`)
+      if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: '✓', message: `已挪到 ${data.path}\n\n请重启服务以加载新数据库` })
       dbInfo.value = { ...dbInfo.value, path: data.path }
       dbPathInput.value = ''
     } else {
-      alert('路径未变化')
+      if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: 'Info', message: '路径未变化' })
       dbPathInput.value = ''
     }
   } catch (e) {
-    alert('保存失败: ' + (e.response?.data?.error || e.message))
+    if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: 'Error', message: '保存失败: ' + (e.response?.data?.error || e.message) })
   } finally {
     dbSaving.value = false
   }

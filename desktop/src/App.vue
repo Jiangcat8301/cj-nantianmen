@@ -57,17 +57,23 @@
         <router-view />
       </div>
     </div>
+    <Modal ref="modalRef" />
   </div>
 </template>
 
 <script setup>
 import { ref, provide, onMounted, onUnmounted } from 'vue'
 import api from './lib/api'
+import Modal from './components/Modal.vue'
 
 const serverOnline = ref(false)
 const isMax = ref(false)
+const modalRef = ref(null)
 const lang = ref(localStorage.getItem('ntm-lang') || 'zh')
 const win = typeof window !== 'undefined' ? window.win : null
+
+// ponytail: expose modal globally via provide
+provide('modal', modalRef)
 
 // ponytail: i18n - three languages (zh/en/ja), inline dict, no lib.
 // ponytail: nav labels do NOT include emoji here - emoji is in navItems[].icon to avoid double icon.
@@ -104,7 +110,9 @@ const i18n = {
  per_million: '/百万Token', deleted_badge: '已删除',
  log_title: '通信日志', log_toggle: '启用日志', log_clear: '清空日志', log_clear_confirm: '确认清空所有通信日志?',
  log_time: '时间', log_user: '用户', log_provider: '供应商', log_model: '模型',
- log_tokens_in: '输入Token', log_tokens_out: '输出Token', log_status: '状态', log_count: '记录数',
+ log_tokens_in: '输入Token', log_tokens_out: '输出Token', log_tokens_cached: '缓存命中', log_status: '状态', log_count: '记录数',
+ log_rotation: '滚动记录', log_rotation_off: '未启用', log_rotation_hint: '保留最新', log_rotation_unit: '条',
+ stats_all_users: '全部用户', db_volume: '数据库体积',
  },
   en: {
     dashboard: 'Dashboard', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings',
@@ -138,7 +146,9 @@ const i18n = {
  per_million: '/M tokens', deleted_badge: 'Deleted',
  log_title: 'Communication Log', log_toggle: 'Enable Logging', log_clear: 'Clear Log', log_clear_confirm: 'Clear all communication logs?',
  log_time: 'Time', log_user: 'User', log_provider: 'Provider', log_model: 'Model',
- log_tokens_in: 'Input Tokens', log_tokens_out: 'Output Tokens', log_status: 'Status', log_count: 'Records',
+ log_tokens_in: 'Input Tokens', log_tokens_out: 'Output Tokens', log_tokens_cached: 'Cached', log_status: 'Status', log_count: 'Records',
+ log_rotation: 'Rotation', log_rotation_off: 'Disabled', log_rotation_hint: 'Keep latest', log_rotation_unit: 'entries',
+ stats_all_users: 'All Users', db_volume: 'DB Volume',
   },
   ja: {
     dashboard: 'ダッシュボード', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定',
@@ -172,7 +182,9 @@ const i18n = {
  per_million: '/百万Token', deleted_badge: '削除済',
  log_title: '通信ログ', log_toggle: 'ログ有効化', log_clear: 'ログ消去', log_clear_confirm: 'すべての通信ログを消去しますか?',
  log_time: '時刻', log_user: 'ユーザー', log_provider: 'プロバイダー', log_model: 'モデル',
- log_tokens_in: '入力Token', log_tokens_out: '出力Token', log_status: '状態', log_count: '件数',
+ log_tokens_in: '入力Token', log_tokens_out: '出力Token', log_tokens_cached: 'キャッシュ', log_status: '状態', log_count: '件数',
+ log_rotation: 'ローテーション', log_rotation_off: '無効', log_rotation_hint: '最新', log_rotation_unit: '件',
+ stats_all_users: '全ユーザー', db_volume: 'DB容量',
   },
 }
 const t = (key) => i18n[lang.value]?.[key] || key

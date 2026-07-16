@@ -146,12 +146,15 @@ export default async function adminRoutes(fastify) {
 
   fastify.post('/api/admin/server/shutdown', async (req, reply) => {
     reply.send({ ok: true })
+    // ponytail: flush buffered stats + logs before exit
+    await stats.flush()
+    await commlog.flushBuffer()
     setTimeout(() => process.exit(0), 100)
   })
 
   fastify.post('/api/admin/server/restart', async (req, reply) => {
     reply.send({ ok: true })
-    // parent (CLI/desktop) should respawn from outside; server just exits
+    await stats.flush()
     setTimeout(() => process.exit(0), 100)
   })
 
@@ -164,7 +167,17 @@ export default async function adminRoutes(fastify) {
     return getConf().ui_filters
   })
 
-  // ponytail: communication log — paginated GET with filters, DELETE to clear, PUT to toggle
+  fastify.get('/api/admin/database/info', async () => {
+    const conf = getConf()
+    const db = getDb()
+    let size = 0
+    if (conf.database?.type === 'sqlite3') {
+      const stat = fs.statSync(conf.database.path)
+      size = stat.size
+    }
+    const count = (await db.query('SELECT COUNT(*) as c FROM communication_log'))[0]?.c || 0
+    return { type: conf.database?.type || 'unknown', path: conf.database?.path || '', size, log_count: count }
+  })
   fastify.get('/api/admin/communication-log', async (req) => {
     const query = req.query || {}
     const page = parseInt(query.page) || null

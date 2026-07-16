@@ -33,6 +33,9 @@ export default {
   // Server status (from /api/admin/status - whitelisted, no auth needed)
   getServerStatus: () => axios.get(`${SERVER_URL}/api/admin/status`),
 
+  // Database info
+  getDbInfo: () => api.get('/database/info'),
+
   // ponytail: change DB file path; server closes handle, moves file, updates conf
   moveDatabase: (newPath) => api.post('/database/move', { path: newPath }),
   // Default model
