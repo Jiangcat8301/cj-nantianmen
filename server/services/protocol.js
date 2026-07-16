@@ -107,6 +107,26 @@ function parseMinimaxToolCalls(text) {
     const clean = cleaned.replace(/<actions>.*?<\/actions>/s, '').trim() || null
     return { cleanText: clean, toolCalls }
   }
+  // ponytail: try XML v3 format — <function_calls><invoke name="..."><parameter name="k">v</parameter></invoke></function_calls>
+  const fcsMatch = cleaned.match(/<function_calls>(.*?)<\/function_calls>/s)
+  if (fcsMatch) {
+    const toolCalls = []
+    let callId = 0
+    const invokeRe2 = /<invoke\s+name="([^"]+)">(.*?)<\/invoke>/gs
+    let im
+    while ((im = invokeRe2.exec(fcsMatch[1])) !== null) {
+      const name = im[1], body = im[2]
+      const args = {}
+      const paramRe2 = /<parameter\s+name="([^"]+)">(.*?)<\/parameter>/gs
+      let pm2
+      while ((pm2 = paramRe2.exec(body)) !== null) args[pm2[1]] = pm2[2].trim()
+      toolCalls.push({ id: `minimax_${++callId}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+    }
+    // strip <function_calls> & <function_results> blocks
+    let clean = cleaned.replace(/<function_calls>.*?<\/function_calls>/gs, '').replace(/<function_results>.*?<\/function_results>/gs, '').trim() || null
+    clean = clean ? clean.replace(/<(\/)?(?:invoke|parameter)[^>]*>/gs, '').trim() || null : null
+    return { cleanText: clean, toolCalls }
+  }
   // ponytail: try inline JSON — {"name":"...","arguments":{...}} per line
   const jsonRe = /\{"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{)/g
   let jm = jsonRe.exec(cleaned)
