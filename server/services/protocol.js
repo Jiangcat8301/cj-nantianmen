@@ -60,35 +60,70 @@ function blockToToolCall(block) {
 // ponytail: parse Minimax non-standard tool_call XML into OpenAI tool_calls
 function parseMinimaxToolCalls(text) {
   const cleaned = text.replace(/<\]minimax\[>\[/g, '')
+  // ponytail: try XML format — <tool_call><invoke name="..."><query>...</query></invoke></tool_call>
   const tcMatch = cleaned.match(/<tool_call>(.*?)<\/tool_call>/s)
-  if (!tcMatch) return { cleanText: cleaned.trim() || null, toolCalls: [] }
-  const toolCalls = []
-  let callId = 0
-  const invokeRe = /<invoke\s+name="([^"]+)">(.*?)<\/invoke>/gs
-  let m
-  while ((m = invokeRe.exec(tcMatch[1])) !== null) {
-    const name = m[1]
-    const body = m[2]
-    const args = {}
-    // extract <query>text</query> or <parameter name="k">v</parameter>
-    const paramRe = /<(query|parameter)(?:\s+name="([^"]*)")?>(.*?)<\/\1>/gs
-    let pm
-    while ((pm = paramRe.exec(body)) !== null) {
-      const key = pm[1] === 'parameter' ? (pm[2] || 'value') : 'query'
-      args[key] = pm[3].trim()
+  if (tcMatch) {
+    const toolCalls = []
+    let callId = 0
+    const invokeRe = /<invoke\s+name="([^"]+)">(.*?)<\/invoke>/gs
+    let m
+    while ((m = invokeRe.exec(tcMatch[1])) !== null) {
+      const name = m[1]
+      const body = m[2]
+      const args = {}
+      const paramRe = /<(query|parameter)(?:\s+name="([^"]*)")?>(.*?)<\/\1>/gs
+      let pm
+      while ((pm = paramRe.exec(body)) !== null) {
+        const key = pm[1] === 'parameter' ? (pm[2] || 'value') : 'query'
+        args[key] = pm[3].trim()
+      }
+      toolCalls.push({
+        id: `minimax_${++callId}`,
+        type: 'function',
+        function: { name, arguments: JSON.stringify(args) },
+      })
     }
-    toolCalls.push({
-      id: `minimax_${++callId}`,
-      type: 'function',
-      function: { name, arguments: JSON.stringify(args) },
-    })
+    const clean = cleaned.replace(/<tool_call>.*?<\/tool_call>/s, '').trim() || null
+    const finalText = clean
+      ? clean.replace(/<(\/)?(?:invoke|query|parameter)[^>]*>/g, '').trim() || null
+      : null
+    return { cleanText: finalText, toolCalls }
   }
-  const cleanText = cleaned.replace(/<tool_call>.*?<\/tool_call>/s, '').trim() || null
-  // also strip dangling XML tags
-  const finalText = cleanText
-    ? cleanText.replace(/<(\/)?(?:invoke|query|parameter)[^>]*>/g, '').trim() || null
-    : null
-  return { cleanText: finalText, toolCalls }
+  // ponytail: try inline JSON — {"name":"...","arguments":{...}} per line
+  const jsonRe = /\{"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{)/g
+  let jm = jsonRe.exec(cleaned)
+  if (jm) {
+    // find the start of the first JSON tool_call block
+    const preStart = cleaned.lastIndexOf('\n{"name"', jm.index) + 1 || jm.index
+    const cleanText = cleaned.slice(0, preStart).trim().replace(/\s*\n\{\s*$/, '') || null
+    // extract JSON blocks — brace-counter for nested arguments
+    const jsonPart = cleaned.slice(preStart)
+    const toolCalls = []
+    let callId = 0
+    let i = 0
+    while (i < jsonPart.length) {
+      // skip whitespace/newlines before JSON
+      while (i < jsonPart.length && /\s/.test(jsonPart[i])) i++
+      if (i >= jsonPart.length || jsonPart[i] !== '{') break
+      let depth = 0, start = i
+      for (; i < jsonPart.length; i++) {
+        if (jsonPart[i] === '{') depth++
+        else if (jsonPart[i] === '}') { depth--; if (depth === 0) { i++; break } }
+      }
+      try {
+        const obj = JSON.parse(jsonPart.slice(start, i))
+        if (obj.name && obj.arguments) {
+          toolCalls.push({
+            id: `minimax_${++callId}`,
+            type: 'function',
+            function: { name: obj.name, arguments: JSON.stringify(obj.arguments) },
+          })
+        }
+      } catch {}
+    }
+    if (toolCalls.length > 0) return { cleanText, toolCalls }
+  }
+  return { cleanText: cleaned.trim() || null, toolCalls: [] }
 }
 const STOP_REASON_MAP = {
   end_turn: 'stop',
