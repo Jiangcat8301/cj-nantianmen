@@ -79,7 +79,7 @@ provide('modal', modalRef)
 // ponytail: nav labels do NOT include emoji here - emoji is in navItems[].icon to avoid double icon.
 const i18n = {
   zh: {
-    dashboard: '概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置',
+    dashboard: '系统概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置',
     server: 'Server', online: '在线', offline: '离线',
     minimize: '最小化', maximize: '最大化', restore: '还原', close: '关闭',
     add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动',
@@ -115,7 +115,7 @@ const i18n = {
  stats_all_users: '全部用户', db_volume: '数据库体积',
  },
   en: {
-    dashboard: 'Dashboard', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings',
+    dashboard: 'System Overview', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings',
     server: 'Server', online: 'Online', offline: 'Offline',
     minimize: 'Minimize', maximize: 'Maximize', restore: 'Restore', close: 'Close',
     add_provider: 'Add Provider', health: 'Health Check', edit: 'Edit', delete: 'Delete', set_default: 'Set Default', default_badge: '★ Default', manual: 'Manual',
@@ -151,7 +151,7 @@ const i18n = {
  stats_all_users: 'All Users', db_volume: 'DB Volume',
   },
   ja: {
-    dashboard: 'ダッシュボード', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定',
+    dashboard: 'システム概要', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定',
     server: 'Server', online: 'オンライン', offline: 'オフライン',
     minimize: '最小化', maximize: '最大化', restore: '元に戻す', close: '閉じる',
     add_provider: 'プロバイダー追加', health: 'ヘルスチェック', edit: '編集', delete: '削除', set_default: 'デフォルト設定', default_badge: '★ デフォルト', manual: '手動',
