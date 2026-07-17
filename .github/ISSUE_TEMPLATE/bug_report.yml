@@ -43,14 +43,6 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: actual
-    attributes:
-      label: Actual Behavior
-      description: What actually happened? Include full error output if available.
-    validations:
-      required: true
-
   - type: dropdown
     id: component
     attributes:
