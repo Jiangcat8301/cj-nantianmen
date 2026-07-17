@@ -1,0 +1,73 @@
+name: "🐛 Bug Report"
+description: Report a bug — something that's broken, crashes, or behaves incorrectly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below so we can reproduce and fix it quickly.
+
+        **Before submitting**, please:
+        - [ ] Search [existing issues](https://github.com/Jiangcat8301/cj-nantianmen/issues) to avoid duplicates
+        - [ ] Update to the latest version and confirm the bug still exists
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear description of what's broken. Include error messages, tracebacks, or screenshots if relevant.
+      placeholder: |
+        What happened? What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to trigger the bug. The more specific, the faster we can fix it.
+      placeholder: |
+        1. Adding a provider
+        2. Filling settings but left Key blank
+        3. Clicking "save"
+        4. Error appears: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include full error output if available.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of Nantianmen is affected?
+      multiple: true
+      options:
+        - Server (Backend)
+        - Desktop (All OS)
+        - CLI
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: nantianmen-version
+    attributes:
+      label: Nantianmen Version
+      description: The version shown on the top right corner of desktop app, or show in 'nantianmen-cli --version'
+      placeholder: "0.1.0"
