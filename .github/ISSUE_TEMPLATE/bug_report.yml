@@ -2,6 +2,7 @@ name: "🐛 Bug Report"
 description: Report a bug — something that's broken, crashes, or behaves incorrectly.
 title: "[Bug]: "
 labels: ["bug"]
+assignees: ["Jiangcat8301"]
 body:
   - type: markdown
     attributes:
