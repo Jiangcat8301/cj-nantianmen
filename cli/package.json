@@ -1,10 +1,10 @@
 {
   "name": "nantianmen-cli",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Nantianmen CLI - node-only command line tool",
   "type": "module",
   "bin": { "nantianmen": "./index.js" },
   "scripts": {
-    "cli:build": "cd cli && bun build ./index.js --compile --target=bun-windows-x64 --outfile=../releases/nantianmen-cli-0.2.7-win-x64.exe"
+    "cli:build": "cd cli && bun build ./index.js --compile --target=bun-windows-x64 --outfile=../releases/nantianmen-cli-0.2.9-win-x64.exe"
   }
 }

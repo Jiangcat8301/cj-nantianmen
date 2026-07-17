@@ -4,7 +4,7 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.2.4--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.9--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
@@ -20,6 +20,8 @@
 放行请求到对应仙府，再将回话翻译回来。全程记录谁找了谁、说了多少话。
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
+
+> 🚀 **[v0.2.9](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.9) 已发布** — 2026-07-17。新增模型停用开关、Top 3 并排统计、日志管理优化、Dashboard flex 自适应布局。详见 [CHANGELOG](./CHANGELOG.md)。[下载桌面版 EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.9/nantianmen-0.2.9-win-x64.exe) (Windows x64, 85 MB)
 
 ---
 

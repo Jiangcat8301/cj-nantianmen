@@ -73,6 +73,8 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
   else if (range === '30d') { where.push("datetime(u.created_at,'localtime') >= date('now','-30 days','localtime')"); }
   const w = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
+  // ponytail: breakdown keeps per-key detail (admin table);
+  // topModels/topProviders/topUsers are pre-aggregated to dedupe same provider+model across multiple keys (#4).
   const rows = await getDb().query(
     `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
             m.input_price, m.output_price, m.cache_hit_price,
@@ -90,7 +92,34 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
     params,
   )
 
-  // ponytail: aggregate totals from breakdown rows (avoids a second query).
+  // ponytail: pre-aggregate by (provider, model) so the Top-5 panel doesn't show the same
+  // provider/model multiple times when several API keys used it. One pass over `rows`.
+  const byModel = new Map()
+  const byProvider = new Map()
+  for (const r of rows) {
+    const mk = `${r.provider}|${r.model_name}`
+    const m = byModel.get(mk) || { provider: r.provider || '?', model: r.model_name || '?',
+      request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0,
+      input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0 }
+    m.request_count += r.request_count || 0
+    m.input_tokens += r.input_tokens || 0
+    m.output_tokens += r.output_tokens || 0
+    m.cached_tokens += r.cached_tokens || 0
+    byModel.set(mk, m)
+
+    const pk = r.provider || '?'
+    const p = byProvider.get(pk) || { provider: pk, request_count: 0,
+      input_tokens: 0, output_tokens: 0, cached_tokens: 0,
+      input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0 }
+    p.request_count += r.request_count || 0
+    p.input_tokens += r.input_tokens || 0
+    p.output_tokens += r.output_tokens || 0
+    p.cached_tokens += r.cached_tokens || 0
+    byProvider.set(pk, p)
+  }
+  const topModels = [...byModel.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)).slice(0, 5)
+  const topProviders = [...byProvider.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)).slice(0, 5)
+
   let total_requests = 0, total_input_tokens = 0, total_output_tokens = 0, total_cached_tokens = 0
   for (const r of rows) {
     total_requests += r.request_count || 0
@@ -98,5 +127,5 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
     total_output_tokens += r.output_tokens || 0
     total_cached_tokens += r.cached_tokens || 0
   }
-  return { total_requests, total_input_tokens, total_output_tokens, total_cached_tokens, breakdown: rows }
+  return { total_requests, total_input_tokens, total_output_tokens, total_cached_tokens, breakdown: rows, topModels, topProviders }
 }

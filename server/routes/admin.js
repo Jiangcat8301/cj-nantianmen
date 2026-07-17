@@ -195,7 +195,7 @@ export default async function adminRoutes(fastify) {
     return {
       log_enabled: c.log_enabled || false,
       log_rotation_enabled: c.log_rotation_enabled || false,
-      log_rotation_max: c.log_rotation_max || 1000,
+      log_rotation_max: c.log_rotation_max || 500,
     }
   })
 
@@ -203,13 +203,21 @@ export default async function adminRoutes(fastify) {
     const patch = {}
     if (req.body.log_enabled !== undefined) patch.log_enabled = !!req.body.log_enabled
     if (req.body.log_rotation_enabled !== undefined) patch.log_rotation_enabled = !!req.body.log_rotation_enabled
-    if (req.body.log_rotation_max !== undefined) patch.log_rotation_max = parseInt(req.body.log_rotation_max) || 1000
+    if (req.body.log_rotation_max !== undefined) patch.log_rotation_max = parseInt(req.body.log_rotation_max) || 500
     if (Object.keys(patch).length > 0) updateConf(patch)
+    // ponytail: lowering max below current count must trim NOW, not wait for next flush (#6).
+    // Trigger only when rotation is enabled and we have a numeric max.
     const c = getConf()
+    if (patch.log_rotation_enabled !== false && c.log_rotation_max && c.log_rotation_max > 0) {
+      try { await commlog.trimToMax(parseInt(c.log_rotation_max)) } catch (e) {
+        req.log.warn('[admin] commlog trim failed: ' + e.message)
+      }
+    }
+    const c2 = getConf()
     return {
-      log_enabled: c.log_enabled || false,
-      log_rotation_enabled: c.log_rotation_enabled || false,
-      log_rotation_max: c.log_rotation_max || 1000,
+      log_enabled: c2.log_enabled || false,
+      log_rotation_enabled: c2.log_rotation_enabled || false,
+      log_rotation_max: c2.log_rotation_max || 500,
     }
   })
 }

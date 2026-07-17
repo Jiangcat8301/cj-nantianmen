@@ -44,14 +44,24 @@
               <div class="flex items-center gap-2">
                 <span>{{ m.model_name }}</span>
                 <span v-if="m.deleted" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
+                <span v-else-if="m.is_disabled" class="text-xs text-red-400">{{ t('disabled_badge') }}</span>
                 <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs" :title="t('copy')">📋</button>
                 <button @click="openEditModel(p.id, m)" class="text-gray-600 hover:text-amber-400 text-xs" :title="t('edit_model')">💰</button>
                 <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-xs text-gray-400">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <span v-if="m.is_default" class="text-xs text-emerald-400">{{ t('default_badge') }}</span>
-                <button v-else @click="setDefault(p.id, m.id)" class="text-xs text-gray-500 hover:text-emerald-400">{{ t('set_default') }}</button>
+                <button v-else :disabled="m.is_disabled" @click="setDefault(p.id, m.id)"
+                  class="text-xs hover:text-emerald-400 disabled:text-gray-700 disabled:cursor-not-allowed"
+                  :class="m.is_disabled ? 'text-gray-700' : 'text-gray-500'">{{ t('set_default') }}</button>
                 <span class="text-xs text-gray-600" v-if="m.is_manual">{{ t('manual') }}</span>
+                <!-- ponytail: per-model disable toggle. disabled models stay visible (badge) so user can re-enable. -->
+                <button @click="toggleModel(p.id, m)" :title="m.is_disabled ? t('enable_model') : t('disable_model')"
+                  class="relative inline-flex h-4 w-7 items-center rounded-full transition"
+                  :class="m.is_disabled ? 'bg-red-500/40' : 'bg-emerald-500/40'">
+                  <span class="inline-block h-3 w-3 transform rounded-full bg-white transition"
+                    :class="m.is_disabled ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
+                </button>
               </div>
             </div>
           </div>
@@ -199,6 +209,17 @@ const setDefault = async (providerId, modelId) => {
   try {
     await api.setDefaultModel(providerId, modelId)
     await load()
+    await fetchModels(providerId)
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
+}
+
+// ponytail: toggle is_disabled on the model row. Server rebuilds modelMap so /v1/models + dispatch update.
+// Only fetchModels needed — toggle doesn't change provider list or default model, just the model row.
+const toggleModel = async (providerId, m) => {
+  try {
+    await api.toggleModel(providerId, m.id)
     await fetchModels(providerId)
   } catch (e) {
     alert('Error: ' + (e.response?.data?.error || e.message))

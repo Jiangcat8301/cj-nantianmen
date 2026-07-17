@@ -12,7 +12,7 @@
         <button v-if="logEnabled" @click="openRotationModal"
           class="px-3 py-1.5 text-sm rounded-lg border transition"
           :class="rotationEnabled ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400' : 'bg-red-500/10 border-red-500/50 text-red-400'">
-          {{ rotationEnabled ? `${rotationCount}/${rotationMax}` : t('log_rotation_off') }}
+          {{ rotationEnabled ? `现有日志 ${rotationCount}/${rotationMax}` : t('log_rotation_off') }}
         </button>
         <button @click="clearLogs" class="px-3 py-1.5 text-sm bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition">
           {{ t('log_clear') }}

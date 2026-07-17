@@ -11,7 +11,7 @@
         <div class="flex items-center gap-1.5 px-3 text-xs">
           <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
           <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.8</span>
+          <span class="text-gray-600">v0.2.9</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">
@@ -82,7 +82,7 @@ const i18n = {
     dashboard: '系统概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置',
     server: 'Server', online: '在线', offline: '离线',
     minimize: '最小化', maximize: '最大化', restore: '还原', close: '关闭',
-    add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动',
+    add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动', disable_model: '停用模型', enable_model: '启用模型',
     fld_name: '名称', fld_name_hint: '⚠ 不能包含空格或下划线', fld_protocol: '协议', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
     btn_cancel: '取消', btn_confirm: '确认', refresh_models: '刷新模型列表', add_model: '添加模型',
     fld_model_hint: '输入上游供应商支持的模型名称，如 gpt-4o-mini', no_providers: '暂无供应商，点击右上角添加',
@@ -101,13 +101,13 @@ const i18n = {
     th_provider: '供应商', th_model: '模型',
     not_used: '未使用', details: '详情', collapse: '收起', no_keys: '暂无 API Key',
     refresh: '刷新', default_provider_model: '默认模型',
-    stats_title: '统计', stats_all_providers: '全部 Provider', stats_all_models: '全部模型',
+    stats_title: '统计', stats_all_providers: '全部供应商', stats_all_models: '全部模型',
     stats_today: '今天', stats_7d: '最近7天', stats_30d: '最近30天', stats_all: '全部',
     stats_total_requests: '总请求数', stats_input_tokens: '输入 Token', stats_output_tokens: '输出 Token', stats_cached_tokens: '已缓存', stats_total_cost: '总消费',
     stats_table_provider: '供应商', stats_table_model: '模型', stats_table_requests: '请求数', stats_table_input: '输入 Token', stats_table_output: '输出 Token', stats_table_cached: '已缓存', stats_cost: '消费',
- stats_no_data: '暂无数据', stats_top_models: 'Top 5 模型请求量', stats_top_users: 'Top 5 请求用户',
+ stats_no_data: '暂无数据', stats_top_models: 'Top 3 模型请求量', stats_top_users: 'Top 3 请求用户',
  edit_model: '编辑定价', fld_input_price: '输入价格', fld_output_price: '输出价格', fld_cache_price: '缓存命中价格',
- per_million: '/百万Token', deleted_badge: '已删除',
+ per_million: '/百万Token', deleted_badge: '已删除', disabled_badge: '已停用',
  log_title: '通信日志', log_toggle: '启用日志', log_clear: '清空日志', log_clear_confirm: '确认清空所有通信日志?',
  log_time: '时间', log_user: '用户', log_provider: '供应商', log_model: '模型',
  log_tokens_in: '输入Token', log_tokens_out: '输出Token', log_tokens_cached: '缓存命中', log_status: '状态', log_count: '记录数',
@@ -118,7 +118,7 @@ const i18n = {
     dashboard: 'System Overview', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings',
     server: 'Server', online: 'Online', offline: 'Offline',
     minimize: 'Minimize', maximize: 'Maximize', restore: 'Restore', close: 'Close',
-    add_provider: 'Add Provider', health: 'Health Check', edit: 'Edit', delete: 'Delete', set_default: 'Set Default', default_badge: '★ Default', manual: 'Manual',
+    add_provider: 'Add Provider', health: 'Health Check', edit: 'Edit', delete: 'Delete', set_default: 'Set Default', default_badge: '★ Default', manual: 'Manual', disable_model: 'Disable Model', enable_model: 'Enable Model',
     fld_name: 'Name', fld_name_hint: '⚠ No spaces or underscores allowed', fld_protocol: 'Protocol', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
     btn_cancel: 'Cancel', btn_confirm: 'Confirm', refresh_models: 'Refresh Models', add_model: 'Add Model',
     fld_model_hint: 'Enter a model name supported by the upstream provider, e.g. gpt-4o-mini', no_providers: 'No providers yet. Click + to add one.',
@@ -141,9 +141,9 @@ const i18n = {
     stats_today: 'Today', stats_7d: 'Last 7 Days', stats_30d: 'Last 30 Days', stats_all: 'All',
     stats_total_requests: 'Total Requests', stats_input_tokens: 'Input Tokens', stats_output_tokens: 'Output Tokens', stats_cached_tokens: 'Cached', stats_total_cost: 'Total Cost',
     stats_table_provider: 'Provider', stats_table_model: 'Model', stats_table_requests: 'Requests', stats_table_input: 'Input Tokens', stats_table_output: 'Output Tokens', stats_table_cached: 'Cached', stats_cost: 'Cost',
- stats_no_data: 'No data', stats_top_models: 'Top 5 Models by Requests', stats_top_users: 'Top 5 Users',
+ stats_no_data: 'No data', stats_top_models: 'Top 3 Models by Requests', stats_top_users: 'Top 3 Users',
  edit_model: 'Edit Pricing', fld_input_price: 'Input Price', fld_output_price: 'Output Price', fld_cache_price: 'Cache Hit Price',
- per_million: '/M tokens', deleted_badge: 'Deleted',
+ per_million: '/M tokens', deleted_badge: 'Deleted', disabled_badge: 'Disabled',
  log_title: 'Communication Log', log_toggle: 'Enable Logging', log_clear: 'Clear Log', log_clear_confirm: 'Clear all communication logs?',
  log_time: 'Time', log_user: 'User', log_provider: 'Provider', log_model: 'Model',
  log_tokens_in: 'Input Tokens', log_tokens_out: 'Output Tokens', log_tokens_cached: 'Cached', log_status: 'Status', log_count: 'Records',
@@ -154,7 +154,7 @@ const i18n = {
     dashboard: 'システム概要', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定',
     server: 'Server', online: 'オンライン', offline: 'オフライン',
     minimize: '最小化', maximize: '最大化', restore: '元に戻す', close: '閉じる',
-    add_provider: 'プロバイダー追加', health: 'ヘルスチェック', edit: '編集', delete: '削除', set_default: 'デフォルト設定', default_badge: '★ デフォルト', manual: '手動',
+    add_provider: 'プロバイダー追加', health: 'ヘルスチェック', edit: '編集', delete: '削除', set_default: 'デフォルト設定', default_badge: '★ デフォルト', manual: '手動', disable_model: 'モデル無効化', enable_model: 'モデル有効化',
     fld_name: '名称', fld_name_hint: '⚠ スペース・アンダースコア不可', fld_protocol: 'プロトコル', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
     btn_cancel: 'キャンセル', btn_confirm: '確認', refresh_models: 'モデル更新', add_model: 'モデル追加',
     fld_model_hint: '上流プロバイダーがサポートするモデル名を入力（例: gpt-4o-mini）', no_providers: 'プロバイダーがありません。右上の+をクリックして追加。',
@@ -177,9 +177,9 @@ const i18n = {
     stats_today: '今日', stats_7d: '過去7日', stats_30d: '過去30日', stats_all: '全て',
     stats_total_requests: '総リクエスト数', stats_input_tokens: '入力 Token', stats_output_tokens: '出力 Token', stats_cached_tokens: 'キャッシュ', stats_total_cost: '総コスト',
     stats_table_provider: 'プロバイダー', stats_table_model: 'モデル', stats_table_requests: 'リクエスト数', stats_table_input: '入力 Token', stats_table_output: '出力 Token', stats_table_cached: 'キャッシュ', stats_cost: 'コスト',
- stats_no_data: 'データなし', stats_top_models: 'Top 5 リクエスト数', stats_top_users: 'Top 5 ユーザー',
+ stats_no_data: 'データなし', stats_top_models: 'Top 3 リクエスト数', stats_top_users: 'Top 3 ユーザー',
  edit_model: '価格編集', fld_input_price: '入力価格', fld_output_price: '出力価格', fld_cache_price: 'キャッシュ価格',
- per_million: '/百万Token', deleted_badge: '削除済',
+ per_million: '/百万Token', deleted_badge: '削除済', disabled_badge: '無効',
  log_title: '通信ログ', log_toggle: 'ログ有効化', log_clear: 'ログ消去', log_clear_confirm: 'すべての通信ログを消去しますか?',
  log_time: '時刻', log_user: 'ユーザー', log_provider: 'プロバイダー', log_model: 'モデル',
  log_tokens_in: '入力Token', log_tokens_out: '出力Token', log_tokens_cached: 'キャッシュ', log_status: '状態', log_count: '件数',

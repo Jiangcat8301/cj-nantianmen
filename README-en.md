@@ -2,7 +2,7 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.2.4--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.9--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
@@ -17,7 +17,9 @@ Nantianmen does not judge right or wrong; it does one thing: **verify the identi
 declaring which "immortal" (Provider + Model) it wishes to consult. Nantianmen verifies the token, translates the visitor's "language" (protocol conversion),
 forwards the request to the corresponding celestial court, and translates the response back. All the while, it records who sought whom and how much was said.
 
-> In one sentence: **a local gateway that lets any Agent access any LLM using any protocol--it handles all translation and accounting in between.**
+> One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
+
+> 🚀 **[v0.2.9](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.9) released** — 2026-07-17. Model disable toggle, Top 3 side-by-side stats, log management tweaks, Dashboard flex layout. See [CHANGELOG](./CHANGELOG-en.md). [Download Desktop EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.9/nantianmen-0.2.9-win-x64.exe) (Windows x64, 85 MB)
 
 ---
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.9] — 2026-07-17
+
+### Added
+
+- **Model disable toggle**: each model row now has an enable/disable switch (green/red toggle). Disabled models are excluded from `/v1/models` and cannot be used through the gateway. Re-enabling manually is required to restore.
+- **Stats Top 3 side-by-side**: Top 5→3 models/users displayed left-right on a single row at 50% width each, equal-height cards, no scrolling, fixed 400px height fits exactly 3 rows.
+
+### Changed
+
+- **Log management** (#6): default retention 1000→500; second button shows "现有日志 n/max" (active count/max); lowering the limit immediately trims old records; list sorted by ID descending.
+- **Dashboard stat cards** (#2): replaced `grid-cols-5` with `flex + flex-1` equal-width layout — 6 cards (including DB volume) share one row, no wrapping; <1000px falls back to 4-per-row.
+- **Stats page layout** (#5): Top 5→3; model/user names moved above bars; value labels moved from inside bars to right side of bars; row gap `space-y-3→5`.
+- **i18n fix**: Chinese locale "全部 Provider" → "全部供应商".
+- **Unified token formatting**: `formatToken(n)` extracted to `desktop/src/lib/format.js`, shared by Stats/ApiKeys/Dashboard views. Supports K→M carry (>1024k shows M, 1-2 decimal digits).
+
+### Fixed
+
+- **Stats Top 5 duplicates** (#4): same provider+model across multiple API keys was showing as multiple rows → server-side aggregation in `stats.query()` returns `topModels`/`topProviders` arrays.
+- **User page token carry missing** (#3): `ApiKeys.vue` local `fmt()` only handled K (no M), 1,500,000→"1500.0K" → now uses shared `formatToken` showing "1.50M".
+
 ## [v0.2.6] — 2026-07-16
 
 ### Fixed

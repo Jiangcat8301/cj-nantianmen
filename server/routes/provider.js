@@ -142,9 +142,28 @@ export default async function providerRoutes(fastify) {
     const db = getDb()
     const m = (await db.query('SELECT * FROM models WHERE id=? AND provider_id=?', [modelId, providerId]))[0]
     if (!m) return reply.code(404).send({ error: 'not found' })
+    // ponytail: refuse to set default on a disabled model — would leave /v1/models pointing at nothing.
+    if (m.is_disabled) return reply.code(400).send({ error: 'cannot set default: model is disabled' })
     await db.run('UPDATE models SET is_default=0')
     await db.run('UPDATE models SET is_default=1 WHERE id=?', [modelId])
     await rebuildModelMap()
     return m
+  })
+
+  // ponytail: toggle is_disabled for a single model. Re-enabling a previously-default disabled model
+  // is allowed but does NOT restore is_default=1 (user must re-set explicitly).
+  fastify.put('/api/admin/providers/:id/models/:modelId/toggle', async (req, reply) => {
+    const { providerId, modelId } = { providerId: Number(req.params.id), modelId: Number(req.params.modelId) }
+    const db = getDb()
+    const m = (await db.query('SELECT * FROM models WHERE id=? AND provider_id=?', [modelId, providerId]))[0]
+    if (!m) return reply.code(404).send({ error: 'not found' })
+    const next = m.is_disabled ? 0 : 1
+    if (next === 1 && m.is_default) {
+      // ponytail: clearing default when disabling so /v1/models stays consistent.
+      await db.run('UPDATE models SET is_default=0')
+    }
+    await db.run('UPDATE models SET is_disabled=? WHERE id=?', [next, modelId])
+    await rebuildModelMap()
+    return (await db.query('SELECT * FROM models WHERE id=?', [modelId]))[0]
   })
 }

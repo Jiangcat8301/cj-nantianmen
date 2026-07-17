@@ -60,8 +60,9 @@
       </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-5 gap-4 mb-6">
+    <!-- Stats Cards (#2): 6 cards in one flex row, flex-1 average-distributed, no wrap at >=1000px. -->
+    <!-- ponytail: DB Volume lives in the SAME flex container as the 5 stats — same type, same row. -->
+    <div class="flex gap-4 mb-6 [&>*]:flex-1 [&>*]:min-w-0 max-[999px]:flex-wrap max-[999px]:[&>*]:basis-[calc(25%-12px)] max-[999px]:[&>*]:flex-none">
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
         <p class="text-xs text-gray-500 mb-2 truncate">{{ t('provider_count') }}</p>
         <p class="text-2xl font-bold text-emerald-400">{{ providerCount }}</p>
@@ -82,13 +83,9 @@
         <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_cost') }}</p>
         <p class="text-2xl font-bold text-emerald-400">¥{{ todayCost.toFixed(4) }}</p>
       </div>
-    </div>
-
-    <!-- DB Volume -->
-    <div class="mb-6">
-      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 max-w-xs">
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
         <p class="text-xs text-gray-500 mb-2">{{ t('db_volume') }}</p>
-        <p class="text-3xl font-bold text-emerald-400">{{ dbSize }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ dbSize }}</p>
       </div>
     </div>
   </div>
@@ -97,7 +94,7 @@
 <script setup>
 import { ref, inject, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
-import { calcCost } from '../lib/format.js'
+import { calcCost, formatToken } from '../lib/format.js'
 
 const t = inject('t')
 const win = typeof window !== 'undefined' ? window.win : null
@@ -167,12 +164,7 @@ const copy = (text) => {
   navigator.clipboard?.writeText(text)
 }
 
-const formatNum = (n) => {
-  if (!n) return '0'
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
-  return n.toString()
-}
+const formatNum = formatToken
 
 const formatBytes = (bytes) => {
   if (!bytes) return '0 B'

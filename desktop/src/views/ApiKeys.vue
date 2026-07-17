@@ -119,6 +119,7 @@
 <script setup>
 import { ref, inject, onMounted } from 'vue'
 import api from '../lib/api'
+import { formatToken } from '../lib/format.js'
 
 const t = inject('t')
 const keys = ref([])
@@ -128,10 +129,7 @@ const showEdit = ref(false)
 const editForm = ref({ id: null, name: '', note: '', oldName: '' })
 const expandedId = ref(null)
 
-const fmt = (n) => {
-  if (!n) return '0'
-  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)
-}
+const fmt = formatToken
 
 const costRow = (r) => {
   const c = ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000

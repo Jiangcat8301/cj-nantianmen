@@ -21,7 +21,8 @@ export async function rebuildModelMap() {
   const db = getDb()
   const providers = await db.query('SELECT * FROM providers')
   const pMap = Object.fromEntries(providers.map(p => [p.id, p]))
-  const models = await db.query('SELECT * FROM models WHERE deleted=0')
+  // ponytail: is_disabled excludes model from /v1/models and llmProxy dispatch. Treat NULL as 0 (old rows).
+  const models = await db.query('SELECT * FROM models WHERE deleted=0 AND (is_disabled IS NULL OR is_disabled=0)')
   const next = {}
   let defaultEntry = null
   for (const m of models) {

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS models (
   is_default INTEGER NOT NULL DEFAULT 0,
   is_manual INTEGER NOT NULL DEFAULT 0,
   deleted INTEGER NOT NULL DEFAULT 0,
+  is_disabled INTEGER NOT NULL DEFAULT 0,
   input_price REAL NOT NULL DEFAULT 0,
   output_price REAL NOT NULL DEFAULT 0,
   cache_hit_price REAL NOT NULL DEFAULT 0,
@@ -73,7 +74,7 @@ export class SqliteDatabase extends IDatabase {
     this.db.pragma('foreign_keys = ON')
     this.db.exec(SCHEMA)
     // ponytail: migrate existing DBs — add columns if missing (ignore "duplicate column" errors).
-    for (const col of ['deleted','input_price','output_price','cache_hit_price']) {
+    for (const col of ['deleted','is_disabled','input_price','output_price','cache_hit_price']) {
       try { this.db.exec(`ALTER TABLE models ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`) } catch {}
     }
   }

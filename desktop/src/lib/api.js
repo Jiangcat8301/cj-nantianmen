@@ -20,6 +20,8 @@ export default {
   addModel: (id, name) => api.post(`/providers/${id}/models`, { model_name: name }),
   updateModel: (providerId, modelId, data) => api.put(`/providers/${providerId}/models/${modelId}`, data),
   setDefaultModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/default`),
+  // ponytail: toggle is_disabled on a model — rebuilds modelMap so /v1/models reflects the change.
+  toggleModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/toggle`),
 
   // API Keys
   listApiKeys: () => api.get('/api-keys'),

@@ -7,7 +7,7 @@ import path from 'node:path'
 import { getConfDir, getConf } from '../conf.js'
 import { getDb } from '../db/index.js'
 
-const ROTATION_DEFAULT_MAX = 1000
+const ROTATION_DEFAULT_MAX = 500
 const LEGACY_FILE = path.join(getConfDir(), 'communication_log.json')
 
 // ── buffer ──
@@ -40,13 +40,10 @@ export async function flushBuffer() {
          entry.input || '', entry.output || '', entry.error?.code || null, entry.error?.message || null]
       )
     }
-    // ponytail: rotation — trim oldest rows beyond max
+    // ponytail: rotation — trim oldest rows beyond max (by id, stable under same-time inserts)
     if (rotationEnabled()) {
       const max = rotationMax()
-      const count = (await db.query(`SELECT COUNT(*) as c FROM communication_log`))[0]?.c || 0
-      if (count > max) {
-        await db.run(`DELETE FROM communication_log WHERE id IN (SELECT id FROM communication_log ORDER BY created_at ASC LIMIT ?)`, [count - max])
-      }
+      if (max > 0) await trimToMax(max)
     }
   } catch (e) {
     console.error('[commlog] flush failed:', e.message)
@@ -93,6 +90,20 @@ async function migrateLegacy() {
   }
 }
 
+// ponytail: trim table to at most `max` rows, keeping newest by id (#6).
+// Returns number of rows deleted. Safe to call when count <= max (no-op).
+export async function trimToMax(max) {
+  if (!max || max < 0) return 0
+  const n = parseInt(max) || 0
+  if (n === 0) return 0
+  const db = getDb()
+  const count = (await db.query(`SELECT COUNT(*) as c FROM communication_log`))[0]?.c || 0
+  if (count <= n) return 0
+  const del = count - n
+  await db.run(`DELETE FROM communication_log WHERE id IN (SELECT id FROM communication_log ORDER BY id ASC LIMIT ?)`, [del])
+  return del
+}
+
 export async function append(entry) {
   if (!getConf().log_enabled) return
   await migrateLegacy()
@@ -113,7 +124,7 @@ export async function list(filters = {}, page = 1, perPage = 0) {
     const total = (await db.query(`SELECT COUNT(*) as c FROM communication_log ${where}`, params))[0]?.c || 0
     const rows = await db.query(
       `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message
-       FROM communication_log ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+       FROM communication_log ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
       [...params, perPage, offset]
     )
     return { total, rows: rows.map(r => ({
@@ -126,7 +137,7 @@ export async function list(filters = {}, page = 1, perPage = 0) {
   }
   const rows = await db.query(
     `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message
-     FROM communication_log ${where} ORDER BY created_at DESC`,
+     FROM communication_log ${where} ORDER BY id DESC`,
     params
   )
   return rows.map(r => ({
