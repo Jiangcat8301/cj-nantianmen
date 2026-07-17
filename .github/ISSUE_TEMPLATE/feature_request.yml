@@ -1,0 +1,48 @@
+name: "✨ Feature Request"
+description: Suggest a new feature or improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Before submitting, please consider:
+
+        - **Search [existing issues](https://github.com/Jiangcat8301/cj-nantianmen/issues?q=is%3Aissue%20label%3Aenhancement)** — someone may have already proposed this.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this solve? What are you trying to do that you can't today?
+      placeholder: |
+        I'm trying to use Nantianmen to ... but currently
+        there's no way to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this should work? Be as specific as you can — CLI flags, config options, UI behavior.
+      placeholder: |
+        Add a `--foo` flag to `nantianmen-cli log` that enables...
+        Or: Add a config key `bar.baz` that controls...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Feature Type
+      options:
+        - Server (Backend)
+        - Desktop
+        - CLI
+        - Configuration option
+        - Performance / reliability
+        - Developer experience (tests, docs, CI)
+        - Other
+    validations:
+      required: true

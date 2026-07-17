@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔗 Beijing Hope Charity Foundation
+    url: https://hopecharity.org.cn
+    about: Charity foundation established over 30 years.
+  - name: 📖 Documentation
+    url: https://github.com/Jiangcat8301/cj-nantianmen/blob/main/README-en.md
+    about: Check the README and docs before opening an issue.
