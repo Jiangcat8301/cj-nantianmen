@@ -14,16 +14,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 ### Changed
 
-- **日志管理** (#6)：默认保留条数 1000→500；右上角第二个按钮文字改为「现有日志 n/max」；修改保留条数时若小于当前已有条数，即时清理旧记录；列表按 ID 倒序排列。
-- **系统概览页底部统计卡** (#2)：由固定 `grid-cols-5` 改为 `flex + flex-1` 等分布局，6 张卡片（含数据库体积）同一行不换行；窗口 <1000px 时降级为 4 列。
-- **数据统计页布局** (#5)：Top 5→Top 3；标题从 bars 左侧移到上方；数据标签从 bars 内部移到 bar 右侧同行；行间距 `space-y-3→5`。
+- **日志管理** ([#6](https://github.com/Jiangcat8301/cj-nantianmen/issues/6))：默认保留条数 1000→500；右上角第二个按钮文字改为「现有日志 n/max」；修改保留条数时若小于当前已有条数，即时清理旧记录；列表按 ID 倒序排列。
+- **系统概览页底部统计卡** ([#2](https://github.com/Jiangcat8301/cj-nantianmen/issues/2))：由固定 `grid-cols-5` 改为 `flex + flex-1` 等分布局，6 张卡片（含数据库体积）同一行不换行；窗口 <1000px 时降级为 4 列。
+- **数据统计页布局** ([#5](https://github.com/Jiangcat8301/cj-nantianmen/issues/5))：Top 5→Top 3；标题从 bars 左侧移到上方；数据标签从 bars 内部移到 bar 右侧同行；行间距 `space-y-3→5`。
 - **i18n 修正**：中文版「全部 Provider」→「全部供应商」。
 - **Token 格式化统一**：`formatToken(n)` 提取到 `desktop/src/lib/format.js`，Stats/ApiKeys/Dashboard 三视图共用，支持 K→M 进位（>1024k 显示 M，1~2 位小数）。
 
 ### Fixed
 
-- **数据统计 Top 5 重复** (#4)：同 provider+model 多 API key 时聚合拆出多行 → 后端 `stats.query()` 返回 `topModels`/`topProviders` 预聚合数组，前端直接消费。
-- **用户管理页 Token 进位缺失** (#3)：`ApiKeys.vue` 本地 `fmt()` 只做 K（无 M），1,500,000→"1500.0K" → 现统一使用 `formatToken` 正确显示 "1.50M"。
+- **数据统计 Top 5 重复** ([#4](https://github.com/Jiangcat8301/cj-nantianmen/issues/4))：同 provider+model 多 API key 时聚合拆出多行 → 后端 `stats.query()` 返回 `topModels`/`topProviders` 预聚合数组，前端直接消费。
+- **用户管理页 Token 进位缺失** ([#3](https://github.com/Jiangcat8301/cj-nantianmen/issues/3))：`ApiKeys.vue` 本地 `fmt()` 只做 K（无 M），1,500,000→"1500.0K" → 现统一使用 `formatToken` 正确显示 "1.50M"。
 
 ## [v0.2.6] — 2026-07-16
 
