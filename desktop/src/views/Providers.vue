@@ -3,13 +3,23 @@
     <div class="flex justify-between items-center mb-6">
       <div>
         <h2 class="text-xl font-bold">{{ t('models') }}</h2>
-        <p class="text-xs text-gray-500 mt-1">
-          所有 provider 中首个设为 ★ 默认的模型将作为 <code class="text-emerald-400">Nantianmen-default</code> 路由。若未设置，取第一个可用模型。
-        </p>
       </div>
       <button @click="showAdd = true" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition">
         {{ t('add_provider') }}
       </button>
+    </div>
+
+    <!-- ponytail: default-model info card — clarifies Nantianmen-default routing with click-to-copy. -->
+    <div class="mb-6 bg-gray-800 rounded-lg border border-gray-700 px-4 py-3 flex items-center gap-3">
+      <span class="text-xs text-gray-400 whitespace-nowrap">默认模型：</span>
+      <code class="text-emerald-400 text-sm font-mono">Nantianmen-default</code>
+      <button @click="copyDefaultModel" class="text-gray-600 hover:text-emerald-400 transition" :title="t('copy')">
+        <!-- heroicons: clipboard-document (v0.2.10 inline SVG to avoid font-awesome dep) -->
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+        </svg>
+      </button>
+      <span class="text-xs text-gray-500 ml-2">选择该模型将自动路由到系统当前设置的默认模型中。</span>
     </div>
 
     <!-- Provider List -->
@@ -37,7 +47,20 @@
         <div v-if="expandedId === p.id" class="border-t border-gray-700 p-4">
           <div class="flex justify-between mb-2">
             <span class="text-sm text-gray-400">{{ t('models') }}</span>
-            <button @click="openAddModel(p.id)" class="text-xs text-emerald-400 hover:underline">{{ t('add_model') }}</button>
+            <div class="flex items-center gap-3">
+              <!-- ponytail: bulk enable/disable toggle — single switch reflects aggregate state.
+                   If all enabled → switch off + label '全部启用'; if any disabled → switch on + label '全部禁用'. -->
+              <span class="text-xs" :class="allEnabled(p) ? 'text-gray-500' : 'text-emerald-400'">
+                {{ allEnabled(p) ? t('bulk_enable_all') : t('bulk_disable_all') }}
+              </span>
+              <button @click.stop="toggleAll(p)" :title="allEnabled(p) ? t('bulk_enable_all') : t('bulk_disable_all')"
+                class="relative inline-flex h-4 w-7 items-center rounded-full transition"
+                :class="allEnabled(p) ? 'bg-gray-600' : 'bg-emerald-500/60'">
+                <span class="inline-block h-3 w-3 transform rounded-full bg-white transition"
+                  :class="allEnabled(p) ? 'translate-x-0.5' : 'translate-x-3.5'"></span>
+              </button>
+              <button @click="openAddModel(p.id)" class="text-xs text-emerald-400 hover:underline">{{ t('add_model') }}</button>
+            </div>
           </div>
           <div class="space-y-1">
             <div v-for="m in (p.models || [])" :key="m.id" class="flex items-center justify-between py-1.5 px-3 bg-gray-750 rounded text-sm">
@@ -226,6 +249,20 @@ const toggleModel = async (providerId, m) => {
   }
 }
 
+// ponytail: bulk enable/disable. If any disabled → bulk-disable all; if all enabled → bulk-enable (no-op for already-enabled).
+// Uses Promise.all on existing toggleModel — no new server endpoint.
+const allEnabled = (p) => (p.models || []).every(m => !m.is_disabled)
+const toggleAll = async (p) => {
+  const targets = (p.models || []).filter(m => allEnabled(p) ? m.is_disabled : !m.is_disabled)
+  if (!targets.length) return
+  try {
+    await Promise.all(targets.map(m => api.toggleModel(p.id, m.id)))
+    await fetchModels(p.id)
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
+}
+
 const editProvider = (p) => {
   editing.value = p.id
   form.value = { name: p.name, protocol: p.protocol, base_url: p.base_url, api_key: '' }
@@ -276,5 +313,10 @@ const saveEditModel = async () => {
 
 const copyModelId = (providerName, modelName) => {
   navigator.clipboard?.writeText(`${providerName}_${modelName}`)
+}
+
+// ponytail: copy Nantianmen-default to clipboard (the virtual default-model id).
+const copyDefaultModel = () => {
+  navigator.clipboard?.writeText('Nantianmen-default')
 }
 </script>

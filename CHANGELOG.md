@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.10] — 2026-07-17
+
+### Added
+
+- **模型管理「全部启用 / 全部禁用」开关**：每个供应商展开模型列表时，新增一个聚合 toggle，反映当前供应商模型启用状态聚合——所有启用时显示「全部禁用」（点击批量停用），存在停用时显示「全部启用」（点击批量启用）。无新增 server 端点，复用 `Promise.all` 并发 `PUT .../toggle`。
+- **数据统计默认模型说明卡**：模型管理页顶部"所有 provider 中首个设为 ★ 默认的模型..."的散文字段替换为圆角矩形卡，包含「默认模型：Nantianmen-default」+ heroicons clipboard 复制图标（点击复制模型名）+ 一句话说明。
+- **CLI `provider model-toggle <pid> <mid>`**：CLI 入口支持 v0.2.9 引入的 model disable 功能（之前只能通过 desktop 切换）。
+- **CLI `default-model` / `default_model`**：查询当前默认模型。
+- **CLI `database info` / `database move`**：查询数据库类型/路径/大小/log_count；将 DB 文件迁到新路径（server 端操作）。
+- **CLI `stats` 输出补全 `topModels` / `topProviders` 字段**：与 desktop 共用 server 端聚合结果。
+- **Mac 桌面端 CI** (`.github/workflows/build-mac.yml`)：`macos-latest` runner 编译 `.dmg` + `.zip` × `x64` + `arm64`。push tag `vX.Y.Z` 自动触发；产物以 artifact 上传（保留 14 天）。本地 Windows 编译 macOS 官方不支持，本方案规避。**ad-hoc 签名（无 Apple Developer 证书），用户首次打开 .app 需右键 → 打开**。
+
+### Changed
+
+- **左侧导航顺序**：API 文档挪到日志管理下边（顺序：仪表盘 → 模型管理 → 用户管理 → 数据统计 → 日志管理 → **API 文档** → 系统设置）。
+- **数据统计 breakdown 改为按供应商聚合**：原「按 (provider, model, api_key) 三元组明细」改为「按 provider 聚合一行 + 点击展开该供应商每个 model 明细」。Per-api_key 明细不再展示（保留在 `nantianmen apikey ls` + 用户管理页）。与桌面 Stats.vue `providerGroups` 同构，CLI `stats` 输出同步按 provider → model 双层聚合。
+- **CLI `cmdStats` cost 公式统一**：原 inline 旧公式（`input × input_price + cached × cache`，cached 重复计费）替换为共享 `calcCost`（`(input-cached) × input_price + output × output_price + cached × cache`）。三视图（顶部总额卡、Top 3 模型 bar、Top 3 用户 bar、breakdown 表）cost 完全一致。
+- **server `topProviders` cost 算法修复**：原 `byProvider` Map 累加 token 时，price 只在第一行定下，导致同一 provider 下不同价格的 model 全用第一行价格算总额（如 Deepseek 整个供应商用 v4-pro 价格 3/6/0.025 算，¥10.5509；真实聚合 ¥6.7949 = v4-pro ¥4.5381 + v4-flash ¥2.2568）。改为按 row 真实价格累加 cost，provider 行不再带 price 字段。`topModels` 同时加 cost 字段作为唯一事实来源。
+- **README 自述段落**：开头加一段作者自述（中英两版）说明工具动机——「频繁修改各种智能体的配置文件切换模型是一件非常'不优雅'的事情」。
+
+### Fixed
+
+- **CLI 多处硬 bug**（历史 v0.2.7 commit 遗留）：
+  - `cli/index.js` L56 regex 4 个反斜杠（应 2 个）——node 24 跑 CLI 必崩，仅 bun-compiled exe 容忍。
+  - L476 `apikey: *** apikeys` —— `***` 字面量导致 `CMDS` 对象语法错误。
+  - `call()` 函数 PUT/POST 无 body 但仍设 `Content-Type: application/json` —— server `Fastify` 报 `Body cannot be empty when content-type is set to 'application/json'`，影响所有无 body 命令。
+  - `fn().catch()` 在 `help`/`quit` 命令上崩（handler 返回 undefined，无 `.catch`）。
+
 ## [v0.2.9] — 2026-07-17
 
 ### Added

@@ -2,13 +2,15 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.2.9--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.10--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
 [![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+
+When many providers and models are in play, switching them by hand-editing every agent's config file — even with the help of external tools — is a profoundly *inelegant* affair. So I built this little tool, hoping to offer a fast, simple, and **auditable** way to switch providers and models.
 
 In Chinese mythology, **Nantianmen** (南天门) is the sole gateway between Heaven and the mortal realm--all immortals must pass through this gate when descending to the world of mortals.
 Nantianmen does not judge right or wrong; it does one thing: **verify the identity of those who come, let the worthy pass, and bar the unworthy.**
@@ -19,7 +21,7 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.9](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.9) released** — 2026-07-17. Model disable toggle, Top 3 side-by-side stats, log management tweaks, Dashboard flex layout. See [CHANGELOG](./CHANGELOG-en.md). [Download Desktop EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.9/nantianmen-0.2.9-win-x64.exe) (Windows x64, 85 MB)
+> 🚀 **[v0.2.10](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.10) released** — 2026-07-17. Added macOS CI pipeline, CLI commands (model-toggle / default-model / database info+move), desktop "Enable All / Disable All" toggle and default-model info card, Stats breakdown now aggregated by provider, CLI cost formula unified, server `topProviders` cost algorithm fix (Deepseek and other multi-model providers now show real aggregate cost), plus 4 long-standing CLI hard bugs. See [CHANGELOG](./CHANGELOG-en.md). [Download Desktop EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.10/nantianmen-0.2.10-win-x64.exe) (Windows x64, 85 MB)
 
 ---
 

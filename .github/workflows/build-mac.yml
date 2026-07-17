@@ -1,0 +1,55 @@
+name: build-mac
+
+# ponytail: cross-compile macOS desktop EXE on macos-latest runner.
+# Triggers: push of vX.Y.Z tag, manual dispatch, or PR to main (sanity check).
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            desktop/package-lock.json
+            server/package-lock.json
+            cli/package-lock.json
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Install server deps (better-sqlite3 native source)
+        working-directory: server
+        run: npm ci
+
+      # ponytail: build + electron-rebuild for Electron's Node ABI, then electron-builder --mac.
+      # Output goes to ../temp/ per package.json `directories.output`. The runner has no Windows
+      # EXE-copier, so we just upload everything in temp/ as an artifact.
+      - name: Build mac (dmg + zip, x64 + arm64)
+        working-directory: desktop
+        run: npm run electron:build:mac
+        env:
+          # Skip code signing — no Apple Developer cert in CI. Builds ad-hoc signed binaries.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload mac artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nantianmen-mac-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            temp/*.dmg
+            temp/*.zip
+            temp/mac*/**

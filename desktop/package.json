@@ -1,6 +1,6 @@
 {
   "name": "cj-nantianmen",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Nantianmen LLM Proxy Gateway - Desktop UI",
   "type": "module",
   "main": "electron/main.cjs",
@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "electron:dev": "concurrently \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "vite build && npx @electron/rebuild -m ../server -w better-sqlite3 -f && npx electron-builder --win --x64 && node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync('../releases',{recursive:true});fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')&&(f.endsWith('.exe')||f.endsWith('.7z'))).forEach(f=>fs.copyFileSync(p.join('../temp',f),p.join('../releases',f)));fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')).forEach(f=>fs.unlinkSync(p.join('../temp',f)));fs.rmSync('../temp/win-unpacked',{recursive:true,force:true})\""
+    "electron:build": "vite build && npx @electron/rebuild -m ../server -w better-sqlite3 -f && npx electron-builder --win --x64 && node -e \"const fs=require('fs'),p=require('path');fs.mkdirSync('../releases',{recursive:true});fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')&&(f.endsWith('.exe')||f.endsWith('.7z'))).forEach(f=>fs.copyFileSync(p.join('../temp',f),p.join('../releases',f)));fs.readdirSync('../temp').filter(f=>f.startsWith('nantianmen-')).forEach(f=>fs.unlinkSync(p.join('../temp',f)));fs.rmSync('../temp/win-unpacked',{recursive:true,force:true})\"",
+    "electron:build:mac": "vite build && npx @electron/rebuild -m ../server -w better-sqlite3 -f && npx electron-builder --mac"
   },
   "build": {
     "appId": "com.jiangcat.nantianmen",
@@ -31,6 +32,27 @@
       "icon": "nantianmen.ico"
     },
     "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "artifactName": "nantianmen-${version}-mac-${arch}.${ext}",
       "icon": "nantianmen-logo.png"
     },
     "linux": {

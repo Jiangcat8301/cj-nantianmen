@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.10] — 2026-07-17
+
+### Added
+
+- **Models page "Enable All / Disable All" toggle**: When expanding a provider's model list, an aggregate toggle reflects the enable state of all its models. When all enabled, shows "Disable All" (bulk disable on click); when any disabled, shows "Enable All" (bulk enable on click). No new server endpoint — uses `Promise.all` over existing `PUT .../toggle`.
+- **Default-model info card**: The free-form prose ("All provider 中首个设为 ★ 默认的模型...") at the top of the Models page is replaced by a rounded card containing "默认模型：Nantianmen-default" + a heroicons clipboard copy icon (clicking copies the model name) + a one-line explanation.
+- **CLI `provider model-toggle <pid> <mid>`**: CLI entry point for the v0.2.9 model-disable feature (previously only available in desktop).
+- **CLI `default-model` / `default_model`**: Query the current default model.
+- **CLI `database info` / `database move`**: Show DB type/path/size/log_count; relocate the DB file (server-side operation).
+- **CLI `stats` now prints `topModels` / `topProviders`**: Shares the same server-side aggregation as desktop.
+- **macOS desktop CI** (`.github/workflows/build-mac.yml`): `macos-latest` runner builds `.dmg` + `.zip` × `x64` + `arm64`. Push of a `vX.Y.Z` tag auto-triggers; artifacts uploaded with 14-day retention. Avoids the platform limitation that Windows cannot cross-compile macOS via electron-builder. **Ad-hoc signed (no Apple Developer certificate); users must right-click → Open on first launch.**
+
+### Changed
+
+- **Left-nav order**: API Docs moved below Comm Log (sequence: Dashboard → Models → API Keys → Statistics → Comm Log → **API Docs** → Settings).
+- **Stats breakdown now aggregated by provider**: Previously rendered one row per `(provider, model, api_key)` triple; now renders one row per provider with click-to-expand per-model details. Per-API-key detail moved to `nantianmen apikey ls` and the Users management UI. Mirrors `Stats.vue`'s `providerGroups`. CLI `stats` mirrors the same structure (provider → model).
+- **CLI `cmdStats` cost formula unified**: Replaced the inline legacy formula (`input × input_price + cached × cache`, double-counting cached tokens) with the shared `calcCost` (`(input - cached) × input_price + output × output_price + cached × cache`). Four views (total-cost card, Top 3 model bar, Top 3 user bar, breakdown table) now produce identical totals.
+- **`server topProviders` cost fix**: The old `byProvider` Map locked the price from the first row, so every model under that provider (e.g. Deepseek v4-pro vs v4-flash) was billed at v4-pro's price (3 / 6 / 0.025), inflating Deepseek total to ¥10.5509 vs the real ¥6.7949 = v4-pro ¥4.5381 + v4-flash ¥2.2568. Now sums cost per row using each row's own price; provider aggregate no longer carries a single price. `topModels` also gets a `cost` field as the single source of truth.
+- **README author preface**: A short author preface added at the top (Chinese + English) explaining the motivation — "switching models by hand-editing every agent's config file is a profoundly *inelegant* affair".
+
+### Fixed
+
+- **CLI hard bugs** (left over from a v0.2.7 commit, only tolerated by bun-compiled exe):
+  - `cli/index.js` L56 regex with 4 backslashes (should be 2) — `node 24` syntax error.
+  - L476 `apikey: *** apikeys` — literal `***` makes the `CMDS` object syntactically invalid.
+  - `call()` sets `Content-Type: application/json` even for empty-body PUT/POST, so Fastify rejects with `Body cannot be empty when content-type is set to 'application/json'`. Affects every body-less command.
+  - `fn().catch()` crashes on `help` / `quit` (handlers return `undefined`, no `.catch`).
+
 ## [v0.2.9] — 2026-07-17
 
 ### Added

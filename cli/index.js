@@ -53,7 +53,7 @@ function resolveServerEntry() {
   const exeDir = path.dirname(process.execPath)
   const bundledEntry = path.join(exeDir, 'server', 'index.js')
   if (fs.existsSync(bundledEntry)) return bundledEntry
-  const cliDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\\//, ''))
+  const cliDir = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ''))
   const devEntry = path.join(cliDir, '..', 'server', 'index.js')
   if (fs.existsSync(devEntry)) return devEntry
   console.error('✗ no server entry found. Pass --server-bin /path/to/server/index.js or set $NANTIANMEN_SERVER_BIN')
@@ -100,9 +100,11 @@ export function resolveArgs() {
 export async function call(method, path, body, { headers = {}, noAuth = false } = {}) {
   const args = resolveArgs()
   const url = `http://${args.host}:${args.port}` + path
-  const h = { 'Content-Type': 'application/json', ...headers }
+  // ponytail: when body is undefined, omit Content-Type so server doesn't reject "empty body with JSON type".
+  const hasBody = body !== undefined
+  const h = { ...(hasBody ? { 'Content-Type': 'application/json' } : {}), ...headers }
   if (!noAuth && args.password_md5 && !h.Authorization) h.Authorization = `Bearer ${args.password_md5}`
-  const resp = await fetch(url, { method, headers: h, body: body !== undefined ? JSON.stringify(body) : undefined })
+  const resp = await fetch(url, { method, headers: h, body: hasBody ? JSON.stringify(body) : undefined })
   const text = await resp.text()
   let data
   try { data = JSON.parse(text) } catch { data = text }
@@ -175,24 +177,47 @@ async function cmdLogin() {
 }
 
 async function cmdDatabase() {
-  console.log('Configure database backend:')
-  console.log('  1) SQLite3')
-  console.log('  2) MySQL')
-  const c = await prompt('Select: ')
-  let database
-  if (c === '2') {
-    const h = await prompt('MySQL host: ')
-    const p = Number((await prompt('MySQL port [3306]: ') || '3306'))
-    const u = await prompt('MySQL username: ')
-    const pw = await askSecret('MySQL password: ')
-    database = { type: 'mysql', host: h, port: p, username: u, password: pw }
-  } else if (c === '1') {
-    const pt = await prompt('SQLite file path [./nantianmen.db]: ') || './nantianmen.db'
-    database = { type: 'sqlite3', path: pt }
-  } else { console.error('invalid choice'); process.exit(1) }
-  const r = await call('POST', '/api/admin/database/configure', database)
-  if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
-  console.log('✓ database configured; restart server to apply')
+  const args = process.argv.slice(3)
+  const sub = args[0]
+  // ponytail: sub-routes — info (read) and move (server-side relocates the file).
+  if (sub === 'info' || !sub) {
+    const r = await call('GET', '/api/admin/database/info')
+    if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
+    const sizeMB = (r.data.size / 1048576).toFixed(2)
+    console.log(`type:     ${r.data.type}`)
+    console.log(`path:     ${r.data.path}`)
+    console.log(`size:     ${r.data.size} bytes (${sizeMB} MB)`)
+    console.log(`log_count: ${r.data.log_count ?? 0}`)
+    return
+  }
+  if (sub === 'move') {
+    const target = args[1] || await prompt('New DB path (absolute): ')
+    const r = await call('POST', '/api/admin/database/move', { path: target })
+    console.log(r.status === 200 ? `✓ moved to ${r.data.path ?? target}` : `✗ ${r.status} ${JSON.stringify(r.data)}`)
+    return
+  }
+  if (sub === 'configure' || sub === 'config') {
+    console.log('Configure database backend:')
+    console.log('  1) SQLite3')
+    console.log('  2) MySQL')
+    const c = await prompt('Select: ')
+    let database
+    if (c === '2') {
+      const h = await prompt('MySQL host: ')
+      const p = Number((await prompt('MySQL port [3306]: ') || '3306'))
+      const u = await prompt('MySQL username: ')
+      const pw = await askSecret('MySQL password: ')
+      database = { type: 'mysql', host: h, port: p, username: u, password: pw }
+    } else if (c === '1') {
+      const pt = await prompt('SQLite file path [./nantianmen.db]: ') || './nantianmen.db'
+      database = { type: 'sqlite3', path: pt }
+    } else { console.error('invalid choice'); process.exit(1) }
+    const r = await call('POST', '/api/admin/database/configure', database)
+    if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
+    console.log('✓ database configured; restart server to apply')
+    return
+  }
+  console.error('usage: nantianmen database [info|configure|move]')
 }
 
 async function cmdSettings() {
@@ -294,7 +319,14 @@ async function cmdProviders() {
     console.log(r.status === 200 ? '✓ set as default' : `✗ ${r.status}`)
     return
   }
-  console.error('usage: nantianmen provider [ls|add|rm|models|models-refresh|model-add|model-edit|default]')
+  if (sub === 'model-toggle') {
+    const pid = args[1] || await prompt('Provider id: ')
+    const mid = args[2] || await prompt('Model id: ')
+    const r = await call('PUT', `/api/admin/providers/${pid}/models/${mid}/toggle`)
+    console.log(r.status === 200 ? `✓ ${r.data.is_disabled ? 'disabled' : 'enabled'} id=${r.data.id}` : `✗ ${r.status} ${JSON.stringify(r.data)}`)
+    return
+  }
+  console.error('usage: nantianmen provider [ls|add|rm|models|models-refresh|model-add|model-edit|model-toggle|default]')
 }
 
 async function cmdApikeys() {
@@ -332,6 +364,14 @@ async function cmdApikeys() {
   }
 }
 
+// ponytail: shared token cost formula — mirrors desktop/src/lib/format.js::calcCost.
+// (input - cached) * input_price + output * output_price + cached * cache_hit_price.
+// Keep the three copies (server lib / desktop lib / CLI) in sync — see Bug 24.
+const calcCost = (r) =>
+  ((r.input_tokens || 0) - (r.cached_tokens || 0)) * (r.input_price || 0) / 1_000_000
+  + (r.output_tokens || 0) * (r.output_price || 0) / 1_000_000
+  + (r.cached_tokens || 0) * (r.cache_hit_price || 0) / 1_000_000
+
 async function cmdStats() {
   // ponytail: support --range=today|7d|30d flag
   const args = process.argv.slice(3)
@@ -342,11 +382,51 @@ async function cmdStats() {
   if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
   const d = r.data
   console.log(`total: ${d.total_requests||0} reqs  in:${d.total_input_tokens||0}  out:${d.total_output_tokens||0}  cached:${d.total_cached_tokens||0}`)
-  if (!d.breakdown || d.breakdown.length === 0) { console.log('(no breakdown)'); return }
-  for (const s of d.breakdown) {
-    const cost = ((s.input_tokens||0)*(s.input_price||0) + (s.output_tokens||0)*(s.output_price||0) + (s.cached_tokens||0)*(s.cache_hit_price||0)) / 1e6
-    console.log(`${s.provider||'-'}\t${s.model_name}\t${s.key_name||s.api_key_id}\treqs:${s.request_count}\tin:${s.input_tokens}\tout:${s.output_tokens}\tcached:${s.cached_tokens}\tcost:$${cost.toFixed(4)}`)
+  if (d.topModels?.length) {
+    console.log('\nTop models:')
+    for (const m of d.topModels) console.log(`  ${m.model}\treqs:${m.request_count}\tin:${m.input_tokens}\tout:${m.output_tokens}\tcached:${m.cached_tokens}\tcost:¥${calcCost(m).toFixed(4)}`)
   }
+  if (d.topProviders?.length) {
+    console.log('\nTop providers:')
+    for (const p of d.topProviders) console.log(`  ${p.provider}\treqs:${p.request_count}\tin:${p.input_tokens}\tout:${p.output_tokens}\tcached:${p.cached_tokens}\tcost:¥${(p.cost ?? 0).toFixed(4)}`)
+  }
+  // ponytail: aggregate breakdown by provider → model (matches desktop Stats.vue providerGroups).
+  // per-api_key detail lives in `nantianmen apikey ls` + the Users management UI, not here.
+  const byProv = new Map()
+  for (const s of (d.breakdown || [])) {
+    const prov = s.provider || '?'
+    let g = byProv.get(prov) || { provider: prov, models: new Map() }
+    g.req = (g.req || 0) + (s.request_count || 0)
+    g.in = (g.in || 0) + (s.input_tokens || 0)
+    g.out = (g.out || 0) + (s.output_tokens || 0)
+    g.cached = (g.cached || 0) + (s.cached_tokens || 0)
+    g.cost = (g.cost || 0) + calcCost(s)
+    const mn = s.model_name || '?'
+    let m = g.models.get(mn) || { model_name: mn }
+    m.req = (m.req || 0) + (s.request_count || 0)
+    m.in = (m.in || 0) + (s.input_tokens || 0)
+    m.out = (m.out || 0) + (s.output_tokens || 0)
+    m.cached = (m.cached || 0) + (s.cached_tokens || 0)
+    m.cost = (m.cost || 0) + calcCost(s)
+    g.models.set(mn, m)
+    byProv.set(prov, g)
+  }
+  if (!byProv.size) { console.log('(no breakdown)'); return }
+  console.log('\nBy provider:')
+  const provList = [...byProv.values()].sort((a, b) => b.req - a.req)
+  for (const g of provList) {
+    console.log(`  ${g.provider}\treqs:${g.req}\tin:${g.in}\tout:${g.out}\tcached:${g.cached}\tcost:¥${g.cost.toFixed(4)}`)
+    const models = [...g.models.values()].sort((a, b) => b.req - a.req)
+    for (const m of models) console.log(`    ${m.model_name}\treqs:${m.req}\tin:${m.in}\tout:${m.out}\tcached:${m.cached}\tcost:¥${m.cost.toFixed(4)}`)
+  }
+}
+
+async function cmdDefaultModel() {
+  const r = await call('GET', '/api/admin/default-model')
+  if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
+  if (!r.data) { console.log('(no default model set)'); return }
+  console.log(`default: ${r.data.provider_name}_${r.data.model_name}  (${r.data.protocol})`)
+  console.log(`id for /v1/models: Nantianmen-default`)
 }
 
 async function cmdQuit() { /* ponytail: alias exit, in case user types quit */ }
@@ -423,6 +503,7 @@ const CMDS = {
   apikey: cmdApikeys, apikeys: cmdApikeys,
   stats: cmdStats,
   log: cmdLog,
+  'default-model': cmdDefaultModel, default_model: cmdDefaultModel,
   quit: cmdQuit,
   help: () => console.log('commands:\n  ' + Object.keys(CMDS).filter(k => !['quit','help'].includes(k)).join('\n  ')),
 }
@@ -457,5 +538,7 @@ const SERVERLESS = new Set(['help', 'quit'])
   if (!SERVERLESS.has(sub)) {
     await ensureServer(args)
   }
-  fn().catch(e => { console.error(e); process.exit(1) })
+  // ponytail: help/quit handlers return undefined; await the call so their side-effects (console.log) run.
+  const r = fn()
+  if (r && typeof r.catch === 'function') r.catch(e => { console.error(e); process.exit(1) })
 })()
