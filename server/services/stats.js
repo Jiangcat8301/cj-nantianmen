@@ -94,27 +94,37 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
 
   // ponytail: pre-aggregate by (provider, model) so the Top-5 panel doesn't show the same
   // provider/model multiple times when several API keys used it. One pass over `rows`.
+  // Cost uses (input-cached)*input_price + output*output_price + cached*cache_hit_price (v0.2.7 Bug 24).
+  const rowCost = (r) =>
+    ((r.input_tokens || 0) - (r.cached_tokens || 0)) * (r.input_price || 0) / 1_000_000
+    + (r.output_tokens || 0) * (r.output_price || 0) / 1_000_000
+    + (r.cached_tokens || 0) * (r.cache_hit_price || 0) / 1_000_000
   const byModel = new Map()
   const byProvider = new Map()
   for (const r of rows) {
     const mk = `${r.provider}|${r.model_name}`
     const m = byModel.get(mk) || { provider: r.provider || '?', model: r.model_name || '?',
       request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0,
-      input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0 }
+      input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0,
+      cost: 0 }
     m.request_count += r.request_count || 0
     m.input_tokens += r.input_tokens || 0
     m.output_tokens += r.output_tokens || 0
     m.cached_tokens += r.cached_tokens || 0
+    m.cost += rowCost(r)
     byModel.set(mk, m)
 
     const pk = r.provider || '?'
+    // ponytail: don't carry a single model's price into the provider aggregate — different models
+    // within the same provider have different prices (e.g. Deepseek v4-pro vs v4-flash). Sum cost
+    // row-by-row using each row's own price; expose cost on the aggregate, drop the misleading price.
     const p = byProvider.get(pk) || { provider: pk, request_count: 0,
-      input_tokens: 0, output_tokens: 0, cached_tokens: 0,
-      input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0 }
+      input_tokens: 0, output_tokens: 0, cached_tokens: 0, cost: 0 }
     p.request_count += r.request_count || 0
     p.input_tokens += r.input_tokens || 0
     p.output_tokens += r.output_tokens || 0
     p.cached_tokens += r.cached_tokens || 0
+    p.cost += rowCost(r)
     byProvider.set(pk, p)
   }
   const topModels = [...byModel.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)).slice(0, 5)

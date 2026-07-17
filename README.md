@@ -4,13 +4,15 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.2.9--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.10--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
 [![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
+
+当使用的供应商和模型较多时，即便通过外部工具，频繁修改各种智能体的配置文件切换模型也是一件非常"不优雅"的事情。为此，我作了这个小工具，希望提供一个快速、简单、可审计地切换供应商和模型的方式。
 
 在中国神话中，**南天门**是天界与人间的唯一通道--众仙出入凡间，必经此门。
 南天门不裁断是非，只做一件事：**验明来者身份，放行该放的人，拦住该拦的妖。**
@@ -21,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.9](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.9) 已发布** — 2026-07-17。新增模型停用开关、Top 3 并排统计、日志管理优化、Dashboard flex 自适应布局。详见 [CHANGELOG](./CHANGELOG.md)。[下载桌面版 EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.9/nantianmen-0.2.9-win-x64.exe) (Windows x64, 85 MB)
+> 🚀 **[v0.2.10](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.10) 已发布** — 2026-07-17。新增 macOS CI 流水线、CLI 模型停用/默认模型/database info 等命令、桌面端「全部启用/全部禁用」开关与默认模型说明卡、Stats breakdown 改为按供应商聚合、CLI cost 公式统一、修复 server `topProviders` cost 算法（Deepseek 等多 model provider 真实成本）及 4 处 CLI 历史硬 bug。详见 [CHANGELOG](./CHANGELOG.md)。[下载桌面版 EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.10/nantianmen-0.2.10-win-x64.exe) (Windows x64, 85 MB)
 
 ---
 

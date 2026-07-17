@@ -11,7 +11,7 @@
         <div class="flex items-center gap-1.5 px-3 text-xs">
           <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
           <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.9</span>
+          <span class="text-gray-600">v0.2.10</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">
@@ -84,7 +84,7 @@ const i18n = {
     minimize: '最小化', maximize: '最大化', restore: '还原', close: '关闭',
     add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动', disable_model: '停用模型', enable_model: '启用模型',
     fld_name: '名称', fld_name_hint: '⚠ 不能包含空格或下划线', fld_protocol: '协议', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
-    btn_cancel: '取消', btn_confirm: '确认', refresh_models: '刷新模型列表', add_model: '添加模型',
+    btn_cancel: '取消', btn_confirm: '确认', refresh_models: '刷新模型列表', add_model: '添加模型', bulk_enable_all: '全部启用', bulk_disable_all: '全部禁用',
     fld_model_hint: '输入上游供应商支持的模型名称，如 gpt-4o-mini', no_providers: '暂无供应商，点击右上角添加',
     settings_title: '系统设置', set_listen_port: '监听端口', set_port_hint: '范围 1024-65535，默认 38271',
     set_autostart: '开机自动启动', set_autostart_desc: '系统启动时自动运行南天门', set_autostart_on: '已开启', set_autostart_off: '已关闭', set_save: '保存设置',
@@ -120,7 +120,7 @@ const i18n = {
     minimize: 'Minimize', maximize: 'Maximize', restore: 'Restore', close: 'Close',
     add_provider: 'Add Provider', health: 'Health Check', edit: 'Edit', delete: 'Delete', set_default: 'Set Default', default_badge: '★ Default', manual: 'Manual', disable_model: 'Disable Model', enable_model: 'Enable Model',
     fld_name: 'Name', fld_name_hint: '⚠ No spaces or underscores allowed', fld_protocol: 'Protocol', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
-    btn_cancel: 'Cancel', btn_confirm: 'Confirm', refresh_models: 'Refresh Models', add_model: 'Add Model',
+    btn_cancel: 'Cancel', btn_confirm: 'Confirm', refresh_models: 'Refresh Models', add_model: 'Add Model', bulk_enable_all: 'Enable All', bulk_disable_all: 'Disable All',
     fld_model_hint: 'Enter a model name supported by the upstream provider, e.g. gpt-4o-mini', no_providers: 'No providers yet. Click + to add one.',
     settings_title: 'Settings', set_listen_port: 'Listen Port', set_port_hint: 'Range 1024-65535, default 38271',
     set_autostart: 'Auto Start', set_autostart_desc: 'Launch Nantianmen on system startup', set_autostart_on: 'Enabled', set_autostart_off: 'Disabled', set_save: 'Save',
@@ -156,7 +156,7 @@ const i18n = {
     minimize: '最小化', maximize: '最大化', restore: '元に戻す', close: '閉じる',
     add_provider: 'プロバイダー追加', health: 'ヘルスチェック', edit: '編集', delete: '削除', set_default: 'デフォルト設定', default_badge: '★ デフォルト', manual: '手動', disable_model: 'モデル無効化', enable_model: 'モデル有効化',
     fld_name: '名称', fld_name_hint: '⚠ スペース・アンダースコア不可', fld_protocol: 'プロトコル', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
-    btn_cancel: 'キャンセル', btn_confirm: '確認', refresh_models: 'モデル更新', add_model: 'モデル追加',
+    btn_cancel: 'キャンセル', btn_confirm: '確認', refresh_models: 'モデル更新', add_model: 'モデル追加', bulk_enable_all: '全て有効化', bulk_disable_all: '全て無効化',
     fld_model_hint: '上流プロバイダーがサポートするモデル名を入力（例: gpt-4o-mini）', no_providers: 'プロバイダーがありません。右上の+をクリックして追加。',
     settings_title: '設定', set_listen_port: 'リッスンポート', set_port_hint: '範囲 1024-65535、デフォルト 38271',
     set_autostart: '自動起動', set_autostart_desc: 'システム起動時に南天門を自動実行', set_autostart_on: 'オン', set_autostart_off: 'オフ', set_save: '保存',
@@ -196,8 +196,8 @@ const navItems = [
   { path: '/providers', labelKey: 'models', icon: '🤖' },
   { path: '/apikeys', labelKey: 'users', icon: '🔑' },
   { path: '/stats', labelKey: 'stats', icon: '📈' },
-  { path: '/docs', labelKey: 'docs', icon: '📚' },
   { path: '/logs', labelKey: 'logs', icon: '📝' },
+  { path: '/docs', labelKey: 'docs', icon: '📚' },
   { path: '/settings', labelKey: 'settings', icon: '⚙️' },
 ]
 
