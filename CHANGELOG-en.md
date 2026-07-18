@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [v0.2.12] — 2026-07-18
 
+### Fixed
+
+- **Streaming duration_ms astronomical values**: `makeStreamingResponse` passed TTFB milliseconds as a timestamp into `Date.now() - ttfbMs`, causing all streaming requests to record ~17 trillion ms durations ([#50](https://github.com/Jiangcat8301/cj-nantianmen/issues/50)).
+- **t0 relocation**: TTFB clock starts right before `fetch()` instead of function entry, excluding DB query / protocol conversion overhead.
+
 ### Changed
 
-- **Version bump**: v0.2.11 → v0.2.12.
+- Log page duration red threshold: 1s → 5s.
 
 ## [v0.2.11] — 2026-07-18
 

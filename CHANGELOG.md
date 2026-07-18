@@ -7,9 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 ## [v0.2.12] — 2026-07-18
 
+### Fixed
+
+- **流式路径 duration_ms 天文数字**：`makeStreamingResponse` 把 TTFB 毫秒数当时间戳拼入 `Date.now() - ttfbMs`，所有流式请求记录 ~17 万亿 ms 的 duration（[#50](https://github.com/Jiangcat8301/cj-nantianmen/issues/50)）。
+- **t0 定位修正**：TTFB 计时起点从函数入口移到 `fetch()` 前一行，排除 DB 查询/协议转换开销。
+
 ### Changed
 
-- **版本 Bump**：v0.2.11 → v0.2.12。
+- 日志页 duration 红色阈值从 1s → 5s。
 
 ## [v0.2.11] — 2026-07-18
 

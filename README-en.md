@@ -21,7 +21,7 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.11](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) released** — 2026-07-18. Added iconfont UI icon system, API Key assigned model routing, proxy settings (system/direct/custom), log duration column (TTFB) + page-load spinner, multi-resolution .ico fix, macOS DMG CI. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.11/nantianmen-0.2.11-win-x64.exe) (x64, 85 MB) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) (x64 + arm64)
+> 🚀 **[v0.2.12](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) released** — 2026-07-18. Fixed streaming duration astronomical bug, precise TTFB timing, duration red threshold 1s→5s. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.12/nantianmen-0.2.12-win-x64.exe) (x64, 79 MB) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) (x64 + arm64)
 
 ---
 

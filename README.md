@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.11](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) 已发布** — 2026-07-18。iconfont UI 图标系统、API Key 指定模型路由、代理设置（system/direct/custom）、日志耗时列（TTFB）+ 翻页加载动画、多分辨率 .ico 图标修复、macOS DMG CI。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.11/nantianmen-0.2.11-win-x64.exe) (x64, 85 MB) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) (x64 + arm64)
+> 🚀 **[v0.2.12](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) 已发布** — 2026-07-18。流式路径 duration 天文数字 Bug 修复、TTFB 计时精确定位、duration 红色阈值 1s→5s。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.12/nantianmen-0.2.12-win-x64.exe) (x64, 79 MB) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) (x64 + arm64)
 
 ---
 
