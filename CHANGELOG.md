@@ -2,8 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
+The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+
+## [v0.2.11] — 2026-07-18
+
+### Added
+
+- **iconfont UI 图标系统**：全局替换 emoji 为自定义 iconfont（24 个图标），包括导航栏、dashboard 复制按钮、provider 操作按钮、api-key 显隐/分配、日志查看/复制。字体文件打入 CSS bundle。
+- **API 文档示例卡片**：每个接口新增示例卡片 + icon-copy 按钮，一键复制 curl 命令。
+- **用户管理「指定模型」弹窗**：app-key 行操作栏新增 icon-assign 按钮，弹出模型选择 modal（居中 + 650px 宽），选中后持久化到 `api_keys.assigned_model`。后端 `getAssignedEntry()` 优先路由分配模型。
+- **代理设置**：系统设置新增代理配置，三种模式（system/direct/custom），存入 `nantianmen-conf.json`。`direct` 绕过系统代理直接连接，`custom` 提供 http(s)/socks5 URL。基于 undici ProxyAgent，lazy import 保证 Electron fork server 兼容。
+- **日志耗时列**：TTFB（南天门发 request → LLM 回应首字节），`communication_log.duration_ms` 字段。桌面端 Logs.vue 表格右对齐显示，>1s 红色白色。CLI `log ls` 同步输出 `dur` 列。
+- **加载动画**：日志管理页加载/翻页时显示毛玻璃旋转 spinner（`backdrop-blur + animate-spin`），三语 i18n（加载中…/Loading…/読み込み中…）。
+- **CLI proxy 子命令**：`nantianmen proxy` 查看当前模式；`nantianmen proxy set <system|direct|custom> [url]` 切换。与 desktop 对齐。
+- **CLI header 行**：`nantianmen log ls` 输出带表头（time/user/provider/model/in/out/cached/duration/status）。
+- **多分辨率 .ico**：`nantianmen.ico` 包含 16/24/32/48/64/128/256 七个尺寸（PNG-in-ICO，Vista+ 格式），241 KB。打包进 EXE 资源。
+- **macOS CI** (`.github/workflows/build-mac.yml`)：push tag `v*.*.*` 自动编译 x64 + arm64 DMG，产物上传 release。
+
+### Changed
+
+- **titlebar 升级**：高度 40px，logo 20×20 px。
+- **全局 nowrap**：button、td、th 全用 `white-space: nowrap` 防止换行。
+- **Stats top 卡**：高度 400→350px。
+- **iconfont 引入方式**：从 `@import`（postcss 警告）改为 `main.js` 直接 `import './iconfont.css'`，0 warning。
+- **耗时计算方式**：改为 fetch 返回 response headers 时刻（TTFB），非原来的全部 round-trip 时间。
+
+### Fixed
+
+- **PUT /api-keys/:id 500 Internal Server Error**：SELECT 语句中 `datetime(…,"localtime")` 双引号改为单引号，SQLite 之前报 `no such column: "localtime"`。
+- **server 无法启动**（Electron fork 环境）：`proxyDispatcher.js` 改为 lazy `import('undici')`，找不到包时 silent fallback（undefined dispatcher = fetch 默认行为），不阻 server 启动。
+- **任务栏图标缺失**：`BrowserWindow.icon` 从 PNG 改为多分辨率 .ico 文件，Windows 任务栏正常显示。
+- **系统托盘图标**：改为 `nantianmen.ico` 多分辨率格式，Windows 自动选取最佳尺寸。
 
 ## [v0.2.8] — 2026-07-16
 

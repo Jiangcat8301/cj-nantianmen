@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.10](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.10) 已发布** — 2026-07-17。新增 macOS CI 流水线、CLI 模型停用/默认模型/database info 等命令、桌面端「全部启用/全部禁用」开关与默认模型说明卡、Stats breakdown 改为按供应商聚合、CLI cost 公式统一、修复 server `topProviders` cost 算法（Deepseek 等多 model provider 真实成本）及 4 处 CLI 历史硬 bug。详见 [CHANGELOG](./CHANGELOG.md)。[下载桌面版 EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.10/nantianmen-0.2.10-win-x64.exe) (Windows x64, 85 MB)
+> 🚀 **[v0.2.11](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) 已发布** — 2026-07-18。iconfont UI 图标系统、API Key 指定模型路由、代理设置（system/direct/custom）、日志耗时列（TTFB）+ 翻页加载动画、多分辨率 .ico 图标修复、macOS DMG CI。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.11/nantianmen-0.2.11-win-x64.exe) (x64, 85 MB) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.11) (x64 + arm64)
 
 ---
 

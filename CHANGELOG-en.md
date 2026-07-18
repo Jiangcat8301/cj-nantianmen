@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.11] — 2026-07-18
+
+### Added
+
+- **iconfont UI icon system**: Replaced all emojis with custom iconfont (24 icons) — nav, dashboard copy, provider actions, api-key show/hide/assign, log view/copy. Font file bundled into CSS.
+- **API docs example cards**: Each endpoint now has an example card with icon-copy button for one-click curl copy.
+- **API Key assigned model modal**: Added icon-assign button per api-key row with centered model picker modal (650px wide). Persisted to `api_keys.assigned_model`. Backend `getAssignedEntry()` routes requests to the assigned model first.
+- **Proxy settings**: System settings now has proxy configuration — three modes (system/direct/custom), persisted to `nantianmen-conf.json`. `direct` bypasses any system proxy; `custom` accepts http(s)/socks5 URLs. Powered by undici ProxyAgent with lazy import for Electron fork compatibility.
+- **Log duration column**: TTFB (Nantianmen request dispatch → LLM first response byte), stored as `communication_log.duration_ms`. Desktop Logs.vue displays right-aligned, >1s in red. CLI `log ls` outputs `dur` column.
+- **Loading animation**: Log page shows a blurred-backdrop spinning ring (`backdrop-blur + animate-spin`) during load/pagination, with i18n (加载中…/Loading…/読み込み中…).
+- **CLI proxy subcommand**: `nantianmen proxy` to view current mode; `nantianmen proxy set <system|direct|custom> [url]` to switch. Parity with desktop.
+- **CLI log header row**: `nantianmen log ls` now prints a header line (time/user/provider/model/in/out/cached/duration/status).
+- **Multi-resolution .ico**: `nantianmen.ico` contains 7 sizes (16/24/32/48/64/128/256) in Vista+ PNG-in-ICO format, 241 KB. Embedded in EXE resources.
+- **macOS CI** (`.github/workflows/build-mac.yml`): Push `v*.*.*` tag auto-builds x64 + arm64 DMG, uploads artifacts to release.
+
+### Changed
+
+- **titlebar upgrade**: Height 40px, logo 20×20 px.
+- **Global nowrap**: `button`, `td`, `th` all use `white-space: nowrap` to prevent line breaks.
+- **Stats top cards**: Height 400→350px.
+- **iconfont import**: Changed from `@import` (postcss warning) to `main.js` `import './iconfont.css'`, 0 warnings.
+- **Duration calculation**: Now measured at fetch response header time (TTFB), not the full round-trip.
+
+### Fixed
+
+- **PUT /api-keys/:id 500 Internal Server Error**: SELECT used double-quoted `"localtime"` (treated as column reference by SQLite → `no such column`). Fixed to single-quoted `'localtime'`.
+- **Server crash on Electron fork**: `proxyDispatcher.js` now lazy-imports `undici`; silent fallback (undefined dispatcher = fetch default) when the module isn't resolvable in the Electron-embedded server.
+- **Taskbar icon missing**: `BrowserWindow.icon` changed from PNG to multi-resolution .ico, taskbar now displays correctly.
+- **System tray icon**: Now uses `nantianmen.ico` multi-resolution format; Windows auto-picks the best size.
+
 ## [v0.2.8] — 2026-07-16
 
 ### Added
