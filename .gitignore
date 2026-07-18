@@ -1,0 +1,59 @@
+# Dependencies
+server/node_modules/
+desktop/node_modules/
+cli/node_modules/
+
+# Build output
+build/
+desktop/dist/
+desktop/build/
+desktop/release/
+desktop/releases/
+releases/
+temp/
+*.exe
+*.dll
+*.app
+
+# Demo (not synced to repo)
+demo/
+
+# Python (legacy v0.1 only; v0.2 is Node.js)
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Env
+.env
+.env.local
+
+# Certificates
+*.pfx
+
+# Logs
+*.log
+
+# ponytail: project-local tooling
+.codegraph/
+tools/
+.gitignore
+.githooks/
