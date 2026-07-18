@@ -164,9 +164,10 @@ const formatDuration = (ms) => {
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
 }
+// ponytail: duration class. null → gray. >=5000ms → red. <5000ms → gray-400.
 const durationClass = (ms) => {
   if (ms == null) return 'text-gray-600'
-  if (ms >= 1000) return 'text-red-400'
+  if (ms >= 5000) return 'text-red-400'
   return 'text-gray-400'
 }
 const toggleDetail = (l, i) => {

@@ -77,9 +77,6 @@ async function getAssignedEntry(apiKeyId) {
 }
 
 export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
-  // ponytail: wall-clock duration from full request arrival to full response.
-  // Logged as `duration_ms`; null for older entries lacking the field.
-  const t0 = Date.now()
   const overrideEntry = await getAssignedEntry(apiKeyId)
   const entry = overrideEntry || resolveModel(body.model || 'auto')
   const { provider, model_name, protocol: providerProtocol, endpoint, headers } = entry
@@ -97,10 +94,8 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   stats.acquire()
   let captured = { input_tokens: 0, output_tokens: 0, cached_tokens: 0 }
   try {
-    // ponytail: duration = time from outbound request start (t0) to when the upstream
-    // LLM responds (response headers received) = TTFB. We capture this immediately
-    // when fetch() resolves, BEFORE reading the body, so streaming chunks / JSON
-    // parsing time aren't included in the recorded duration.
+    // ponytail: TTFB — from fetch() call to upstream response headers received.
+    const t0 = Date.now()
     const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(upstreamBody), dispatcher: await getDispatcher() })
     const durationMs = Date.now() - t0
     if (body.stream && resp.ok && resp.body) {
@@ -137,7 +132,7 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   }
 }
 
-function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, providerId, reply, upstreamBody, provider, t0 = Date.now()) {
+function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, providerId, reply, upstreamBody, provider, ttfbMs) {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -197,7 +192,7 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
       }
     } catch (e) {
       outputBuf += '\n[stop]'
-      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: Date.now() - t0, error: { code: 0, message: e.message } })
+      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs, error: { code: 0, message: e.message } })
       reply.raw.destroy(e)
       return
     }
@@ -209,6 +204,6 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
     reply.raw.end()
     stats.record({ api_key_id: apiKeyId, provider_id: providerId, model_name, request_count: 1, input_tokens: inputTokens, output_tokens: outputTokens, cached_tokens: cachedTokens })
     stats.release()
-    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: Date.now() - t0 })
+    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs })
   })()
 }

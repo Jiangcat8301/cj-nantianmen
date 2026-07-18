@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.12] — 2026-07-18
+
+### Changed
+
+- **版本 Bump**：v0.2.11 → v0.2.12。
+
 ## [v0.2.11] — 2026-07-18
 
 ### Added
@@ -34,29 +40,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 - **server 无法启动**（Electron fork 环境）：`proxyDispatcher.js` 改为 lazy `import('undici')`，找不到包时 silent fallback（undefined dispatcher = fetch 默认行为），不阻 server 启动。
 - **任务栏图标缺失**：`BrowserWindow.icon` 从 PNG 改为多分辨率 .ico 文件，Windows 任务栏正常显示。
 - **系统托盘图标**：改为 `nantianmen.ico` 多分辨率格式，Windows 自动选取最佳尺寸。
-
-## [v0.2.8] — 2026-07-16
-
-### Added
-
-- **Minimax `<function_calls>` XML v3 tool_call parser**（commit `b6e4ba5`）：Minimax 协议下识别 `<function_calls>` XML 格式的 tool_calls，转为 OpenAI 标准格式。Minimax 5 种 tool_call 格式之一。
-
-### Fixed
-
-- **`openaiReqToAnthropic` non-string content 修复**（commit `7dd6c22`）：当 Anthropic 协议下游收到的 message content 不是 string（如 array of blocks）时，OpenAI→Anthropic 转换时 stringify 处理，避免下游 API 报错。
-
-## [v0.2.7] — 2026-07-15
-
-### Added
-
-- **commlog 落库迁移**：原 `communication.log` JSON 文件改为 SQLite `communication_log` 表，支持索引 + 查询 + 翻页（`?lines=`）。
-- **tool_use 格式转换**：OpenAI `tool_calls` ↔ Anthropic `tool_use` 双向桥接。
-- **SSE 协议转换**：OpenAI `data: {...}` ↔ Anthropic `event: ...` 流式协议桥接。
-- **Graceful shutdown flush**：server 关闭前 flush 内存中的 usage/commlog 批次到 SQLite。
-
-### Fixed
-
-- **cached token 重复计费**：原 cost 公式 `input × input_price + cached × cache` 把 cached tokens 算了两遍。改为 `(input - cached) × input_price + cached × cache`。
 
 ## [v0.2.10] — 2026-07-17
 
@@ -105,6 +88,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 - **数据统计 Top 5 重复** ([#4](https://github.com/Jiangcat8301/cj-nantianmen/issues/4))：同 provider+model 多 API key 时聚合拆出多行 → 后端 `stats.query()` 返回 `topModels`/`topProviders` 预聚合数组，前端直接消费。
 - **用户管理页 Token 进位缺失** ([#3](https://github.com/Jiangcat8301/cj-nantianmen/issues/3))：`ApiKeys.vue` 本地 `fmt()` 只做 K（无 M），1,500,000→"1500.0K" → 现统一使用 `formatToken` 正确显示 "1.50M"。
+
+## [v0.2.8] — 2026-07-16
+
+### Added
+
+- **Minimax `<function_calls>` XML v3 tool_call parser**（commit `b6e4ba5`）：Minimax 协议下识别 `<function_calls>` XML 格式的 tool_calls，转为 OpenAI 标准格式。Minimax 5 种 tool_call 格式之一。
+
+### Fixed
+
+- **`openaiReqToAnthropic` non-string content 修复**（commit `7dd6c22`）：当 Anthropic 协议下游收到的 message content 不是 string（如 array of blocks）时，OpenAI→Anthropic 转换时 stringify 处理，避免下游 API 报错。
+
+## [v0.2.7] — 2026-07-15
+
+### Added
+
+- **commlog 落库迁移**：原 `communication.log` JSON 文件改为 SQLite `communication_log` 表，支持索引 + 查询 + 翻页（`?lines=`）。
+- **tool_use 格式转换**：OpenAI `tool_calls` ↔ Anthropic `tool_use` 双向桥接。
+- **SSE 协议转换**：OpenAI `data: {...}` ↔ Anthropic `event: ...` 流式协议桥接。
+- **Graceful shutdown flush**：server 关闭前 flush 内存中的 usage/commlog 批次到 SQLite。
+
+### Fixed
+
+- **cached token 重复计费**：原 cost 公式 `input × input_price + cached × cache` 把 cached tokens 算了两遍。改为 `(input - cached) × input_price + cached × cache`。
 
 ## [v0.2.6] — 2026-07-16
 

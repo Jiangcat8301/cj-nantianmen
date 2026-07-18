@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.12] — 2026-07-18
+
+### Changed
+
+- **Version bump**: v0.2.11 → v0.2.12.
+
 ## [v0.2.11] — 2026-07-18
 
 ### Added
@@ -34,29 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Server crash on Electron fork**: `proxyDispatcher.js` now lazy-imports `undici`; silent fallback (undefined dispatcher = fetch default) when the module isn't resolvable in the Electron-embedded server.
 - **Taskbar icon missing**: `BrowserWindow.icon` changed from PNG to multi-resolution .ico, taskbar now displays correctly.
 - **System tray icon**: Now uses `nantianmen.ico` multi-resolution format; Windows auto-picks the best size.
-
-## [v0.2.8] — 2026-07-16
-
-### Added
-
-- **Minimax `<function_calls>` XML v3 tool_call parser** (commit `b6e4ba5`): Detect the `<function_calls>` XML tool_call format under the Minimax protocol and convert it to the OpenAI standard. One of Minimax's 5 tool_call formats.
-
-### Fixed
-
-- **`openaiReqToAnthropic` non-string content** (commit `7dd6c22`): When an Anthropic-protocol downstream receives a message whose `content` is not a string (e.g. array of content blocks), stringify it during the OpenAI→Anthropic conversion to avoid downstream API errors.
-
-## [v0.2.7] — 2026-07-15
-
-### Added
-
-- **commlog persistence migration**: The previous JSON `communication.log` file is replaced by a SQLite `communication_log` table with indexing, querying, and pagination (`?lines=`).
-- **tool_use conversion**: Bidirectional bridge between OpenAI `tool_calls` and Anthropic `tool_use`.
-- **SSE protocol conversion**: Streaming protocol bridge — OpenAI `data: {...}` ↔ Anthropic `event: ...`.
-- **Graceful shutdown flush**: Server flushes in-memory usage / commlog batches to SQLite before exit.
-
-### Fixed
-
-- **Cached tokens double-billed**: The old cost formula `input × input_price + cached × cache` counted cached tokens twice. Now `(input - cached) × input_price + cached × cache`.
 
 ## [v0.2.10] — 2026-07-17
 
@@ -105,6 +88,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Stats Top 5 duplicates** ([#4](https://github.com/Jiangcat8301/cj-nantianmen/issues/4)): same provider+model across multiple API keys was showing as multiple rows → server-side aggregation in `stats.query()` returns `topModels`/`topProviders` arrays.
 - **User page token carry missing** ([#3](https://github.com/Jiangcat8301/cj-nantianmen/issues/3)): `ApiKeys.vue` local `fmt()` only handled K (no M), 1,500,000→"1500.0K" → now uses shared `formatToken` showing "1.50M".
+
+## [v0.2.8] — 2026-07-16
+
+### Added
+
+- **Minimax `<function_calls>` XML v3 tool_call parser** (commit `b6e4ba5`): Detect the `<function_calls>` XML tool_call format under the Minimax protocol and convert it to the OpenAI standard. One of Minimax's 5 tool_call formats.
+
+### Fixed
+
+- **`openaiReqToAnthropic` non-string content** (commit `7dd6c22`): When an Anthropic-protocol downstream receives a message whose `content` is not a string (e.g. array of content blocks), stringify it during the OpenAI→Anthropic conversion to avoid downstream API errors.
+
+## [v0.2.7] — 2026-07-15
+
+### Added
+
+- **commlog persistence migration**: The previous JSON `communication.log` file is replaced by a SQLite `communication_log` table with indexing, querying, and pagination (`?lines=`).
+- **tool_use conversion**: Bidirectional bridge between OpenAI `tool_calls` and Anthropic `tool_use`.
+- **SSE protocol conversion**: Streaming protocol bridge — OpenAI `data: {...}` ↔ Anthropic `event: ...`.
+- **Graceful shutdown flush**: Server flushes in-memory usage / commlog batches to SQLite before exit.
+
+### Fixed
+
+- **Cached tokens double-billed**: The old cost formula `input × input_price + cached × cache` counted cached tokens twice. Now `(input - cached) × input_price + cached × cache`.
 
 ## [v0.2.6] — 2026-07-16
 
