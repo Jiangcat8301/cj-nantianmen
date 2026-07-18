@@ -236,6 +236,22 @@ async function cmdSettings() {
   console.log(JSON.stringify(r.data, null, 2))
 }
 
+// ponytail: outbound proxy management (system / direct / custom <url>).
+async function cmdProxy() {
+  const args = process.argv.slice(3)
+  if (args[0] === 'set') {
+    const mode = args[1]
+    if (!['system', 'direct', 'custom'].includes(mode)) { console.error('usage: nantianmen proxy set <system|direct|custom> [url]'); process.exit(1) }
+    const url = args[2] || ''
+    if (mode === 'custom' && !url) { console.error('custom mode requires a proxy URL'); process.exit(1) }
+    const r = await call('PUT', '/api/admin/proxy', { mode, url })
+    console.log(r.status === 200 ? `✓ proxy mode set to ${r.data.mode}${r.data.url ? ` (${r.data.url})` : ''}` : `✗ ${r.status} ${r.data?.error || ''}`)
+    return
+  }
+  const r = await call('GET', '/api/admin/proxy')
+  console.log(JSON.stringify(r.data, null, 2))
+}
+
 async function cmdPasswordChange() {
   const oldPwd = await askSecret('Current password: ')
   const new1 = await askSecret('New password: ')
@@ -335,7 +351,7 @@ async function cmdApikeys() {
   if (sub === 'ls' || !sub) {
     const r = await call('GET', '/api/admin/api-keys')
     if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
-    for (const k of r.data) console.log(`${k.id}\t${k.key}\t${k.name}\t${k.note}\t${k.last_used_at || '-'}`)
+    for (const k of r.data) console.log(`${k.id}\t${k.key}\t${k.name}\t${k.note}\t${k.assigned_model || '-'}\t${k.last_used_at || '-'}`)
     return
   }
   if (sub === 'new') {
@@ -358,8 +374,13 @@ async function cmdApikeys() {
     const name = args[2] || await prompt('New name: ')
     const note = args[3] !== undefined ? args[3] : await prompt('New note: ')
     const oldName = args[4] || ''
-    const r = await call('PUT', `/api/admin/api-keys/${id}`, { name, note, old_name: oldName })
-    console.log(r.status === 200 ? '✓ updated' : `✗ ${r.status}`)
+    // ponytail: assigned_model — pass '-' to clear, full_id string to set. Empty arg keeps existing.
+    const assignedArg = args[5]
+    const body = { name, note, old_name: oldName }
+    if (assignedArg === '-') body.assigned_model = null
+    else if (assignedArg) body.assigned_model = assignedArg
+    const r = await call('PUT', `/api/admin/api-keys/${id}`, body)
+    console.log(r.status === 200 ? `✓ updated${r.data?.assigned_model ? ' (assigned: ' + r.data.assigned_model + ')' : r.data?.assigned_model === null ? ' (no assignment)' : ''}` : `✗ ${r.status}`)
     return
   }
 }
@@ -450,8 +471,10 @@ async function cmdLog() {
     if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
     const data = r.data.rows || r.data  // ponytail: paginated returns {rows, total}; legacy returns array
     if (!Array.isArray(data) || data.length === 0) { console.log('(no log entries)'); return }
+    // ponytail: header row so the columns are readable in plain terminal output.
+    console.log('time\tuser\tprovider\tmodel\tin_tokens\tout_tokens\tcached\tduration\tstatus')
     for (const l of data) {
-      console.log(`${l.time}\t${l.user_name||l.user_id}\t${l.provider_name}\t${l.model_name}\tin:${l.tokens_input}\tout:${l.tokens_output}\tcached:${l.tokens_cached}\t${l.error ? '✕'+l.error.code : '✓'}`)
+      console.log(`${l.time}\t${l.user_name||l.user_id}\t${l.provider_name}\t${l.model_name}\tin:${l.tokens_input}\tout:${l.tokens_output}\tcached:${l.tokens_cached}\tdur:${l.duration_ms == null ? '-' : l.duration_ms + 'ms'}\t${l.error ? '✕'+l.error.code : '✓'}`)
     }
     const tot = r.data.total
     if (tot && tot > data.length) console.log(`\n(page ${r.data.page || p}, ${data.length} of ${tot} total)`)
@@ -497,7 +520,7 @@ async function cmdLog() {
 
 const CMDS = {
   setup: cmdSetup, health: cmdHealth, status: cmdStatus, login: cmdLogin,
-  database: cmdDatabase, settings: cmdSettings, password: cmdPasswordChange,
+  database: cmdDatabase, settings: cmdSettings, proxy: cmdProxy, password: cmdPasswordChange,
   shutdown: cmdShutdown, restart: cmdRestart,
   provider: cmdProviders, providers: cmdProviders,
   apikey: cmdApikeys, apikeys: cmdApikeys,

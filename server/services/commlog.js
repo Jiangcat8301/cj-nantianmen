@@ -33,10 +33,11 @@ export async function flushBuffer() {
     // ponytail: batch insert — one INSERT per entry, wrapped in a transaction
     for (const entry of batch) {
       await db.run(
-        `INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, duration_ms, input, output, error_code, error_message)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [entry.request_id || '', entry.time || '', entry.user_id || '', entry.user_name || '', entry.provider_id || 0, entry.provider_name || '', entry.model_name || '',
          entry.tokens_input || 0, entry.tokens_output || 0, entry.tokens_cached || 0,
+         entry.duration_ms ?? null,
          entry.input || '', entry.output || '', entry.error?.code || null, entry.error?.message || null]
       )
     }
@@ -76,10 +77,11 @@ async function migrateLegacy() {
     const db = getDb()
     for (const e of entries) {
       await db.run(
-        `INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, duration_ms, input, output, error_code, error_message)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [e.request_id || '', e.time || '', e.user_id || '', e.user_name || '', e.provider_id || 0, e.provider_name || '', e.model_name || '',
          e.tokens_input || 0, e.tokens_output || 0, e.tokens_cached || 0,
+         e.duration_ms ?? null,
          e.input || '', e.output || '', e.error?.code || null, e.error?.message || null]
       )
     }
@@ -123,31 +125,33 @@ export async function list(filters = {}, page = 1, perPage = 0) {
     const offset = (page - 1) * perPage
     const total = (await db.query(`SELECT COUNT(*) as c FROM communication_log ${where}`, params))[0]?.c || 0
     const rows = await db.query(
-      `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message
-       FROM communication_log ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
-      [...params, perPage, offset]
-    )
-    return { total, rows: rows.map(r => ({
-      id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
-      provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
-      tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
-      input: r.input, output: r.output,
-      error: r.error_code ? { code: r.error_code, message: r.error_message } : undefined,
-    })) }
-  }
-  const rows = await db.query(
-    `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, input, output, error_code, error_message
-     FROM communication_log ${where} ORDER BY id DESC`,
-    params
-  )
-  return rows.map(r => ({
-    id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
-    provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
-    tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
-    input: r.input, output: r.output,
-    error: r.error_code ? { code: r.error_code, message: r.error_message } : undefined,
-  }))
-}
+      `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, duration_ms, input, output, error_code, error_message
+             FROM communication_log ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
+            [...params, perPage, offset]
+          )
+          return { total, rows: rows.map(r => ({
+            id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
+            provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
+            tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
+            duration_ms: r.duration_ms,
+            input: r.input, output: r.output,
+            error: r.error_code ? { code: r.error_code, message: r.error_message } : undefined,
+          })) }
+        }
+        const rows = await db.query(
+          `SELECT id, request_id, time, user_id, user_name, provider_id, provider_name, model_name, tokens_input, tokens_output, tokens_cached, duration_ms, input, output, error_code, error_message
+           FROM communication_log ${where} ORDER BY id DESC`,
+          params
+        )
+        return rows.map(r => ({
+          id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
+          provider_id: r.provider_id, provider_name: r.provider_name, model_name: r.model_name,
+          tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
+          duration_ms: r.duration_ms,
+          input: r.input, output: r.output,
+          error: r.error_code ? { code: r.error_code, message: r.error_message } : undefined,
+        }))
+      }
 
 export async function clear() {
   await migrateLegacy()

@@ -55,11 +55,9 @@ ipcMain.handle('server:restart', async () => {
 })
 
 function getIcon() {
-  // ponytail: .ico on Windows, .png on macOS/Linux
-  if (process.platform === 'win32') {
-    return path.join(__dirname, '..', 'nantianmen.ico')
-  }
-  return path.join(__dirname, '..', 'nantianmen-logo.png')
+  // ponytail: Windows taskbar + titlebar require an .ico file (multi-resolution).
+  // PNG in BrowserWindow.icon silently fails → taskbar shows the default Electron icon.
+  return path.join(__dirname, '..', 'nantianmen.ico')
 }
 
 function getServerPath() {
@@ -244,7 +242,9 @@ app.whenReady().then(async () => {
   createSplash()
   await createWindow()
   startServer().catch(e => console.error('Server start failed:', e))
-  // System tray — use existing nantianmen.ico (tray-*.png don't exist)
+  // System tray — use multi-resolution ICO (16/24/32/48/64/128/256) so Windows
+  // picks the closest match to tray size (typically 16x16). PNG sometimes fails
+  // to render in the tray on Windows because the shell expects ICO format.
   const iconDir = path.join(__dirname, '..')
   const trayIcon = nativeImage.createFromPath(path.join(iconDir, 'nantianmen.ico'))
   tray = new Tray(trayIcon)

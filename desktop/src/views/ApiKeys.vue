@@ -11,16 +11,15 @@
       <table class="w-full text-sm">
         <thead class="bg-gray-750 border-b border-gray-700 text-gray-400">
           <tr>
-            <th class="text-left px-4 py-3">{{ t('th_key') }}</th>
-            <th class="text-left px-4 py-3">{{ t('th_name') }}</th>
-            <th class="text-left px-4 py-3">{{ t('th_note') }}</th>
-            <th class="text-right px-4 py-3">{{ t('th_requests') }}</th>
-            <th class="text-right px-4 py-3">{{ t('th_input') }}</th>
-            <th class="text-right px-4 py-3">{{ t('th_output') }}</th>
-            <th class="text-right px-4 py-3">{{ t('th_cached') }}</th>
-            <th class="text-left px-4 py-3">{{ t('th_created') }}</th>
-            <th class="text-left px-4 py-3">{{ t('th_last_used') }}</th>
-            <th class="text-left px-4 py-3">{{ t('th_actions') }}</th>
+            <th class="text-left px-4 py-3 whitespace-nowrap">{{ t('th_key') }}</th>
+            <th class="text-left px-4 py-3 whitespace-nowrap">{{ t('th_name') }}</th>
+            <th class="text-right px-4 py-3 whitespace-nowrap">{{ t('th_requests') }}</th>
+            <th class="text-right px-4 py-3 whitespace-nowrap">{{ t('th_input') }}</th>
+            <th class="text-right px-4 py-3 whitespace-nowrap">{{ t('th_output') }}</th>
+            <th class="text-right px-4 py-3 whitespace-nowrap">{{ t('th_cached') }}</th>
+            <th class="text-left px-4 py-3 whitespace-nowrap">{{ t('th_created') }}</th>
+            <th class="text-left px-4 py-3 whitespace-nowrap">{{ t('th_last_used') }}</th>
+            <th class="text-left px-4 py-3 whitespace-nowrap">{{ t('th_actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -28,25 +27,46 @@
             <tr class="border-b border-gray-700/50">
               <td class="px-4 py-3 font-mono text-gray-400">
                 <div class="flex items-center gap-2">
-                  <span v-if="!k._revealed">{{ k.key.slice(0, 12) }}...{{ k.key.slice(-4) }}</span>
+                  <span v-if="!k._revealed" class="whitespace-nowrap">{{ k.key.slice(0, 12) }}...{{ k.key.slice(-4) }}</span>
                   <span v-else class="break-all">{{ k.key }}</span>
-                  <button @click="toggleReveal(k.id)" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded">{{ k._revealed ? '🙈' : '👁' }}</button>
+                  <button @click="toggleReveal(k.id)" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center" :title="k._revealed ? t('hide') : t('show')">
+                    <span :class="['iconfont', k._revealed ? 'icon-hide' : 'icon-show']"></span>
+                  </button>
+                </div>
+                <!-- ponytail: assigned model hint under key (icon-assign + name in accent color, small text) -->
+                <div v-if="k.assigned_model" class="mt-1 text-[10px] text-emerald-400 whitespace-nowrap inline-flex items-center gap-1">
+                  <span class="iconfont icon-assign"></span>
+                  {{ k.assigned_model }}
                 </div>
               </td>
-              <td class="px-4 py-3">{{ k.name }}</td>
-              <td class="px-4 py-3 text-gray-500">{{ k.note || '-' }}</td>
-              <td class="px-4 py-3 text-right text-gray-300">{{ k._stats?.request_count ?? 0 }}</td>
-              <td class="px-4 py-3 text-right text-gray-300">{{ fmt(k._stats?.input_tokens) }}</td>
-              <td class="px-4 py-3 text-right text-gray-300">{{ fmt(k._stats?.output_tokens) }}</td>
-              <td class="px-4 py-3 text-right text-cyan-400">{{ fmt(k._stats?.cached_tokens) }}</td>
-              <td class="px-4 py-3 text-gray-500">{{ k.created_at }}</td>
-              <td class="px-4 py-3 text-gray-500">{{ k.last_used_at || t('not_used') }}</td>
+              <td class="px-4 py-3 align-top">
+                <div>{{ k.name }}</div>
+                <!-- ponytail: note moves below name, smaller and dimmer -->
+                <div v-if="k.note" class="text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{{ k.note }}</div>
+              </td>
+              <td class="px-4 py-3 text-right text-gray-300 whitespace-nowrap">{{ k._stats?.request_count ?? 0 }}</td>
+              <td class="px-4 py-3 text-right text-gray-300 whitespace-nowrap">{{ fmt(k._stats?.input_tokens) }}</td>
+              <td class="px-4 py-3 text-right text-gray-300 whitespace-nowrap">{{ fmt(k._stats?.output_tokens) }}</td>
+              <td class="px-4 py-3 text-right text-cyan-400 whitespace-nowrap">{{ fmt(k._stats?.cached_tokens) }}</td>
+              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ formatDate(k.created_at) }}</td>
+              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ k.last_used_at ? formatDate(k.last_used_at) : t('not_used') }}</td>
               <td class="px-4 py-3">
                 <div class="flex gap-2">
-                  <button v-if="k._stats?.rows?.length" @click="toggleDetail(k.id)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ expandedId === k.id ? t('collapse') : t('details') }}</button>
-                  <button @click="openEdit(k)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('edit') }}</button>
-                  <button @click="copyKey(k.key)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('copy') }}</button>
-                  <button @click="deleteKey(k.id)" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded">{{ t('delete') }}</button>
+                  <button v-if="k._stats?.rows?.length" @click="toggleDetail(k.id)" :title="expandedId === k.id ? t('collapse') : t('details')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
+                    <span class="iconfont icon-view"></span>
+                  </button>
+                  <button @click="openEdit(k)" :title="t('edit')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
+                    <span class="iconfont icon-edit"></span>
+                  </button>
+                  <button @click="openAssign(k)" :title="t('assign_model')" class="text-xs px-2 py-1 bg-amber-900/40 hover:bg-amber-800/60 rounded whitespace-nowrap inline-flex items-center gap-1" :class="k.assigned_model ? 'ring-1 ring-emerald-500/40' : ''">
+                    <span class="iconfont icon-assign"></span>
+                  </button>
+                  <button @click="copyKey(k.key)" :title="t('copy')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
+                    <span class="iconfont icon-copy"></span>
+                  </button>
+                  <button @click="deleteKey(k.id)" :title="t('delete')" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded whitespace-nowrap inline-flex items-center gap-1">
+                    <span class="iconfont icon-delete"></span>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -113,6 +133,29 @@
         </div>
       </div>
     </div>
+
+    <!-- Assign Model Modal — centered, wider for long model IDs (e.g. NVIDIA-NIM_z-ai/glm-5.2) -->
+    <div v-if="showAssign" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAssign = false">
+      <div class="bg-gray-800 rounded-lg p-6 w-[40.5rem] border border-gray-700 max-h-[80vh] flex flex-col">
+        <h3 class="text-lg font-bold mb-2">{{ t('assign_model') }}: {{ assignForm.keyName }}</h3>
+        <p class="text-xs text-gray-500 mb-3">{{ t('assign_model_hint') }}</p>
+        <div class="flex-1 overflow-y-auto space-y-1 mb-4 bg-gray-900 rounded p-2 max-h-96">
+          <label v-for="m in modelOptions" :key="m.id" class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
+            <input type="radio" :value="m.full_id" v-model="assignForm.model" class="accent-emerald-500" />
+            <span class="font-mono">{{ m.full_id }}</span>
+            <span v-if="m.is_default" class="text-xs text-emerald-400">★</span>
+          </label>
+          <div v-if="modelOptions.length === 0" class="text-xs text-gray-500 px-2 py-1.5">—</div>
+        </div>
+        <div class="flex justify-between gap-2">
+          <button v-if="assignForm.model" @click="assignForm.model = ''" class="text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded">{{ t('assign_clear') }}</button>
+          <div class="flex gap-2 ml-auto">
+            <button @click="showAssign = false" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
+            <button @click="saveAssign" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded">{{ t('btn_confirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -127,9 +170,15 @@ const showCreate = ref(false)
 const createForm = ref({ name: '', note: '' })
 const showEdit = ref(false)
 const editForm = ref({ id: null, name: '', note: '', oldName: '' })
+const showAssign = ref(false)
+const assignForm = ref({ id: null, keyName: '', model: '' })
+const modelOptions = ref([])
 const expandedId = ref(null)
 
 const fmt = formatToken
+
+// ponytail: extract yyyy-mm-dd only. Backend stores localtime, so no TZ shift.
+const formatDate = (s) => (s && typeof s === 'string') ? s.split(' ')[0].split('T')[0] : '-'
 
 const costRow = (r) => {
   const c = ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000
@@ -198,5 +247,39 @@ const deleteKey = async (id) => {
 
 const copyKey = (key) => {
   navigator.clipboard?.writeText(key)
+}
+
+// ponytail: open assign model dialog — load all provider/model options
+const openAssign = async (k) => {
+  assignForm.value = { id: k.id, keyName: k.name, model: k.assigned_model || '' }
+  showAssign.value = true
+  if (modelOptions.value.length === 0) {
+    try {
+      const { data: providers } = await api.listProviders()
+      const all = []
+      for (const p of providers) {
+        try {
+          const { data: models } = await api.getModels(p.id)
+          for (const m of (models || [])) {
+            if (m.is_disabled || m.deleted) continue
+            all.push({ id: m.id, full_id: `${p.name}_${m.model_name}`, is_default: !!m.is_default })
+          }
+        } catch {}
+      }
+      modelOptions.value = all
+    } catch (e) {
+      console.error('load models for assign failed:', e)
+    }
+  }
+}
+
+const saveAssign = async () => {
+  try {
+    await api.updateApiKey(assignForm.value.id, { assigned_model: assignForm.value.model || null })
+    showAssign.value = false
+    await load()
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
 }
 </script>

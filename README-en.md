@@ -2,7 +2,7 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.2.10--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.11--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
@@ -10,7 +10,7 @@
 [![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-When many providers and models are in play, switching them by hand-editing every agent's config file — even with the help of external tools — is a profoundly *inelegant* affair. So I built this little tool, hoping to offer a fast, simple, and **auditable** way to switch providers and models.
+With so many providers and models in use, constantly tweaking config files across agents and applications—even with external helpers—to change models for different scenarios is not only **inelegant** but also a **huge hassle**. That’s why I created this little tool: to provide a **quick, easy, auditable, all‑in‑one** solution for switching providers and models.
 
 In Chinese mythology, **Nantianmen** (南天门) is the sole gateway between Heaven and the mortal realm--all immortals must pass through this gate when descending to the world of mortals.
 Nantianmen does not judge right or wrong; it does one thing: **verify the identity of those who come, let the worthy pass, and bar the unworthy.**

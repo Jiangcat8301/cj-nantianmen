@@ -37,10 +37,18 @@
           </div>
           <div class="flex items-center gap-2">
             <span v-if="p.default_model" class="text-xs text-emerald-400">{{ t('default_badge') }}: {{ p.default_model }}</span>
-            <button @click.stop="checkHealth(p.id)" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">{{ t('health') }}</button>
-            <button @click.stop="refreshModels(p.id)" class="px-3 py-1 text-xs bg-blue-900 hover:bg-blue-800 rounded">{{ t('refresh_models') }}</button>
-            <button @click.stop="editProvider(p)" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded">{{ t('edit') }}</button>
-            <button @click.stop="deleteProvider(p.id)" class="px-3 py-1 text-xs bg-red-900 hover:bg-red-800 rounded">{{ t('delete') }}</button>
+            <button @click.stop="checkHealth(p.id)" :title="t('health')" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
+              <span class="iconfont icon-health"></span>
+            </button>
+            <button @click.stop="refreshModels(p.id)" :title="t('refresh_models')" class="px-3 py-1 text-xs bg-blue-900 hover:bg-blue-800 rounded whitespace-nowrap inline-flex items-center gap-1">
+              <span class="iconfont icon-refresh"></span>
+            </button>
+            <button @click.stop="editProvider(p)" :title="t('edit')" class="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
+              <span class="iconfont icon-edit"></span>
+            </button>
+            <button @click.stop="deleteProvider(p.id)" :title="t('delete')" class="px-3 py-1 text-xs bg-red-900 hover:bg-red-800 rounded whitespace-nowrap inline-flex items-center gap-1">
+              <span class="iconfont icon-delete"></span>
+            </button>
           </div>
         </div>
         <!-- Expanded Model List -->
@@ -68,9 +76,9 @@
                 <span>{{ m.model_name }}</span>
                 <span v-if="m.deleted" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
                 <span v-else-if="m.is_disabled" class="text-xs text-red-400">{{ t('disabled_badge') }}</span>
-                <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs" :title="t('copy')">📋</button>
-                <button @click="openEditModel(p.id, m)" class="text-gray-600 hover:text-amber-400 text-xs" :title="t('edit_model')">💰</button>
-                <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-xs text-gray-400">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
+                <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs inline-flex items-center" :title="t('copy')"><span class="iconfont icon-copy"></span></button>
+                <button @click="openEditModel(p.id, m)" class="text-gray-600 hover:text-amber-400 text-xs inline-flex items-center" :title="t('edit_model')"><span class="iconfont icon-edit"></span></button>
+                <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-xs text-gray-400 whitespace-nowrap">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
               </div>
               <div class="flex items-center gap-2">
                 <span v-if="m.is_default" class="text-xs text-emerald-400">{{ t('default_badge') }}</span>

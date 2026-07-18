@@ -50,10 +50,10 @@
     </div>
 
     <!-- Top 3 并排: grid-cols-2 keeps both panels on one row at >=1000px.
-         No scroll — h-[400px] fits exactly 3 rows (title 32 + 3×90 + 2×20 gap + p-5 40 ≈ 392). -->
+         <!-- ponytail: card height 350px fits 3 rows tight (title 32 + 3×90 + 2×20 gap + 40 padding ≈ 342). -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
       <!-- Top 3 模型请求量 -->
-      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 h-[400px] flex flex-col">
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 h-[350px] flex flex-col">
         <h3 class="text-sm font-semibold text-gray-400 mb-4">{{ t('stats_top_models') }}</h3>
         <div class="space-y-5" v-if="topModels.length">
         <div v-for="(m, i) in topModels" :key="i">
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Top 3 请求用户: same layout pattern as models, paired side-by-side -->
-      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 h-[400px] flex flex-col">
+      <div class="bg-gray-800 rounded-lg p-5 border border-gray-700 h-[350px] flex flex-col">
         <h3 class="text-sm font-semibold text-gray-400 mb-4">{{ t('stats_top_users') }}</h3>
         <div class="space-y-5" v-if="topUsers.length">
         <div v-for="(u, i) in topUsers" :key="i">

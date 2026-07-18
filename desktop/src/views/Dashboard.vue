@@ -55,7 +55,9 @@
             <span class="px-1.5 py-0.5 text-xs rounded font-mono"
               :class="ep.protocol === 'openai' ? 'bg-blue-500/20 text-blue-300' : ep.protocol === 'anthropic' ? 'bg-orange-500/20 text-orange-300' : 'bg-gray-700 text-gray-400'">{{ ep.tag }}</span>
           </div>
-          <button @click="copy(ep.url)" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('copy') }}</button>
+          <button @click="copy(ep.url)" :title="t('copy')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center justify-center">
+            <span class="iconfont icon-copy"></span>
+          </button>
         </div>
       </div>
     </div>

@@ -67,6 +67,10 @@ export const DEFAULT_CONF = () => ({
   password: '',
   salt: '',
   log_enabled: false,
+  // ponytail: outbound proxy for upstream LLM calls. `system` uses env HTTPS_PROXY/ALL_PROXY,
+  // `direct` bypasses any system proxy, `custom` uses `proxy_url` (e.g. http://host:port or socks5://host:port).
+  proxy: 'system',
+  proxy_url: '',
   database: { type: 'sqlite3', path: defaultDbPath() },
 })
 

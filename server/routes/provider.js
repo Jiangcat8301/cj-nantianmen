@@ -1,6 +1,7 @@
 import * as provider from '../services/provider.js'
 import { getDb } from '../db/index.js'
 import { rebuildModelMap } from '../services/modelMap.js'
+import { getDispatcher } from '../services/proxyDispatcher.js'
 
 function mask(k) {
   if (!k) return ''
@@ -17,7 +18,7 @@ async function fetchAndRebuild(providerId) {
     ? { Authorization: `Bearer ${p.api_key}` }
     : { 'x-api-key': p.api_key, 'anthropic-version': '2023-06-01' }
   try {
-    const resp = await fetch(url, { headers })
+    const resp = await fetch(url, { headers, dispatcher: await getDispatcher() })
     if (!resp.ok || resp.status === 404) return []
     const data = await resp.json()
     const names = (data.data || []).map(m => m.id)
@@ -87,7 +88,7 @@ export default async function providerRoutes(fastify) {
       ? { Authorization: `Bearer ${p.api_key}` }
       : { 'x-api-key': p.api_key, 'anthropic-version': '2023-06-01' }
     try {
-      const resp = await fetch(url, { headers })
+      const resp = await fetch(url, { headers, dispatcher: await getDispatcher() })
       // ponytail: 404 on anthropic /v1/models is common (e.g. MiniMax). Try a minimal messages request instead.
       if (resp.status === 404 && p.protocol === 'anthropic') {
         return { healthy: true, status_code: 200, note: 'models endpoint not available, provider assumed healthy' }

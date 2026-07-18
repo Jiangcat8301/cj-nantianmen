@@ -39,9 +39,17 @@
     </div>
 
     <!-- Top pagination -->
-    <Pagination v-if="totalPages > 1" :page="page" :totalPages="totalPages" @go="goPage" />
+    <Pagination v-if="totalPages > 1 && !loading" :page="page" :totalPages="totalPages" @go="goPage" />
 
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto relative">
+      <!-- ponytail: loading overlay over the log table while fetching. -->
+      <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm rounded-lg">
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-10 h-10 rounded-full border-2 border-gray-700 border-t-emerald-400 animate-spin"></div>
+          <p class="text-xs text-gray-400">{{ t('log_loading') }}</p>
+        </div>
+      </div>
+
       <table class="w-full text-sm">
         <thead>
           <tr class="text-left text-gray-400 border-b border-gray-700">
@@ -53,6 +61,7 @@
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_in') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_out') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_cached') || '缓存命中' }}</th>
+            <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_duration') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_status') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('th_actions') }}</th>
           </tr>
@@ -67,32 +76,45 @@
               <td class="py-2 px-2 text-xs">{{ l.model_name }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_input) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_output) }}</td>
-              <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_cached) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap">{{ fmt(l.tokens_cached) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap" :class="durationClass(l.duration_ms)">
+                {{ formatDuration(l.duration_ms) }}
+              </td>
               <td class="py-2 px-2">
                 <span v-if="l.error" class="text-red-400 text-xs" :title="l.error.message">✕ {{ l.error.code }}</span>
                 <span v-else class="text-emerald-400 text-xs">✓</span>
               </td>
               <td class="py-2 px-2">
-                <button @click="selected.has(l.request_id||i) ? selected.delete(l.request_id||i) : selected.add(l.request_id||i)" class="text-xs text-blue-400 hover:underline">
-                  {{ selected.has(l.request_id||i) ? t('collapse') : t('details') }}
+                <button @click="toggleDetail(l, i)" :title="selected.has(l.request_id||i) ? t('collapse') : t('details')" class="text-xs text-blue-400 hover:underline whitespace-nowrap inline-flex items-center gap-1">
+                  <span class="iconfont icon-view"></span>
                 </button>
               </td>
             </tr>
             <!-- Inline detail panel -->
             <tr v-if="selected.has(l.request_id||i)">
-              <td colspan="10" class="bg-gray-800/50 border-b border-gray-700 p-4">
+              <td colspan="11" class="bg-gray-800/50 border-b border-gray-700 p-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <div class="flex items-center justify-between mb-1">
-                      <h4 class="text-xs text-gray-500">📥 Input</h4>
-                      <button @click="copy(l.input)" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200">📋</button>
+                      <h4 class="text-xs text-gray-500 inline-flex items-center gap-1">
+                        <span class="iconfont icon-input"></span>
+                        {{ t('log_tokens_in') }}
+                      </h4>
+                      <button @click="copy(l.input)" :title="t('copy')" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200 inline-flex items-center justify-center">
+                        <span class="iconfont icon-copy"></span>
+                      </button>
                     </div>
                     <pre class="text-xs text-gray-300 whitespace-pre-wrap max-h-64 overflow-auto bg-gray-900 p-2 rounded">{{ pretty(l.input) }}</pre>
                   </div>
                   <div>
                     <div class="flex items-center justify-between mb-1">
-                      <h4 class="text-xs text-gray-500">📤 Output</h4>
-                      <button @click="copy(l.output)" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200">📋</button>
+                      <h4 class="text-xs text-gray-500 inline-flex items-center gap-1">
+                        <span class="iconfont icon-output"></span>
+                        {{ t('log_tokens_out') }}
+                      </h4>
+                      <button @click="copy(l.output)" :title="t('copy')" class="text-xs px-2 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-400 hover:text-gray-200 inline-flex items-center justify-center">
+                        <span class="iconfont icon-copy"></span>
+                      </button>
                     </div>
                     <pre class="text-xs text-gray-300 whitespace-pre-wrap max-h-64 overflow-auto bg-gray-900 p-2 rounded">{{ pretty(l.output) }}</pre>
                   </div>
@@ -108,7 +130,7 @@
     </div>
 
     <!-- Bottom pagination -->
-    <Pagination v-if="totalPages > 1" :page="page" :totalPages="totalPages" @go="goPage" />
+    <Pagination v-if="totalPages > 1 && !loading" :page="page" :totalPages="totalPages" @go="goPage" />
   </div>
 </template>
 
@@ -119,6 +141,7 @@ import api from '../lib/api'
 const t = inject('t')
 const modalRef = inject('modal')
 const logs = ref([])
+const loading = ref(false)  // ponytail: shows overlay spinner while fetching
 const logEnabled = ref(false)
 const rotationEnabled = ref(false)
 const rotationMax = ref(1000)
@@ -135,8 +158,25 @@ const total = ref(0)
 const fmt = (n) => n ? n.toLocaleString() : '0'
 const pretty = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
 const copy = (text) => { navigator.clipboard?.writeText(typeof text === 'string' ? text : '') }
+// ponytail: duration formatter. null → '−' (gray). ms <1000 → 'Nms'. >=1000 → 'N.NNs' (red).
+const formatDuration = (ms) => {
+  if (ms == null) return '−'
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
+const durationClass = (ms) => {
+  if (ms == null) return 'text-gray-600'
+  if (ms >= 1000) return 'text-red-400'
+  return 'text-gray-400'
+}
+const toggleDetail = (l, i) => {
+  const k = l.request_id || i
+  if (selected.value.has(k)) selected.value.delete(k); else selected.value.add(k)
+  selected.value = new Set(selected.value)  // trigger reactivity
+}
 
 async function load() {
+  loading.value = true
   try {
     const p = { page: page.value, per_page: 20 }
     if (filters.value.provider_id) p.provider_id = filters.value.provider_id
@@ -146,7 +186,9 @@ async function load() {
     logs.value = data.rows || []
     total.value = data.total || 0
     totalPages.value = Math.max(1, Math.ceil(total.value / 20))
-  } catch {}
+  } catch {} finally {
+    loading.value = false
+  }
 }
 
 function goPage(n) {

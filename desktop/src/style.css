@@ -1,3 +1,5 @@
+/* iconfont is imported via main.js (so its @font-face comes first). */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,4 +32,17 @@ body {
 * {
   scrollbar-width: thin;
   scrollbar-color: #374151 transparent;
+}
+
+/* ponytail: button text never wraps mid-word — labels like 「全部启用 / 全部禁用」
+   should stay on one line even when container shrinks. */
+button {
+  white-space: nowrap;
+}
+
+/* ponytail: table cells never wrap — single line per cell. Long content is
+   handled by column width / truncation. `<pre>` blocks override via
+   `whitespace-pre-wrap` where they need it (e.g. ApiKeys detail rows). */
+td, th {
+  white-space: nowrap;
 }

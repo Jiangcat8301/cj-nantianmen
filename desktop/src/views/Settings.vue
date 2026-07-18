@@ -59,6 +59,32 @@
       </div>
     </div>
 
+    <!-- Proxy Settings — controls outbound LLM call routing -->
+    <div class="bg-gray-800 rounded-lg border border-gray-700 p-5 mb-6">
+      <h3 class="text-sm font-semibold text-gray-300 mb-3">{{ t('set_proxy') }}</h3>
+      <div class="space-y-2">
+        <label v-for="opt in proxyOptions" :key="opt.value" class="flex items-start gap-3 px-3 py-2 rounded cursor-pointer hover:bg-gray-700/50">
+          <input type="radio" :value="opt.value" v-model="proxyMode" class="mt-1 accent-emerald-500" />
+          <div>
+            <p class="text-sm text-gray-200">{{ t(opt.labelKey) }}</p>
+            <p class="text-xs text-gray-500">{{ t(opt.descKey) }}</p>
+          </div>
+        </label>
+      </div>
+      <div v-if="proxyMode === 'custom'" class="mt-3">
+        <label class="block text-xs text-gray-500 mb-1">{{ t('set_proxy_url') }}</label>
+        <input v-model="proxyUrl" type="text" :placeholder="t('set_proxy_url_placeholder')"
+          class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none" />
+        <p class="text-xs text-gray-600 mt-1">{{ t('set_proxy_url_hint') }}</p>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button @click="saveProxy" :disabled="proxySaving"
+          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-600 rounded text-sm font-medium whitespace-nowrap">
+          {{ proxySaving ? t('set_saving') : t('set_save') }}
+        </button>
+      </div>
+    </div>
+
     <hr class="border-gray-700 my-8" />
   </div>
 </template>
@@ -75,6 +101,15 @@ const autostart = ref(false)
 const dbInfo = ref({})
 const dbPathInput = ref('')
 const dbSaving = ref(false)
+// ponytail: outbound proxy for upstream LLM calls (3 modes)
+const proxyMode = ref('system')
+const proxyUrl = ref('')
+const proxySaving = ref(false)
+const proxyOptions = [
+  { value: 'system', labelKey: 'set_proxy_system', descKey: 'set_proxy_system_desc' },
+  { value: 'direct', labelKey: 'set_proxy_direct', descKey: 'set_proxy_direct_desc' },
+  { value: 'custom', labelKey: 'set_proxy_custom', descKey: 'set_proxy_custom_desc' },
+]
 
 const toggleAutostart = async () => {
   const next = !autostart.value
@@ -128,6 +163,20 @@ const saveDbPath = async () => {
   }
 }
 
+const saveProxy = async () => {
+  proxySaving.value = true
+  try {
+    const body = { mode: proxyMode.value }
+    if (proxyMode.value === 'custom') body.url = proxyUrl.value.trim()
+    await api.setProxy(body)
+    if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: '✓', message: t('set_save') + ' ✓' })
+  } catch (e) {
+    if (modalRef?.value) await modalRef.value.show({ mode: 'alert', title: 'Error', message: '保存失败: ' + (e.response?.data?.error || e.message) })
+  } finally {
+    proxySaving.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const { data } = await api.getServerStatus()
@@ -140,5 +189,11 @@ onMounted(async () => {
   if (win && win.autostartGet) {
     try { autostart.value = await win.autostartGet() } catch {}
   }
+  // ponytail: load current proxy mode
+  try {
+    const { data } = await api.getProxy()
+    proxyMode.value = data.mode || 'system'
+    proxyUrl.value = data.url || ''
+  } catch {}
 })
 </script>

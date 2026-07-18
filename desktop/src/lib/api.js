@@ -52,4 +52,8 @@ export default {
   // UI filter persistence
   getUiFilters: () => api.get('/ui-filters'),
   saveUiFilters: (filters) => api.put('/ui-filters', filters),
+
+  // ponytail: outbound proxy settings (server reads conf.proxy at request time)
+  getProxy: () => api.get('/proxy'),
+  setProxy: (body) => api.put('/proxy', body),
 }

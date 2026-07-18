@@ -4,6 +4,7 @@ import path from 'node:path'
 import { getConfDir, getConf, updateConf, randomSalt } from '../conf.js'
 import { getDb, initDb, closeDb } from '../db/index.js'
 import { rebuildModelMap } from '../services/modelMap.js'
+import { resetDispatcherCache } from '../services/proxyDispatcher.js'
 import * as commlog from '../services/commlog.js'
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
@@ -132,6 +133,8 @@ export default async function adminRoutes(fastify) {
       host: conf.server_host,
       port: conf.server_port,
       database: conf.database,
+      proxy: conf.proxy || 'system',
+      proxy_url: conf.proxy_url || '',
     }
   })
 
@@ -142,6 +145,25 @@ export default async function adminRoutes(fastify) {
     const portChanged = Number(port) !== conf.server_port
     updateConf({ server_host: host, server_port: Number(port) })
     return { ok: true, restart_required: portChanged }
+  })
+
+  // ponytail: proxy mode for upstream LLM calls. system/direct/custom.
+  fastify.get('/api/admin/proxy', async () => {
+    const conf = getConf()
+    return { mode: conf.proxy || 'system', url: conf.proxy_url || '' }
+  })
+
+  fastify.put('/api/admin/proxy', async (req, reply) => {
+    const { mode, url } = req.body || {}
+    if (!['system', 'direct', 'custom'].includes(mode)) {
+      return reply.code(400).send({ error: 'mode must be system|direct|custom' })
+    }
+    if (mode === 'custom' && (!url || !/^(https?|socks5?):\/\//.test(url))) {
+      return reply.code(400).send({ error: 'custom mode requires a proxy URL like http://host:port or socks5://host:port' })
+    }
+    updateConf({ proxy: mode, proxy_url: mode === 'custom' ? url : '' })
+    resetDispatcherCache()
+    return { ok: true, mode, url: mode === 'custom' ? url : '' }
   })
 
   fastify.post('/api/admin/server/shutdown', async (req, reply) => {

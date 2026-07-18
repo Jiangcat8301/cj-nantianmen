@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.8] — 2026-07-16
+
+### Added
+
+- **Minimax `<function_calls>` XML v3 tool_call parser** (commit `b6e4ba5`): Detect the `<function_calls>` XML tool_call format under the Minimax protocol and convert it to the OpenAI standard. One of Minimax's 5 tool_call formats.
+
+### Fixed
+
+- **`openaiReqToAnthropic` non-string content** (commit `7dd6c22`): When an Anthropic-protocol downstream receives a message whose `content` is not a string (e.g. array of content blocks), stringify it during the OpenAI→Anthropic conversion to avoid downstream API errors.
+
+## [v0.2.7] — 2026-07-15
+
+### Added
+
+- **commlog persistence migration**: The previous JSON `communication.log` file is replaced by a SQLite `communication_log` table with indexing, querying, and pagination (`?lines=`).
+- **tool_use conversion**: Bidirectional bridge between OpenAI `tool_calls` and Anthropic `tool_use`.
+- **SSE protocol conversion**: Streaming protocol bridge — OpenAI `data: {...}` ↔ Anthropic `event: ...`.
+- **Graceful shutdown flush**: Server flushes in-memory usage / commlog batches to SQLite before exit.
+
+### Fixed
+
+- **Cached tokens double-billed**: The old cost formula `input × input_price + cached × cache` counted cached tokens twice. Now `(input - cached) × input_price + cached × cache`.
+
 ## [v0.2.10] — 2026-07-17
 
 ### Added

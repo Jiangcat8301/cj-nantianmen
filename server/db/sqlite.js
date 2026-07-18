@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
   name TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_used_at TEXT
+  last_used_at TEXT,
+  assigned_model TEXT DEFAULT NULL
 );
 CREATE TABLE IF NOT EXISTS usage_stats (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS communication_log (
   tokens_input INTEGER NOT NULL DEFAULT 0,
   tokens_output INTEGER NOT NULL DEFAULT 0,
   tokens_cached INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER DEFAULT NULL,
   input TEXT NOT NULL DEFAULT '',
   output TEXT NOT NULL DEFAULT '',
   error_code INTEGER,
@@ -77,6 +79,11 @@ export class SqliteDatabase extends IDatabase {
     for (const col of ['deleted','is_disabled','input_price','output_price','cache_hit_price']) {
       try { this.db.exec(`ALTER TABLE models ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`) } catch {}
     }
+    // ponytail: api_keys.assigned_model — when set, every llm request from this key uses this model
+    // regardless of the requested model name (admin override).
+    try { this.db.exec(`ALTER TABLE api_keys ADD COLUMN assigned_model TEXT DEFAULT NULL`) } catch {}
+    // ponytail: communication_log.duration_ms — total wall time from request arrival to response
+    try { this.db.exec(`ALTER TABLE communication_log ADD COLUMN duration_ms INTEGER DEFAULT NULL`) } catch {}
   }
   // better-sqlite3 is sync; we expose async to match the interface.
   async query(sql, params = []) { return this.db.prepare(sql).all(...params) }
