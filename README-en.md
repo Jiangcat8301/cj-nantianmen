@@ -27,6 +27,8 @@ forwards the request to the corresponding celestial court, and translates the re
 
 ## ☰ Overview · What is Nantianmen
 
+> In Taoist cosmology, the Southern Heavenly Gate is the sole official passage through which the celestial gods, spirits, and beings of the three realms appear before the Heavenly Court. It is guarded in rotating shifts by the Four Heavenly Kings and celestial soldiers, who verify immortal registers, screen visitors, and bar evil intrusions — the only external entry to the celestial realm, recorded in the *Wushang Miyi* and the traditional celestial bureaucracy.
+
 **Nantianmen (南天门)** is a **local multi-protocol LLM proxy gateway**.
 Any Agent (Hermes / OpenClaw / Codex / scripts) can connect via OpenAI or Anthropic protocol,
 and Nantianmen forwards the request to a registered LLM Provider (OpenAI / Anthropic / Volcengine ARK / any compatible service).
