@@ -82,7 +82,7 @@ async function ensureServer(args) {
   process.exit(1)
 }
 
-export function resolveArgs() {
+function resolveArgs() {
   const cfg = loadCfg()
   const host = flagValue(process.argv, '-H', '--host') || process.env.NANTIANMEN_SERVER_HOST || cfg.host || '127.0.0.1'
   const port = Number(flagValue(process.argv, '--port') || process.env.NANTIANMEN_SERVER_PORT || cfg.port || 38271)
