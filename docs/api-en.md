@@ -21,6 +21,7 @@ Nantianmen exposes two classes of HTTP endpoints:
 | POST | `/api/admin/providers/:id/models/refresh` | Bearer M | Re-fetch provider model list |
 | POST | `/api/admin/providers/:id/models` | Bearer M | Manually add a model name |
 | GET/POST/PUT/DELETE | `/api/admin/api-keys` | Bearer M | API key CRUD |
+| GET | `/api/admin/api-keys/available-models` | Bearer M | List grantable models (excludes disabled/deleted) |
 | GET | `/api/admin/stats` | Bearer M | Usage aggregation (`?range=today\|7d\|30d`) |
 | GET | `/api/admin/default-model` | Bearer M | Get default routing model |
 | GET | `/api/admin/communication-log` | Bearer M | Query comm log (`?provider_id=&model_name=&user_id=`) |
@@ -31,17 +32,25 @@ Nantianmen exposes two classes of HTTP endpoints:
 All admin endpoints except the whitelist require:
 
 ```
-Authorization: Bearer M
+Authorization: Bearer ***
 where M = md5(RAWPASSWORD); server checks md5(M + conf.salt) == conf.password
 ```
+
+### API Key Model Authorization (v0.2.14)
+
+- `POST /api/admin/api-keys` accepts `model_ids: [1, 3]` array to grant models to a new key
+- `PUT /api/admin/api-keys/:id` accepts `model_ids` array (full replacement) and `assigned_model_id` integer
+- `GET /api/admin/api-keys` returns `authorized_models: [{model_id, provider_name, model_name}]` and `assigned_model_id`
+- `GET /api/admin/api-keys/available-models` returns currently grantable models (excludes disabled/deleted; existing grants are not revoked)
 
 ## LLM Proxy API
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
 | GET | `/v1/health` | public | Health check + active_requests |
-| GET | `/v1/models` | Bearer `skm-` | Model list (`{name}_{model}` format) |
+| GET | `/v1/models` | Bearer `skm-` (optional) | Model list (with key: authorization-filtered; without/invalid key: full list) |
 | POST | `/v1/chat/completions` | Bearer `skm-` | OpenAI Chat Completions entry |
 | POST | `/v1/messages` | Bearer `skm-` | Anthropic Messages entry |
 
 > When Provider protocol differs from inbound protocol, streaming responses are real-time converted (Anthropic SSE ↔ OpenAI SSE). No Agent-side adaptation needed.
+> **v0.2.14**: `/v1/chat/completions` and `/v1/messages` check model authorization after auth; unauthorized models return `403 model not authorized`.

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.14] — 2026-07-19
+
+### Added
+
+- **API key model authorization**: admin can grant model lists per key; `/v1/chat/completions` and `/v1/messages` return `403 model not authorized` for ungranted models.
+- **Authorization management UI**: multi-select model grants, auth count badge (button style, always visible including 0), select-all/deselect-all, assigned_model pick from authorized list. Click badge to open edit modal.
+- **Available-model filtering**: `GET /api/admin/api-keys/available-models` excludes disabled/deleted models (existing grants are not revoked).
+- **DB auto-cleanup**: detects legacy schema columns (`deleted`/`assigned_model`) on startup, backfills `deleted_at`/`assigned_model_id`, then DROPs legacy columns. Desktop splash window and CLI show `[ntm-cleanup] start/done` progress.
+- **CLI auth interaction**: `apikey new` interactive multi-select; `apikey edit --auth=<id,...>` / `--assigned=<id>` flag mode; `apikey ls` shows auth count; `provider add` duplicate name check.
+
+### Changed
+
+- **model_id foreign key refactor**: `usage_stats`/`communication_log`/`api_keys` now use FK to models table; model rename automatically reflects via JOIN (single source of truth).
+- **Soft delete**: `providers`/`models` gain `deleted_at` column replacing old `deleted` INTEGER. Legacy columns auto-dropped on first startup.
+- **Single model resolution entry**: `resolveEntryFor()` in `modelMap.js`, shared by `llmProxy.js` and auth check to prevent drift.
+- **i18n cleanup**: removed 14 unused i18n keys (zh/en/ja parity, including `assign_model_hint`/`auth_count_label`/`tray_*`).
+- API docs synced (`ApiDocs.vue` v0.2.14 endpoint descriptions and examples).
+
+### Fixed
+
+- **better-sqlite3 ABI mismatch**: electron-rebuild overwrites with v22 ABI, causing `ERR_DLOPEN_FAILED` on system Node v24 → `npm rebuild better-sqlite3` as workaround (published EXE bundles Electron runtime, unaffected).
+- **SCHEMA exec exception**: `CREATE INDEX` ran before `ALTER TABLE`, causing `no such column: model_id` → indices moved to after ALTER.
+
 ## [v0.2.13] — 2026-07-18
 
 ### Changed

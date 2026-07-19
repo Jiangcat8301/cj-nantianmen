@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.14] — 2026-07-19
+
+### Added
+
+- **API Key 模型授权系统**：admin 可为每个 key 指定授权模型列表，`/v1/chat/completions` 和 `/v1/messages` 调未授权模型返回 `403 model not authorized`。
+- **授权管理 UI**：ApiKeys 页面多选模型授权、授权数 badge（button 风格，始终显示含 0）、全选/取消全选、assigned_model 从已授权列表中单选。点击 badge 进入编辑弹窗。
+- **可用模型过滤**：`GET /api/admin/api-keys/available-models` 不列出已停用/已删除模型（已存在授权不撤回）。
+- **DB 自动清理**：启动时检测旧 schema（`deleted`/`assigned_model` 列），自动回填 `deleted_at`/`assigned_model_id` 后 DROP 废弃列。Desktop splash 窗口和 CLI 显示 `[ntm-cleanup] start/done` 进度。
+- **CLI 授权交互**：`apikey new` 交互式多选授权模型；`apikey edit --auth=<id,...>` / `--assigned=<id>` flag 模式；`apikey ls` 显示授权数；`provider add` 创建前查重。
+
+### Changed
+
+- **model_id FK 化**：`usage_stats`/`communication_log`/`api_keys` 改走 FK 引用 models 表，model 改名后 JOIN 自动拿当前名（单点真理在 models 表）。
+- **软删除**：`providers`/`models` 加 `deleted_at` 列替代旧 `deleted` INTEGER。废弃列在第一次启动时自动 DROP。
+- **模型解析统一入口**：`resolveEntryFor()` 在 `modelMap.js` 中，`llmProxy.js` 和授权检查共用以防分叉。
+- **i18n 清理**：删除 14 个未使用的 i18n key（zh/en/ja 三语同步，包括 `assign_model_hint`/`auth_count_label`/`tray_*` 等）。
+- API 文档同步更新（`ApiDocs.vue` v0.2.14 端点描述和示例）。
+
+### Fixed
+
+- **better-sqlite3 ABI 不匹配**：electron-rebuild 覆盖为 v22 后系统 Node v24 启动 server 报 `ERR_DLOPEN_FAILED` → `npm rebuild better-sqlite3` 临时修复（发布后 EXE 自带 Electron 运行时不受影响）。
+- **SCHEMA exec 异常**：`CREATE INDEX` 在 ALTER TABLE 之前执行导致 `no such column: model_id` → 索引移到 ALTER 之后。
+
 ## [v0.2.13] — 2026-07-18
 
 ### Changed

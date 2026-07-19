@@ -24,8 +24,12 @@ nantianmen provider model-edit <pid> <mid> --input=0.1 --output=0.5 --cache=0.01
 nantianmen provider default <pid> <mid>     # set as default
 
 # API Keys
-nantianmen apikey new
-nantianmen apikey ls
+nantianmen apikey new                            # interactive: name/note + model authorization multi-select
+nantianmen apikey ls                             # shows auth: N (granted model count)
+nantianmen apikey edit <id> --auth=1,3           # non-interactive: update authorization list only
+nantianmen apikey edit <id> --assigned=2         # assign model (model_id, must be in grant list)
+nantianmen apikey edit <id> --assigned=-         # clear assigned model
+nantianmen apikey edit <id>                      # interactive: name/note + show current grants/assignment
 
 # Stats (with range filter)
 nantianmen stats --range=today
@@ -41,7 +45,7 @@ nantianmen settings set --port=8380        # change port
 # Global flag resolution: --flag > $NANTIANMEN_* > ~/.cj-nantianmen/config.json > error
 ```
 
-**Auto-start server**: before each subcommand (except `help` / `quit`), the CLI probes `${HOST}:${PORT}/v1/health`. If not reachable, it forks a subprocess via `--server-bin` (fallback `../server/index.js`, then `$NANTIANMEN_SERVER_BIN`), detached so the server outlives the CLI.
+**Auto-start server**: before each subcommand (except `help` / `quit`), the CLI probes `${HOST}:${PORT}/v1/health`. If not reachable, it forks a subprocess via `--server-bin` (fallback `../server/index.js`, then `$NANTIANMEN_SERVER_BIN`), detached so the server outlives the CLI. When legacy schema cleanup is running (DB migration on first boot), the CLI prints `[server] database schema cleanup running (one-time)...` / `[server] schema cleanup done.`.
 
 ## Command-Line Flags
 

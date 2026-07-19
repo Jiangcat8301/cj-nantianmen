@@ -4,7 +4,7 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.2.12--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.14--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
@@ -12,7 +12,7 @@
 [![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-当使用的供应商和模型较多时，即便通过外部工具，频繁修改各种智能体、应用的配置文件，切换不同情境下使用的模型，也是一件非常“不优雅”且“极其麻烦”的事情。我作了这个小工具，希望提供一个快速、简单、可审计地一站式供应商和模型切换方式。
+当使用的供应商和模型较多时，即便通过外部工具，频繁修改各种智能体、应用的配置文件，切换不同情境下使用的模型，也是一件非常"不优雅"且"极其麻烦"的事情。我作了这个小工具，希望提供一个快速、简单、可审计地一站式供应商和模型切换方式。
 
 在中国神话中，**南天门**是天界与人间的唯一通道--众仙出入凡间，必经此门。
 南天门不裁断是非，只做一件事：**验明来者身份，放行该放的人，拦住该拦的妖。**
@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.13](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) 已发布** — 2026-07-18。统一数据目录 `~/.cj-nantianmen/`、移除 legacy migration。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.13/nantianmen-0.2.13-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) (x64 + arm64)
+> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) 已发布** — 2026-07-19。模型授权系统 + DB 自动清理 + 未授权 403。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) (x64 + arm64)
 
 ---
 
@@ -100,6 +100,7 @@ Agent ──(skm-xxx, Authorization: Bearer *** Server
                                             │ md5(M+salt) admin auth     │
                                             │ OpenAI ⇄ Anthropic 协议转换 │
                                             │ SSE 流式转换 (Anthropic→OpenAI) │
+                                            │ 模型授权检查 (v0.2.14)     │
                                             └─────────────┬─────────────┘
                                                           ▼
                                                   LLM Provider
@@ -148,7 +149,7 @@ nantianmen-cli-0.2.3-win-x64.exe setup
 cd desktop
 npm install
 npm run electron:dev          # dev：fork ../server，conf+db 写到 user-data/cj-nantianmen/
-npm run electron:build        # 出包到 ../releases/nantianmen-0.2.3-win-x64.exe
+npm run electron:build        # 出包到 ../releases/nantianmen-0.2.14-win-x64.exe
 # 双击 Nantianmen.exe，conf+db 落到 ~/.cj-nantianmen/（持久）
 ```
 
@@ -168,6 +169,7 @@ npm run electron:build        # 出包到 ../releases/nantianmen-0.2.3-win-x64.e
 - 管理员密码 server 侧存储为 `md5(md5(RAWPASSWORD) + salt)`。salt 是首次启动随机生成的 6 位 `[A-Za-z0-9]`，每次改密码都重生成，旧 md5 立刻失效。
 - 服务监听 `0.0.0.0` 时所有 `/api/admin/*` 与 `/v1/chat/*` 都要求带 Token（无 Token 直接 401）。`/v1/health` 公开。
 - Provider 的 API Key 仅 server 端使用，admin API 列表时做 `1234...efgh` 遮盖。
+- **v0.2.14 新增**：API Key 模型授权系统，调用未授权的模型返回 `403 model not authorized`。
 
 ## Provider 命名约束
 

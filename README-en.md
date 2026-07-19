@@ -2,7 +2,7 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.2.12--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.2.14--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
@@ -10,7 +10,7 @@
 [![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
-With so many providers and models in use, constantly tweaking config files across agents and applications—even with external helpers—to change models for different scenarios is not only **inelegant** but also a **huge hassle**. That’s why I created this little tool: to provide a **quick, easy, auditable, all‑in‑one** solution for switching providers and models.
+With so many providers and models in use, constantly tweaking config files across agents and applications—even with external helpers—to change models for different scenarios is not only **inelegant** but also a **huge hassle**. That's why I created this little tool: to provide a **quick, easy, auditable, all‑in‑one** solution for switching providers and models.
 
 In Chinese mythology, **Nantianmen** (南天门) is the sole gateway between Heaven and the mortal realm--all immortals must pass through this gate when descending to the world of mortals.
 Nantianmen does not judge right or wrong; it does one thing: **verify the identity of those who come, let the worthy pass, and bar the unworthy.**
@@ -21,13 +21,13 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.13](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) released** — 2026-07-18. Unified data directory `~/.cj-nantianmen/`, removed legacy migration. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.13/nantianmen-0.2.13-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) (x64 + arm64)
+> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) released** — 2026-07-19. Model authorization system + DB auto-cleanup + 403 for unauthorized models. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) (x64 + arm64)
 
 ---
 
 ## ☰ Overview · What is Nantianmen
 
-> In Taoist cosmology, the Southern Heavenly Gate is the sole official passage through which the celestial gods, spirits, and beings of the three realms appear before the Heavenly Court. It is guarded in rotating shifts by the Four Heavenly Kings and celestial soldiers, who verify immortal registers, screen visitors, and bar evil intrusions — the only external entry to the celestial realm, recorded in the *Wushang Miyi* and the traditional celestial bureaucracy.
+> In Taoist cosmology, the Southern Heavenly Gate is the sole official passage through which the celestial gods, spirits, and beings of the three realms appear before the Heavenly Court. It is guarded in rotating shifts by the Four Heavenly Kings and celestial soldiers, who verify immortal registers, screen visitors, and bar evil intrusions — the only external entry to the celestial realm, recorded in the *Wushu Miyi* and the traditional celestial bureaucracy.
 
 **Nantianmen (南天门)** is a **local multi-protocol LLM proxy gateway**.
 Any Agent (Hermes / OpenClaw / Codex / scripts) can connect via OpenAI or Anthropic protocol,
@@ -96,6 +96,7 @@ Agent ──(skm-xxx, Authorization: Bearer *** Server
                                        │ md5(M+salt) admin auth     │
                                        │ OpenAI ⇄ Anthropic convert │
                                        │ SSE streaming conversion   │
+                                       │ Model auth check (v0.2.14) │
                                        └─────────────┬─────────────┘
                                                      ▼
                                              LLM Provider
@@ -144,7 +145,7 @@ nantianmen-cli-0.2.3-win-x64.exe setup
 cd desktop
 npm install
 npm run electron:dev          # dev: forks ../server
-npm run electron:build        # outputs ../releases/nantianmen-0.2.3-win-x64.exe
+npm run electron:build        # outputs ../releases/nantianmen-0.2.14-win-x64.exe
 ```
 
 ## Tech Stack
@@ -163,6 +164,7 @@ npm run electron:build        # outputs ../releases/nantianmen-0.2.3-win-x64.exe
 - Admin password is stored as `md5(md5(RAWPASSWORD) + salt)`. Salt is a 6-char `[A-Za-z0-9]` random string generated on first setup. Password change regenerates the salt, immediately invalidating the old md5.
 - Server listens on `0.0.0.0`; all `/api/admin/*` and `/v1/chat/*` require a Token (no Token → 401). `/v1/health` is public.
 - Provider API keys are server-side only; admin API list responses mask them as `1234...efgh`.
+- **v0.2.14 new**: API key model authorization — calling unauthorized models returns `403 model not authorized`.
 
 ## Provider Naming Constraints
 
