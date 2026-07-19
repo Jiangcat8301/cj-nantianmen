@@ -25,8 +25,12 @@ nantianmen provider model-edit <pid> <mid> --input=0.1 --output=0.5 --cache=0.01
 nantianmen provider default <pid> <mid>     # 设为默认
 
 # API Key
-nantianmen apikey new
-nantianmen apikey ls
+nantianmen apikey new                            # 交互: name/note + 授权模型多选
+nantianmen apikey ls                             # 含 auth: N (授权数)
+nantianmen apikey edit <id> --auth=1,3           # 非交互: 仅改授权列表
+nantianmen apikey edit <id> --assigned=2         # 指定模型 (model_id, 必须在授权列表里)
+nantianmen apikey edit <id> --assigned=-         # 清除指定模型
+nantianmen apikey edit <id>                      # 交互: name/note + 提示当前授权/指定模型
 
 # 统计（支持 --range=today|7d|30d）
 nantianmen stats --range=today

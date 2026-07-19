@@ -283,6 +283,13 @@ async function cmdProviders() {
   }
   if (sub === 'add') {
     const name = await prompt('Provider name (no spaces/underscores): ')
+    if (!name) { console.error('name required'); process.exit(1) }
+    // ponytail: v0.2.14 — pre-check duplicate (DB UNIQUE returns 400 anyway, friendlier here).
+    const ls = await call('GET', '/api/admin/providers')
+    if (ls.status === 200 && Array.isArray(ls.data) && ls.data.some(p => p.name === name)) {
+      console.error(`✗ provider '${name}' already exists`)
+      process.exit(1)
+    }
     const protocol = (await prompt('Protocol (openai|anthropic): '))
     const base_url = await prompt('Base URL: ')
     const api_key = await askSecret('API key: ')
@@ -351,13 +358,34 @@ async function cmdApikeys() {
   if (sub === 'ls' || !sub) {
     const r = await call('GET', '/api/admin/api-keys')
     if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
-    for (const k of r.data) console.log(`${k.id}\t${k.key}\t${k.name}\t${k.note}\t${k.assigned_model || '-'}\t${k.last_used_at || '-'}`)
+    // ponytail: v0.2.14 — also print authorized model count
+    for (const k of r.data) {
+      const authN = (k.authorized_models || []).length
+      console.log(`${k.id}\t${k.key}\t${k.name}\t${k.note}\t${k.assigned_model || '-'}\t${k.last_used_at || '-'}\tauth:${authN}`)
+    }
     return
   }
   if (sub === 'new') {
     const name = await prompt('Name: ')
     const note = await prompt('Note: ')
-    const r = await call('POST', '/api/admin/api-keys', { name, note })
+    // ponytail: v0.2.14 — interactive multi-select for authorized models.
+    // Fetch available list, show numbered, user enters comma-separated numbers (or empty to skip).
+    const avail = await call('GET', '/api/admin/api-keys/available-models')
+    let model_ids = []
+    if (avail.status === 200 && Array.isArray(avail.data) && avail.data.length > 0) {
+      console.log('\nAvailable models (system default is implicitly available to all keys):')
+      avail.data.forEach((m, i) => console.log(`  ${(i+1).toString().padStart(3)}) ${m.provider_name}_${m.model_name}${m.is_default ? '  ★' : ''}${m.deleted_at ? '  (deleted)' : m.is_disabled ? '  (disabled)' : ''}`))
+      console.log('\nSelect authorized models (comma-separated numbers, "all" for all, empty to skip):')
+      const sel = (await prompt('> ')).trim()
+      if (sel === 'all') {
+        model_ids = avail.data.map(m => m.id)
+      } else if (sel) {
+        const picks = sel.split(',').map(s => parseInt(s.trim()) - 1).filter(i => i >= 0 && i < avail.data.length)
+        model_ids = picks.map(i => avail.data[i].id)
+      }
+      console.log(`  → ${model_ids.length} model(s) authorized`)
+    }
+    const r = await call('POST', '/api/admin/api-keys', { name, note, model_ids })
     if (r.status !== 200) { console.error('failed:', r.status, JSON.stringify(r.data)); process.exit(1) }
     console.log(`✓ key created: ${r.data.key}`)
     console.log('⚠ save it now; the plaintext is not shown again')
@@ -371,16 +399,47 @@ async function cmdApikeys() {
   }
   if (sub === 'edit') {
     const id = args[1] || await prompt('Key id: ')
-    const name = args[2] || await prompt('New name: ')
-    const note = args[3] !== undefined ? args[3] : await prompt('New note: ')
-    const oldName = args[4] || ''
-    // ponytail: assigned_model — pass '-' to clear, full_id string to set. Empty arg keeps existing.
-    const assignedArg = args[5]
-    const body = { name, note, old_name: oldName }
-    if (assignedArg === '-') body.assigned_model = null
-    else if (assignedArg) body.assigned_model = assignedArg
+    // ponytail: v0.2.14 — read flags --assigned=<model_id>, --auth=<id,id,...> for non-interactive use.
+    const flag = (n) => { const i = args.indexOf(n); return i !== -1 ? args[i+1] : undefined }
+    let name = flag('--name')
+    let note = flag('--note')
+    let oldName = flag('--old-name') || name || ''
+    let body = {}
+    if (name) body.name = name
+    if (note) body.note = note
+    if (oldName) body.old_name = oldName
+    const assigned = flag('--assigned')
+    if (assigned === '-') body.assigned_model_id = null
+    else if (assigned !== undefined) body.assigned_model_id = Number(assigned)
+    const auth = flag('--auth')
+    if (auth !== undefined) body.model_ids = auth === '' ? [] : auth.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n))
+    if (Object.keys(body).length === 0) {
+      // ponytail: interactive fallback (no flags) — ask name/note, then optionally pick model from authorized list.
+      name = await prompt('New name: ')
+      note = await prompt('New note: ')
+      oldName = name || ''
+      body = { name, note, old_name: oldName }
+      // list current key (to show existing assignment + authorized set)
+      const cur = await call('GET', '/api/admin/api-keys')
+      const key = Array.isArray(cur.data) ? cur.data.find(k => String(k.id) === String(id)) : null
+      if (key) {
+        if (key.assigned_model_id) console.log(`currently assigned: ${key.assigned_model} (model_id=${key.assigned_model_id})`)
+        if (key.authorized_models?.length) {
+          console.log('authorized models:')
+          key.authorized_models.forEach((m, i) => console.log(`  ${(i+1).toString().padStart(3)}) ${m.provider_name}_${m.model_name}`))
+          const a = (await prompt('New assigned model id (1-based) or - to clear (empty to keep): ')).trim()
+          if (a === '-') body.assigned_model_id = null
+          else if (a) {
+            const idx = parseInt(a) - 1
+            if (idx >= 0 && idx < key.authorized_models.length) body.assigned_model_id = key.authorized_models[idx].model_id
+          }
+        } else {
+          console.log('(no authorized models; assign first via --auth=... or interactive new)')
+        }
+      }
+    }
     const r = await call('PUT', `/api/admin/api-keys/${id}`, body)
-    console.log(r.status === 200 ? `✓ updated${r.data?.assigned_model ? ' (assigned: ' + r.data.assigned_model + ')' : r.data?.assigned_model === null ? ' (no assignment)' : ''}` : `✗ ${r.status}`)
+    console.log(r.status === 200 ? `✓ updated${r.data?.assigned_model ? ' (assigned: ' + r.data.assigned_model + ')' : r.data?.assigned_model === null ? ' (no assignment)' : ''}` : `✗ ${r.status} ${JSON.stringify(r.data)}`)
     return
   }
 }
