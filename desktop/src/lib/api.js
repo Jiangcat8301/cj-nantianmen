@@ -13,7 +13,7 @@ export default {
   createProvider: (data) => api.post('/providers', data),
   updateProvider: (id, data) => api.put(`/providers/${id}`, data),
   deleteProvider: (id) => api.delete(`/providers/${id}`),
-  checkHealth: (id) => api.post(`/providers/${id}/health'),
+  checkHealth: (id) => api.post(`/providers/${id}/health`),
   // Models
   getModels: (id) => api.get(`/providers/${id}/models`),
   refreshModels: (id) => api.post(`/providers/${id}/models/refresh`),
