@@ -112,14 +112,16 @@ export default async function apikeyRoutes(fastify) {
     return r.changes ? { ok: true } : reply.code(404).send({ error: 'not found' })
   })
 
-  // ponytail: v0.2.14 — 列出当前所有可用 model 给前端多选下拉。
-  // 不过滤 is_disabled / deleted_at: UI 让 admin 也能看到已禁用 model 并按需授权 (授权后如 model 真删, FK CASCADE 自动撤销)。
+  // ponytail: v0.2.14 — 列出当前可用 model 给前端多选下拉。
+  // 不显示已停用 / 已删除 model; 已存在授权不撤回 (审计 + 启用后无需重配)。
+  // 端点 /v1/models 鉴权路径走 getModelMap(),map 本身已排除 is_disabled/deleted_at,前端看不见就用不到。
   fastify.get('/api/admin/api-keys/available-models', async () => {
     return await getDb().query(
       `SELECT m.id, m.model_name, m.is_default, m.is_disabled, m.deleted_at,
               p.id AS provider_id, p.name AS provider_name, p.protocol
        FROM models m
        JOIN providers p ON p.id = m.provider_id
+       WHERE m.deleted_at IS NULL AND (m.is_disabled IS NULL OR m.is_disabled = 0)
        ORDER BY p.name, m.model_name`
     )
   })

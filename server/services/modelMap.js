@@ -22,7 +22,7 @@ export async function rebuildModelMap() {
   const providers = await db.query('SELECT * FROM providers')
   const pMap = Object.fromEntries(providers.map(p => [p.id, p]))
   // ponytail: is_disabled excludes model from /v1/models and llmProxy dispatch. Treat NULL as 0 (old rows).
-  const models = await db.query('SELECT * FROM models WHERE deleted=0 AND (is_disabled IS NULL OR is_disabled=0)')
+  const models = await db.query('SELECT * FROM models WHERE deleted_at IS NULL AND (is_disabled IS NULL OR is_disabled=0)')
   const next = {}
   let defaultEntry = null
   for (const m of models) {
@@ -32,6 +32,7 @@ export async function rebuildModelMap() {
     // ponytail: entry 携带 models.id, 让写入路径 (commlog/usage_stats/assigned_model) 不用再回查
     const entry = {
       __modelId: m.id,
+      __isDefault: !!m.is_default,
       provider: p,
       model_name: m.model_name,
       protocol: p.protocol,
@@ -58,4 +59,18 @@ export function getDefaultEntry() {
 
 export function getEntry(modelField) {
   return _map[modelField] || null
+}
+
+// ponytail: v0.2.14 — single source of truth for which entry proxyRequest will use.
+// Mirrors resolveModel() in llmProxy.js. Returns null when caller should get a 403/404.
+export function resolveEntryFor({ assignedModelId, bodyModel }) {
+  const map = getModelMap()
+  if (assignedModelId) {
+    return Object.values(map).find(e => e.__modelId === assignedModelId) || null
+  }
+  const field = bodyModel || 'auto'
+  if (field === 'auto' || field === 'Nantikanmen-default' || field === 'Nantianmen-default' || !field) {
+    return getDefaultEntry()
+  }
+  return getEntry(field) || null
 }

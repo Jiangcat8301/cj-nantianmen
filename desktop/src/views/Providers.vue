@@ -74,7 +74,7 @@
             <div v-for="m in (p.models || [])" :key="m.id" class="flex items-center justify-between py-1.5 px-3 bg-gray-750 rounded text-sm">
               <div class="flex items-center gap-2">
                 <span>{{ m.model_name }}</span>
-                <span v-if="m.deleted" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
+                <span v-if="m.deleted_at" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
                 <span v-else-if="m.is_disabled" class="text-xs text-red-400">{{ t('disabled_badge') }}</span>
                 <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs inline-flex items-center" :title="t('copy')"><span class="iconfont icon-copy"></span></button>
                 <button @click="openEditModel(p.id, m)" class="text-gray-600 hover:text-amber-400 text-xs inline-flex items-center" :title="t('edit_model')"><span class="iconfont icon-edit"></span></button>

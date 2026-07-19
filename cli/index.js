@@ -68,12 +68,27 @@ async function ensureServer(args) {
   const serverEntry = resolveServerEntry()
   console.error(`(launching server from ${serverEntry})`)
   const nodeBin = process.platform === 'win32' ? 'node.exe' : 'node'
-  const child = spawn(nodeBin, [serverEntry], {  // no -c/-D: server uses its appData default
+  // ponytail: 'pipe' stdout (was 'ignore') so we can read [ntm-cleanup] lines and print a hint
+  // when legacy schema cleanup is running on first boot. stderr still piped so pino logs surface.
+  let cleanupStarted = false
+  let cleanupDone = false
+  const child = spawn(nodeBin, [serverEntry], {
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NANTIANMEN_LOCAL_MODE: process.env.NANTIANMEN_LOCAL_MODE || '' },
   })
   child.unref()
+  child.stdout?.on('data', (d) => {
+    const s = d.toString()
+    if (!cleanupStarted && /\[ntm-cleanup\] start/.test(s)) {
+      cleanupStarted = true
+      console.error('[server] database schema cleanup running (one-time)...')
+    } else if (cleanupStarted && !cleanupDone && /\[ntm-cleanup\] done/.test(s)) {
+      cleanupDone = true
+      console.error('[server] schema cleanup done.')
+    }
+  })
+  child.stderr?.on('data', () => { /* pino logs are noisy; swallow */ })
   for (let i = 0; i < 30; i++) {
     if (await probeHealth(args.host, args.port)) return 'launched'
     await new Promise(r => setTimeout(r, 200))
@@ -308,7 +323,7 @@ async function cmdProviders() {
     const pid = args[1] || await prompt('Provider id: ')
     const r = await call('GET', `/api/admin/providers/${pid}/models`)
     if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
-    for (const m of r.data) console.log(`${m.id}\t${m.model_name}\t${m.is_default ? '★default' : ''}\t${m.is_manual ? 'manual' : ''}\t${m.deleted ? 'DELETED' : ''}\tin:¥${m.input_price||0}\tout:¥${m.output_price||0}\tcache:¥${m.cache_hit_price||0}`)
+    for (const m of r.data) console.log(`${m.id}\t${m.model_name}\t${m.is_default ? '★default' : ''}\t${m.is_manual ? 'manual' : ''}\t${m.deleted_at ? 'DELETED' : ''}\tin:¥${m.input_price||0}\tout:¥${m.output_price||0}\tcache:¥${m.cache_hit_price||0}`)
     return
   }
   if (sub === 'models-refresh') {

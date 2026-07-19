@@ -199,7 +199,7 @@ const onProviderChange = async () => {
   if (filters.value.provider) {
     try {
       const { data } = await api.getModels(filters.value.provider)
-      modelList.value = (data || []).filter(m => !m.deleted).map(m => m.model_name)
+      modelList.value = (data || []).filter(m => !m.deleted_at).map(m => m.model_name)
     } catch {}
   }
   load()

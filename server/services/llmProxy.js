@@ -1,4 +1,4 @@
-import { getEntry, getDefaultEntry } from './modelMap.js'
+import { getEntry, getDefaultEntry, resolveEntryFor } from './modelMap.js'
 import { openaiReqToAnthropic, anthropicReqToOpenai, anthropicRespToOpenAI, openaiRespToAnthropic, anthropicSSEToOpenAI, extractTokensOpenai, extractTokensAnthropic } from './protocol.js'
 import * as stats from './stats.js'
 import * as commlog from './commlog.js'
@@ -63,6 +63,9 @@ export function resolveModel(modelField) {
   return entry
 }
 
+// ponytail: v0.2.14 — single entry resolver used by both proxyRequest and the auth-check hook.
+// resolveEntryFor() in modelMap.js owns the rules; proxyRequest must use the same one to avoid drift.
+
 // ponytail: per-key model override — when api_keys.assigned_model_id is set,
 // every request from this key uses that model regardless of what the
 // caller puts in `body.model`. Endpoint and the /v1/models list are NOT
@@ -73,10 +76,7 @@ async function getAssignedEntry(apiKeyId) {
     // ponytail: v0.2.14 read assigned_model_id (FK), fallback to old TEXT field if id missing
     const rows = await getDb().query('SELECT assigned_model_id, assigned_model FROM api_keys WHERE id=?', [apiKeyId])
     const id = rows[0]?.assigned_model_id
-    if (id) {
-      const map = getModelMap()
-      return Object.values(map).find(e => e.__modelId === id) || null
-    }
+    if (id) return resolveEntryFor({ assignedModelId: id, bodyModel: null })
     const v = rows[0]?.assigned_model
     if (!v) return null
     return getEntry(v) || null  // returns null if assigned_model points to a deleted/disabled model

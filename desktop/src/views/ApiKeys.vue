@@ -33,6 +33,11 @@
                   <button @click="toggleReveal(k.id)" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center" :title="k._revealed ? t('hide') : t('show')">
                     <span :class="['iconfont', k._revealed ? 'icon-hide' : 'icon-show']"></span>
                   </button>
+                  <!-- ponytail: 授权数量徽章 button 风格, 始终显示 (0 也显示), 点击进入编辑 modal -->
+                  <button @click="openEdit(k)" :title="t('authorized_models')" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center gap-1">
+                    <span class="iconfont icon-key"></span>
+                    <span>{{ (k.authorized_models || []).length }}</span>
+                  </button>
                   <button @click="copyKey(k.key)" :title="t('copy')" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center">
                     <span class="iconfont icon-copy"></span>
                   </button>
@@ -41,11 +46,6 @@
                 <div v-if="k.assigned_model" class="mt-1 text-[10px] text-emerald-400 whitespace-nowrap inline-flex items-center gap-1">
                   <span class="iconfont icon-assign"></span>
                   {{ k.assigned_model }}
-                </div>
-                <!-- ponytail: v0.2.14 — show authorization count badge -->
-                <div v-if="k.authorized_models?.length" class="mt-1 text-[10px] text-gray-500 whitespace-nowrap inline-flex items-center gap-1">
-                  <span class="iconfont icon-key"></span>
-                  {{ k.authorized_models.length }} {{ t('auth_count_label') }}
                 </div>
               </td>
               <td class="px-4 py-3 align-top">

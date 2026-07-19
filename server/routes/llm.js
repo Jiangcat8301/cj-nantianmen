@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 import { getDb } from '../db/index.js'
-import { getModelMap } from '../services/modelMap.js'
+import { getModelMap, resolveEntryFor } from '../services/modelMap.js'
 import { proxyRequest } from '../services/llmProxy.js'
 import * as stats from '../services/stats.js'
 
@@ -15,6 +15,26 @@ async function authApiKey(req, reply) {
   req.apiKeyId = rows[0].id
   // touch last_used_at (ponytail: no-op if column absent; no big deal)
   await getDb().run("UPDATE api_keys SET last_used_at=datetime('now') WHERE id=?", [req.apiKeyId])
+}
+
+// ponytail: v0.2.14 — 403 when the resolved model isn't on the key's grant list.
+// System default (Nantianmen-default virtual / is_default model) is always allowed.
+// assigned_model_id override must be in the grant list (admin override is NOT a free pass).
+async function checkModelAuthorized(req, reply) {
+  const apiKeyId = req.apiKeyId
+  const body = req.body || {}
+  const override = await getDb().query('SELECT assigned_model_id FROM api_keys WHERE id=?', [apiKeyId])
+  const assignedModelId = override[0]?.assigned_model_id ?? null
+  const entry = resolveEntryFor({ assignedModelId, bodyModel: body.model })
+  if (!entry) return reply.code(403).send({ error: `model not authorized: ${body.model || 'Nantianmen-default'}` })
+  // ponytail: when caller used 'auto'/Nantianmen-default and there's no override, system default is implicitly free.
+  const explicitCall = !!(assignedModelId || (body.model && body.model !== 'auto' && body.model !== 'Nantianmen-default'))
+  if (!explicitCall) return
+  const rows = await getDb().query('SELECT model_id FROM api_key_models WHERE api_key_id=?', [apiKeyId])
+  const allowed = new Set(rows.map(r => r.model_id))
+  if (!allowed.has(entry.__modelId)) {
+    return reply.code(403).send({ error: `model not authorized: ${body.model || entry.model_name}` })
+  }
 }
 
 // ponytail: v0.2.14 — return 南天门对外 model 列表.
@@ -59,11 +79,15 @@ export default async function llmRoutes(fastify) {
   fastify.post('/v1/chat/completions', async (req, reply) => {
     await authApiKey(req, reply)
     if (reply.sent) return
+    await checkModelAuthorized(req, reply)
+    if (reply.sent) return
     return proxyRequest(req.body, 'openai', req.apiKeyId, reply)
   })
 
   fastify.post('/v1/messages', async (req, reply) => {
     await authApiKey(req, reply)
+    if (reply.sent) return
+    await checkModelAuthorized(req, reply)
     if (reply.sent) return
     return proxyRequest(req.body, 'anthropic', req.apiKeyId, reply)
   })

@@ -121,7 +121,24 @@ async function startServer() {
   // ponytail: bubble spawn errors so .catch() in app.whenReady() surfaces them.
   serverProcess.on('error', (e) => console.error('[server] error:', e))
 
-  serverProcess.stdout?.on('data', (d) => console.log(`[server] ${d}`))
+  // ponytail: stream server stdout to console + intercept cleanup lifecycle lines so splash can show status.
+  // [ntm-cleanup] start/done are emitted by sqlite.js's runLegacyCleanup when legacy schema cleanup is running.
+  const setSplashStatus = (msg) => {
+    if (!splashWindow) return
+    splashWindow.webContents.executeJavaScript(`document.getElementById('status')?.textContent=${JSON.stringify(msg)}`).catch(() => {})
+  }
+  let cleanupStatus = null  // null | 'start' | 'done'
+  serverProcess.stdout?.on('data', (d) => {
+    const s = d.toString()
+    console.log(`[server] ${s}`)
+    if (cleanupStatus !== 'done' && /\[ntm-cleanup\] start/.test(s)) {
+      cleanupStatus = 'start'
+      setSplashStatus('正在迁移数据库…')
+    } else if (cleanupStatus === 'start' && /\[ntm-cleanup\] done/.test(s)) {
+      cleanupStatus = 'done'
+      setSplashStatus('数据库迁移完成')
+    }
+  })
   serverProcess.stderr?.on('data', (d) => console.error(`[server] ${d}`))
   serverProcess.on('exit', (code) => console.log(`[server] exited with ${code}`))
 
@@ -146,20 +163,21 @@ let splashWindow = null
 
 function createSplash() {
   splashWindow = new BrowserWindow({
-    width: 300, height: 160,
+    width: 320, height: 180,
     frame: false, transparent: true, alwaysOnTop: true,
     center: true, resizable: false,
     backgroundColor: '#00000000',
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.cjs') },
   })
   // ponytail: inline splash HTML — no extra file, shows instantly before Electron extraction + Vue boot.
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     *{margin:0;padding:0} body{background:#0d1117;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:system-ui,-apple-system,sans-serif;border:1px solid #1f2937;border-radius:8px}
     .logo{font-size:36px;margin-bottom:8px} .title{font-size:16px;font-weight:700;color:#34d399;margin-bottom:4px}
-    .sub{font-size:11px;color:#6b7280;margin-bottom:12px} .loader{width:120px;height:3px;background:#1f2937;border-radius:2px;overflow:hidden}
+    .sub{font-size:11px;color:#6b7280;margin-bottom:12px} .loader{width:140px;height:3px;background:#1f2937;border-radius:2px;overflow:hidden}
     .loader-bar{width:30%;height:100%;background:#34d399;border-radius:2px;animation:slide 1.2s ease-in-out infinite}
     @keyframes slide{0%{transform:translateX(-30%)}100%{transform:translateX(430%)}}
-  </style></head><body><div class="logo">🚪</div><div class="title">南天门</div><div class="sub">Nantianmen · Starting…</div><div class="loader"><div class="loader-bar"></div></div></body></html>`
+    #status{font-size:10px;color:#fbbf24;margin-top:6px;min-height:12px}
+  </style></head><body><div class="logo">🚪</div><div class="title">南天门</div><div class="sub">Nantianmen · Starting…</div><div class="loader"><div class="loader-bar"></div></div><div id="status"></div></body></html>`
   splashWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
   splashWindow.show()
 }

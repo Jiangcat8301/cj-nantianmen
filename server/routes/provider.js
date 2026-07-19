@@ -24,15 +24,15 @@ async function fetchAndRebuild(providerId) {
     const names = (data.data || []).map(m => m.id)
     if (names.length) {
       const db = getDb()
-      // ponytail: mark all as deleted, then upsert with deleted=0 so removed upstream models keep their stats.
-      await db.run('UPDATE models SET deleted=1 WHERE provider_id=?', [providerId])
+      // ponytail: mark all as deleted_at (soft-delete), then upsert with deleted_at=NULL so removed upstream models keep their stats.
+      await db.run("UPDATE models SET deleted_at=datetime('now') WHERE provider_id=? AND deleted_at IS NULL", [providerId])
       for (const name of names) {
-        await db.run('INSERT INTO models(provider_id, model_name, deleted) VALUES (?,?,0) ON CONFLICT(provider_id, model_name) DO UPDATE SET deleted=0', [providerId, name])
+        await db.run('INSERT INTO models(provider_id, model_name, deleted_at) VALUES (?,?,NULL) ON CONFLICT(provider_id, model_name) DO UPDATE SET deleted_at=NULL', [providerId, name])
       }
     }
   } catch {}
   await rebuildModelMap()
-  return getDb().query('SELECT * FROM models WHERE provider_id=? AND deleted=0 ORDER BY id', [providerId])
+  return getDb().query('SELECT * FROM models WHERE provider_id=? AND deleted_at IS NULL ORDER BY id', [providerId])
 }
 
 export default async function providerRoutes(fastify) {
@@ -100,7 +100,7 @@ export default async function providerRoutes(fastify) {
   })
 
   fastify.get('/api/admin/providers/:id/models', async (req) => {
-    return getDb().query('SELECT * FROM models WHERE provider_id=? AND deleted=0 ORDER BY id', [req.params.id])
+    return getDb().query('SELECT * FROM models WHERE provider_id=? AND deleted_at IS NULL ORDER BY id', [req.params.id])
   })
 
   fastify.put('/api/admin/providers/:id/models/:modelId', async (req, reply) => {
@@ -133,7 +133,7 @@ export default async function providerRoutes(fastify) {
     const rows = await getDb().query(`
       SELECT p.name AS provider_name, m.model_name, p.protocol
       FROM models m JOIN providers p ON m.provider_id = p.id
-      WHERE m.is_default = 1 AND m.deleted = 0 LIMIT 1
+      WHERE m.is_default = 1 AND m.deleted_at IS NULL LIMIT 1
     `)
     return rows[0] || null
   })
