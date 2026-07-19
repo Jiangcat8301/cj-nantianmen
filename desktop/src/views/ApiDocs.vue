@@ -79,9 +79,8 @@ const proxyEndpoints = [
   }'`
   },
   {
-    method: 'GET', path: '/v1/models', desc: '获取可用模型列表',
-    example: `curl http://127.0.0.1:38271/v1/models \\
-  -H "Authorization: Bearer skm-your-api-key"`
+    method: 'GET', path: '/v1/models', desc: '获取可用模型列表（带 Bearer 时按 key 授权过滤；不带或 key 无效时返回全量）',
+    example: `curl http://127.0.0.1:38271/v1/models \\\\\n  -H "Authorization: Bearer ***"`
   },
   {
     method: 'GET', path: '/v1/health', desc: 'Server 健康检查',
@@ -133,19 +132,32 @@ const adminEndpoints = [
   -H "X-Admin-Password: <md5(your-admin-password)>" \\
   -H "Content-Type: application/json" \\
   -d '{"input_price":1.0,"output_price":2.0,"cache_hit_price":0.02}'` },
-  { method: 'GET', path: '/api/admin/api-keys', desc: '列出所有 API Key',
+  { method: 'GET', path: '/api/admin/api-keys', desc: '列出所有 API Key（含 assigned_model_id、authorized_models）',
     example: `curl http://127.0.0.1:38271/api/admin/api-keys \\
   -H "X-Admin-Password: <md5(your-admin-password)>"` },
-  { method: 'POST', path: '/api/admin/api-keys', desc: '生成新 API Key',
+  { method: 'POST', path: '/api/admin/api-keys', desc: '生成新 API Key（model_ids 可选，授权该 key 可用的模型）',
     example: `curl -X POST http://127.0.0.1:38271/api/admin/api-keys \\
   -H "X-Admin-Password: <md5(your-admin-password)>" \\
   -H "Content-Type: application/json" \\
-  -d '{"name":"MyAgent","note":"claude-code on win11"}'` },
-  { method: 'PUT', path: '/api/admin/api-keys/{id}', desc: '编辑 API Key 名称/备注/指定模型',
+  -d '{
+    "name": "MyAgent",
+    "note": "claude-code on win11",
+    "model_ids": [1, 3]
+  }'` },
+  { method: 'PUT', path: '/api/admin/api-keys/{id}', desc: '编辑 API Key (name/note/old_name + assigned_model_id + model_ids 全量替换)',
     example: `curl -X PUT http://127.0.0.1:38271/api/admin/api-keys/1 \\
   -H "X-Admin-Password: <md5(your-admin-password)>" \\
   -H "Content-Type: application/json" \\
-  -d '{"name":"RenamedAgent","note":"updated","old_name":"MyAgent","assigned_model":"Deepseek_deepseek-v4-flash"}'` },
+  -d '{
+    "name": "RenamedAgent",
+    "note": "updated",
+    "old_name": "MyAgent",
+    "assigned_model_id": 1,
+    "model_ids": [1, 2]
+  }'` },
+  { method: 'GET', path: '/api/admin/api-keys/available-models', desc: '列出所有可用 model（用于前端多选授权）',
+    example: `curl http://127.0.0.1:38271/api/admin/api-keys/available-models \\
+  -H "X-Admin-Password: <md5(your-admin-password)>"` },
   { method: 'DELETE', path: '/api/admin/api-keys/{id}', desc: '删除 API Key',
     example: `curl -X DELETE http://127.0.0.1:38271/api/admin/api-keys/1 \\
   -H "X-Admin-Password: <md5(your-admin-password)>"` },
