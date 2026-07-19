@@ -13,7 +13,7 @@ export default {
   createProvider: (data) => api.post('/providers', data),
   updateProvider: (id, data) => api.put(`/providers/${id}`, data),
   deleteProvider: (id) => api.delete(`/providers/${id}`),
-  checkHealth: (id) => api.post(`/providers/${id}/health`),
+  checkHealth: (id) => api.post(`/providers/${id}/health'),
   // Models
   getModels: (id) => api.get(`/providers/${id}/models`),
   refreshModels: (id) => api.post(`/providers/${id}/models/refresh`),
@@ -28,6 +28,8 @@ export default {
   createApiKey: (data) => api.post('/api-keys', data),
   updateApiKey: (id, data) => api.put(`/api-keys/${id}`, data),
   deleteApiKey: (id) => api.delete(`/api-keys/${id}`),
+  // ponytail: v0.2.14 — available models for the create/edit authorization multi-select
+  listAvailableModels: () => api.get('/api-keys/available-models'),
 
   // Stats
   getStats: (params) => api.get('/stats', { params }),

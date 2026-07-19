@@ -2,7 +2,7 @@
   <div class="p-6">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-xl font-bold">{{ t('users') }}</h2>
-      <button @click="showCreate = true" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition">
+      <button @click="openCreate" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium transition">
         {{ t('generate_apikey') }}
       </button>
     </div>
@@ -29,14 +29,23 @@
                 <div class="flex items-center gap-2">
                   <span v-if="!k._revealed" class="whitespace-nowrap">{{ k.key.slice(0, 12) }}...{{ k.key.slice(-4) }}</span>
                   <span v-else class="break-all">{{ k.key }}</span>
+                  <!-- ponytail: v0.2.14 — show/hide + copy buttons sit side-by-side here in the key column. -->
                   <button @click="toggleReveal(k.id)" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center" :title="k._revealed ? t('hide') : t('show')">
                     <span :class="['iconfont', k._revealed ? 'icon-hide' : 'icon-show']"></span>
+                  </button>
+                  <button @click="copyKey(k.key)" :title="t('copy')" class="text-xs px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded inline-flex items-center justify-center">
+                    <span class="iconfont icon-copy"></span>
                   </button>
                 </div>
                 <!-- ponytail: assigned model hint under key (icon-assign + name in accent color, small text) -->
                 <div v-if="k.assigned_model" class="mt-1 text-[10px] text-emerald-400 whitespace-nowrap inline-flex items-center gap-1">
                   <span class="iconfont icon-assign"></span>
                   {{ k.assigned_model }}
+                </div>
+                <!-- ponytail: v0.2.14 — show authorization count badge -->
+                <div v-if="k.authorized_models?.length" class="mt-1 text-[10px] text-gray-500 whitespace-nowrap inline-flex items-center gap-1">
+                  <span class="iconfont icon-key"></span>
+                  {{ k.authorized_models.length }} {{ t('auth_count_label') }}
                 </div>
               </td>
               <td class="px-4 py-3 align-top">
@@ -60,9 +69,6 @@
                   </button>
                   <button @click="openAssign(k)" :title="t('assign_model')" class="text-xs px-2 py-1 bg-amber-900/40 hover:bg-amber-800/60 rounded whitespace-nowrap inline-flex items-center gap-1" :class="k.assigned_model ? 'ring-1 ring-emerald-500/40' : ''">
                     <span class="iconfont icon-assign"></span>
-                  </button>
-                  <button @click="copyKey(k.key)" :title="t('copy')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
-                    <span class="iconfont icon-copy"></span>
                   </button>
                   <button @click="deleteKey(k.id)" :title="t('delete')" class="text-xs px-2 py-1 bg-red-900 hover:bg-red-800 rounded whitespace-nowrap inline-flex items-center gap-1">
                     <span class="iconfont icon-delete"></span>
@@ -104,48 +110,60 @@
       <div v-if="keys.length === 0" class="text-center py-8 text-gray-500">{{ t('no_keys') }}</div>
     </div>
 
-    <!-- Create Modal -->
-    <div v-if="showCreate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showCreate = false">
-      <div class="bg-gray-800 rounded-lg p-6 w-96 border border-gray-700">
-        <h3 class="text-lg font-bold mb-4">{{ t('modal_generate_key') }}</h3>
+    <!-- Create / Edit Modal — both share the authorization multi-select. -->
+    <div v-if="showCreate || showEdit" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="closeFormModal">
+      <div class="bg-gray-800 rounded-lg p-6 w-[40.5rem] border border-gray-700 max-h-[85vh] flex flex-col">
+        <h3 class="text-lg font-bold mb-4">{{ showEdit ? t('edit') : t('modal_generate_key') }}</h3>
         <div class="space-y-3">
-          <input v-model="createForm.name" :placeholder="t('fld_key_name')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
-          <input v-model="createForm.note" :placeholder="t('fld_key_note')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
+          <input v-model="form.name" :placeholder="t('fld_key_name')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
+          <input v-model="form.note" :placeholder="t('fld_key_note')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
+
+          <!-- ponytail: v0.2.14 — 授权使用的模型 (multi-select, optional). Default model is implicitly available. -->
+          <div class="border border-gray-700 rounded p-3 bg-gray-900">
+            <div class="flex justify-between items-center mb-2">
+              <div>
+                <div class="text-sm font-medium">{{ t('authorized_models') }}</div>
+                <div class="text-[11px] text-gray-500 mt-0.5">{{ t('authorized_models_hint') }}</div>
+              </div>
+              <div class="flex gap-1.5">
+                <button type="button" @click="selectAllModels" class="text-[11px] px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_select_all') }}</button>
+                <button type="button" @click="selectNoneModels" class="text-[11px] px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_select_none') }}</button>
+              </div>
+            </div>
+            <div class="space-y-1 max-h-56 overflow-y-auto pr-1">
+              <label v-for="m in availableModels" :key="m.id" class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
+                <input type="checkbox" :value="m.id" v-model="form.model_ids" class="accent-emerald-500" />
+                <span class="font-mono text-xs">{{ m.provider_name }}_{{ m.model_name }}</span>
+                <span v-if="m.is_default" class="text-[10px] text-emerald-400">★</span>
+                <span v-if="m.deleted_at" class="text-[10px] text-red-400">{{ t('deleted_badge') }}</span>
+                <span v-else-if="m.is_disabled" class="text-[10px] text-red-400">{{ t('disabled_badge') }}</span>
+              </label>
+              <div v-if="availableModels.length === 0" class="text-xs text-gray-500 px-2 py-1.5">—</div>
+            </div>
+            <div class="text-[10px] text-gray-500 mt-2">
+              {{ form.model_ids.length }} {{ t('auth_selected_label') }}
+            </div>
+          </div>
         </div>
         <div class="flex justify-end gap-2 mt-4">
-          <button @click="showCreate = false" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
-          <button @click="createKey" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded">{{ t('btn_generate') }}</button>
+          <button @click="closeFormModal" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
+          <button @click="saveFormModal" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded">{{ t('btn_confirm') }}</button>
         </div>
       </div>
     </div>
 
-    <!-- Edit Modal -->
-    <div v-if="showEdit" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showEdit = false">
-      <div class="bg-gray-800 rounded-lg p-6 w-96 border border-gray-700">
-        <h3 class="text-lg font-bold mb-4">{{ t('edit') }}: {{ editForm.name }}</h3>
-        <div class="space-y-3">
-          <input v-model="editForm.name" :placeholder="t('fld_key_name')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
-          <input v-model="editForm.note" :placeholder="t('fld_key_note')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
-        </div>
-        <div class="flex justify-end gap-2 mt-4">
-          <button @click="showEdit = false" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
-          <button @click="saveEdit" class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded">{{ t('btn_confirm') }}</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Assign Model Modal — centered, wider for long model IDs (e.g. NVIDIA-NIM_z-ai/glm-5.2) -->
+    <!-- Assign Model Modal — single-select from authorized models only (v0.2.14). -->
     <div v-if="showAssign" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" @click.self="showAssign = false">
       <div class="bg-gray-800 rounded-lg p-6 w-[40.5rem] border border-gray-700 max-h-[80vh] flex flex-col">
         <h3 class="text-lg font-bold mb-2">{{ t('assign_model') }}: {{ assignForm.keyName }}</h3>
-        <p class="text-xs text-gray-500 mb-3">{{ t('assign_model_hint') }}</p>
+        <p class="text-xs text-gray-500 mb-3">{{ t('assign_model_v2_hint') }}</p>
         <div class="flex-1 overflow-y-auto space-y-1 mb-4 bg-gray-900 rounded p-2 max-h-96">
-          <label v-for="m in modelOptions" :key="m.id" class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
+          <label v-for="m in assignCandidates" :key="m.id" class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
             <input type="radio" :value="m.full_id" v-model="assignForm.model" class="accent-emerald-500" />
             <span class="font-mono">{{ m.full_id }}</span>
             <span v-if="m.is_default" class="text-xs text-emerald-400">★</span>
           </label>
-          <div v-if="modelOptions.length === 0" class="text-xs text-gray-500 px-2 py-1.5">—</div>
+          <div v-if="assignCandidates.length === 0" class="text-xs text-gray-500 px-2 py-1.5">{{ t('assign_no_authorized') }}</div>
         </div>
         <div class="flex justify-between gap-2">
           <button v-if="assignForm.model" @click="assignForm.model = ''" class="text-xs px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded">{{ t('assign_clear') }}</button>
@@ -160,20 +178,25 @@
 </template>
 
 <script setup>
-import { ref, inject, onMounted } from 'vue'
+import { ref, inject, onMounted, computed } from 'vue'
 import api from '../lib/api'
 import { formatToken } from '../lib/format.js'
 
 const t = inject('t')
 const keys = ref([])
+const expandedId = ref(null)
+
+// form modal (create / edit)
 const showCreate = ref(false)
-const createForm = ref({ name: '', note: '' })
 const showEdit = ref(false)
-const editForm = ref({ id: null, name: '', note: '', oldName: '' })
+const form = ref({ id: null, name: '', note: '', oldName: '', model_ids: [] })
+const availableModels = ref([])
+
+// assign modal
 const showAssign = ref(false)
 const assignForm = ref({ id: null, keyName: '', model: '' })
-const modelOptions = ref([])
-const expandedId = ref(null)
+// assignCandidates derived from the current row's authorized_models — pop only when modal opens.
+const assignCandidates = ref([])
 
 const fmt = formatToken
 
@@ -217,32 +240,67 @@ const load = async () => {
 }
 onMounted(load)
 
+const loadAvailableModels = async () => {
+  if (availableModels.value.length > 0) return
+  try {
+    const { data } = await api.listAvailableModels()
+    availableModels.value = data
+  } catch (e) {
+    console.error('load available models failed:', e)
+  }
+}
+
 const toggleDetail = (id) => { expandedId.value = expandedId.value === id ? null : id }
 const toggleReveal = (id) => {
   const k = keys.value.find(x => x.id === id)
   if (k) k._revealed = !k._revealed
 }
 
-const createKey = async () => {
-  try {
-    await api.createApiKey(createForm.value)
-    showCreate.value = false
-    createForm.value = { name: '', note: '' }
-    await load()
-  } catch (e) {
-    alert('Error: ' + (e.response?.data?.error || e.message))
+const copyKey = (key) => {
+  navigator.clipboard?.writeText(key)
+}
+
+const selectAllModels = () => { form.value.model_ids = availableModels.value.map(m => m.id) }
+const selectNoneModels = () => { form.value.model_ids = [] }
+
+const openCreate = async () => {
+  form.value = { id: null, name: '', note: '', oldName: '', model_ids: [] }
+  showCreate.value = true
+  await loadAvailableModels()
+}
+
+const openEdit = async (k) => {
+  form.value = {
+    id: k.id,
+    name: k.name,
+    note: k.note || '',
+    oldName: k.name,
+    model_ids: (k.authorized_models || []).map(m => m.model_id),
   }
-}
-
-const openEdit = (k) => {
-  editForm.value = { id: k.id, name: k.name, note: k.note || '', oldName: k.name }
   showEdit.value = true
+  await loadAvailableModels()
 }
 
-const saveEdit = async () => {
+const closeFormModal = () => {
+  showCreate.value = false
+  showEdit.value = false
+  form.value = { id: null, name: '', note: '', oldName: '', model_ids: [] }
+}
+
+const saveFormModal = async () => {
   try {
-    await api.updateApiKey(editForm.value.id, { name: editForm.value.name, note: editForm.value.note, old_name: editForm.value.oldName })
-    showEdit.value = false
+    const payload = {
+      name: form.value.name,
+      note: form.value.note,
+      old_name: form.value.oldName || undefined,
+      model_ids: form.value.model_ids,
+    }
+    if (showEdit.value && form.value.id != null) {
+      await api.updateApiKey(form.value.id, payload)
+    } else {
+      await api.createApiKey(payload)
+    }
+    closeFormModal()
     await load()
   } catch (e) {
     alert('Error: ' + (e.response?.data?.error || e.message))
@@ -254,37 +312,25 @@ const deleteKey = async (id) => {
   await api.deleteApiKey(id); await load()
 }
 
-const copyKey = (key) => {
-  navigator.clipboard?.writeText(key)
-}
-
-// ponytail: open assign model dialog — load all provider/model options
-const openAssign = async (k) => {
+// ponytail: v0.2.14 — assign only picks from this key's authorized models.
+const openAssign = (k) => {
   assignForm.value = { id: k.id, keyName: k.name, model: k.assigned_model || '' }
+  assignCandidates.value = (k.authorized_models || []).map(m => ({
+    id: m.model_id,
+    full_id: `${m.provider_name}_${m.model_name}`,
+    is_default: false,  // ponytail: could query is_default from /api-keys/available-models; not needed for assign UX
+  }))
   showAssign.value = true
-  if (modelOptions.value.length === 0) {
-    try {
-      const { data: providers } = await api.listProviders()
-      const all = []
-      for (const p of providers) {
-        try {
-          const { data: models } = await api.getModels(p.id)
-          for (const m of (models || [])) {
-            if (m.is_disabled || m.deleted) continue
-            all.push({ id: m.id, full_id: `${p.name}_${m.model_name}`, is_default: !!m.is_default })
-          }
-        } catch {}
-      }
-      modelOptions.value = all
-    } catch (e) {
-      console.error('load models for assign failed:', e)
-    }
-  }
 }
 
 const saveAssign = async () => {
   try {
-    await api.updateApiKey(assignForm.value.id, { assigned_model: assignForm.value.model || null })
+    // ponytail: convert 南天门对外 model id (ProviderName_modelname) back to model_id (FK).
+    // assignCandidates has the id, so just look up.
+    const selected = assignCandidates.value.find(c => c.full_id === assignForm.value.model)
+    await api.updateApiKey(assignForm.value.id, {
+      assigned_model_id: selected ? selected.id : null,
+    })
     showAssign.value = false
     await load()
   } catch (e) {

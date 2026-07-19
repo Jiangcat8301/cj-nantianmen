@@ -281,6 +281,11 @@ const saveProvider = async () => {
     alert(t('fld_name_hint'))
     return
   }
+  // ponytail: pre-check duplicate name (DB UNIQUE would 400 anyway, but we want a friendly error).
+  if (!editing.value && providers.value.some(p => p.name === form.value.name)) {
+    alert(t('fld_name_dup'))
+    return
+  }
   try {
     if (editing.value) {
       await api.updateProvider(editing.value, form.value)
