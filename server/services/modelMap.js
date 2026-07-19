@@ -29,7 +29,9 @@ export async function rebuildModelMap() {
     const p = pMap[m.provider_id]
     if (!p) continue
     const key = `${p.name}_${m.model_name}`
+    // ponytail: entry 携带 models.id, 让写入路径 (commlog/usage_stats/assigned_model) 不用再回查
     const entry = {
+      __modelId: m.id,
       provider: p,
       model_name: m.model_name,
       protocol: p.protocol,

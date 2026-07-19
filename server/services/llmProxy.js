@@ -27,7 +27,7 @@ async function getUserName(apiKeyId) {
 
 // ponytail: extract functions return snake_case (matches stats.record), streaming
 // passes camelCase shorthand. Normalize here so both callers just work.
-async function logEntry({ apiKeyId, provider, modelName, upstreamBody, responseBody, inputTokens, outputTokens, cachedTokens, error, durationMs, input_tokens, output_tokens, cached_tokens, duration_ms }) {
+async function logEntry({ apiKeyId, provider, modelName, modelId, upstreamBody, responseBody, inputTokens, outputTokens, cachedTokens, error, durationMs, input_tokens, output_tokens, cached_tokens, duration_ms }) {
   inputTokens = inputTokens ?? input_tokens ?? 0
   outputTokens = outputTokens ?? output_tokens ?? 0
   cachedTokens = cachedTokens ?? cached_tokens ?? 0
@@ -40,6 +40,7 @@ async function logEntry({ apiKeyId, provider, modelName, upstreamBody, responseB
     user_name,
     provider_id: provider.id,
     provider_name: provider.name,
+    model_id: modelId || null,
     model_name: modelName,
     tokens_input: inputTokens || 0,
     tokens_output: outputTokens || 0,
@@ -62,14 +63,20 @@ export function resolveModel(modelField) {
   return entry
 }
 
-// ponytail: per-key model override — when api_keys.assigned_model is set,
+// ponytail: per-key model override — when api_keys.assigned_model_id is set,
 // every request from this key uses that model regardless of what the
 // caller puts in `body.model`. Endpoint and the /v1/models list are NOT
 // modified; only the resolved entry is swapped at request time.
 async function getAssignedEntry(apiKeyId) {
   if (!apiKeyId) return null
   try {
-    const rows = await getDb().query('SELECT assigned_model FROM api_keys WHERE id=?', [apiKeyId])
+    // ponytail: v0.2.14 read assigned_model_id (FK), fallback to old TEXT field if id missing
+    const rows = await getDb().query('SELECT assigned_model_id, assigned_model FROM api_keys WHERE id=?', [apiKeyId])
+    const id = rows[0]?.assigned_model_id
+    if (id) {
+      const map = getModelMap()
+      return Object.values(map).find(e => e.__modelId === id) || null
+    }
     const v = rows[0]?.assigned_model
     if (!v) return null
     return getEntry(v) || null  // returns null if assigned_model points to a deleted/disabled model
@@ -79,7 +86,7 @@ async function getAssignedEntry(apiKeyId) {
 export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
   const overrideEntry = await getAssignedEntry(apiKeyId)
   const entry = overrideEntry || resolveModel(body.model || 'auto')
-  const { provider, model_name, protocol: providerProtocol, endpoint, headers } = entry
+  const { __modelId, provider, model_name, protocol: providerProtocol, endpoint, headers } = entry
   let upstreamBody
   if (inboundProtocol === providerProtocol) {
     upstreamBody = { ...body, model: model_name }
@@ -99,11 +106,11 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
     const resp = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(upstreamBody), dispatcher: await getDispatcher() })
     const durationMs = Date.now() - t0
     if (body.stream && resp.ok && resp.body) {
-      return makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, provider.id, reply, upstreamBody, provider, durationMs)
+      return makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, __modelId, apiKeyId, provider.id, reply, upstreamBody, provider, durationMs)
     }
     if (!resp.ok) {
       const t = await resp.text()
-      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: t, inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs, error: { code: resp.status, message: t } })
+      await logEntry({ apiKeyId, provider, modelName: model_name, modelId: __modelId, upstreamBody, responseBody: t, inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs, error: { code: resp.status, message: t } })
       throw new Error(`Upstream ${resp.status}: ${t}`)
     }
     const data = await resp.json()
@@ -115,24 +122,24 @@ export async function proxyRequest(body, inboundProtocol, apiKeyId, reply) {
     } else if (inboundProtocol === 'anthropic' && providerProtocol === 'openai') {
       out = openaiRespToAnthropic(data)
     }
-    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: JSON.stringify(out), durationMs, ...captured })
+    await logEntry({ apiKeyId, provider, modelName: model_name, modelId: __modelId, upstreamBody, responseBody: JSON.stringify(out), durationMs, ...captured })
     return out
   } catch (e) {
     if (!e.message?.startsWith('Upstream ')) {
-      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: '', inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs: Date.now() - t0, error: { code: 0, message: e.message } })
+      await logEntry({ apiKeyId, provider, modelName: model_name, modelId: __modelId, upstreamBody, responseBody: '', inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs: Date.now() - t0, error: { code: 0, message: e.message } })
     }
     throw e
   } finally {
     if (!body.stream) {
       stats.release()
       if (captured.input_tokens || captured.output_tokens) {
-        stats.record({ api_key_id: apiKeyId, provider_id: provider.id, model_name, request_count: 1, ...captured })
+        stats.record({ api_key_id: apiKeyId, provider_id: provider.id, model_id: __modelId, model_name, request_count: 1, ...captured })
       }
     }
   }
 }
 
-function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, apiKeyId, providerId, reply, upstreamBody, provider, ttfbMs) {
+function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_name, modelId, apiKeyId, providerId, reply, upstreamBody, provider, ttfbMs) {
   reply.raw.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -192,7 +199,7 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
       }
     } catch (e) {
       outputBuf += '\n[stop]'
-      await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs, error: { code: 0, message: e.message } })
+      await logEntry({ apiKeyId, provider, modelName: model_name, modelId, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs, error: { code: 0, message: e.message } })
       reply.raw.destroy(e)
       return
     }
@@ -202,8 +209,8 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
     }
     outputBuf += '\n[stop]'
     reply.raw.end()
-    stats.record({ api_key_id: apiKeyId, provider_id: providerId, model_name, request_count: 1, input_tokens: inputTokens, output_tokens: outputTokens, cached_tokens: cachedTokens })
+    stats.record({ api_key_id: apiKeyId, provider_id: providerId, model_id: modelId, model_name, request_count: 1, input_tokens: inputTokens, output_tokens: outputTokens, cached_tokens: cachedTokens })
     stats.release()
-    await logEntry({ apiKeyId, provider, modelName: model_name, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs })
+    await logEntry({ apiKeyId, provider, modelName: model_name, modelId, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs })
   })()
 }

@@ -4,14 +4,14 @@ const buffer = new Map() // key: JSON.stringify(row) -> row sums
 let active = 0
 let lastFlush = Date.now()
 
-// ponytail: append-only log model, periodic flush, in-memory active counter.
+// ponytail: bucket on model_id (FK) when present; fall back to (provider_id, model_name) for legacy rows.
 // Single global lock (JS event loop) — fine for single-node deployment.
 export function acquire() { active++ }
 export function release() { if (active > 0) active-- }
 export function getActive() { return active }
 
 function bucketKey(r) {
-  return `${r.api_key_id ?? ''}|${r.provider_id ?? ''}|${r.model_name}`
+  return `${r.api_key_id ?? ''}|${r.model_id ?? ''}|${r.provider_id ?? ''}|${r.model_name}`
 }
 
 export function record(r) {
@@ -26,6 +26,7 @@ export function record(r) {
     buffer.set(k, {
       api_key_id: r.api_key_id ?? null,
       provider_id: r.provider_id ?? null,
+      model_id: r.model_id ?? null,
       model_name: r.model_name,
       request_count: r.request_count ?? 1,
       input_tokens: r.input_tokens ?? 0,
@@ -44,8 +45,8 @@ export async function flush() {
   const db = getDb()
   for (const r of rows) {
     await db.run(
-      'INSERT INTO usage_stats(api_key_id, provider_id, model_name, request_count, input_tokens, output_tokens, cached_tokens) VALUES (?,?,?,?,?,?,?)',
-      [r.api_key_id, r.provider_id, r.model_name, r.request_count, r.input_tokens, r.output_tokens, r.cached_tokens],
+      'INSERT INTO usage_stats(api_key_id, provider_id, model_id, model_name, request_count, input_tokens, output_tokens, cached_tokens) VALUES (?,?,?,?,?,?,?,?)',
+      [r.api_key_id, r.provider_id, r.model_id ?? null, r.model_name, r.request_count, r.input_tokens, r.output_tokens, r.cached_tokens],
     )
   }
 }
@@ -74,23 +75,29 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
   const w = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
   // ponytail: breakdown keeps per-key detail (admin table);
-  // topModels/topProviders/topUsers are pre-aggregated to dedupe same provider+model across multiple keys (#4).
-  const rows = await getDb().query(
-    `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
-            m.input_price, m.output_price, m.cache_hit_price,
-            SUM(u.request_count) AS request_count,
-            SUM(u.input_tokens) AS input_tokens,
-            SUM(u.output_tokens) AS output_tokens,
-            SUM(u.cached_tokens) AS cached_tokens
-     FROM usage_stats u
-     LEFT JOIN providers p ON u.provider_id = p.id
-     LEFT JOIN api_keys k ON u.api_key_id = k.id
-     LEFT JOIN models m ON u.provider_id = m.provider_id AND u.model_name = m.model_name
-     ${w}
-     GROUP BY u.provider_id, u.model_name, u.api_key_id
-     ORDER BY request_count DESC`,
-    params,
-  )
+    // topModels/topProviders are pre-aggregated to dedupe same provider+model across multiple keys (#4).
+    // v0.2.14: LEFT JOIN via model_id (FK) — picks up renamed models automatically.
+    // For legacy rows (model_id IS NULL), fall back to (provider_id, model_name) lookup to keep price stats.
+    const rows = await getDb().query(
+      `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
+              COALESCE(m.model_name, u.model_name) AS current_model_name,
+              COALESCE(m.input_price, m_legacy.input_price, 0) AS input_price,
+              COALESCE(m.output_price, m_legacy.output_price, 0) AS output_price,
+              COALESCE(m.cache_hit_price, m_legacy.cache_hit_price, 0) AS cache_hit_price,
+              SUM(u.request_count) AS request_count,
+              SUM(u.input_tokens) AS input_tokens,
+              SUM(u.output_tokens) AS output_tokens,
+              SUM(u.cached_tokens) AS cached_tokens
+       FROM usage_stats u
+       LEFT JOIN providers p ON u.provider_id = p.id
+       LEFT JOIN api_keys k ON u.api_key_id = k.id
+       LEFT JOIN models m ON u.model_id = m.id
+       LEFT JOIN models m_legacy ON u.model_id IS NULL AND u.provider_id = m_legacy.provider_id AND u.model_name = m_legacy.model_name
+       ${w}
+       GROUP BY u.provider_id, u.model_name, u.api_key_id
+       ORDER BY request_count DESC`,
+      params,
+    )
 
   // ponytail: pre-aggregate by (provider, model) so the Top-5 panel doesn't show the same
   // provider/model multiple times when several API keys used it. One pass over `rows`.
@@ -102,8 +109,8 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
   const byModel = new Map()
   const byProvider = new Map()
   for (const r of rows) {
-    const mk = `${r.provider}|${r.model_name}`
-    const m = byModel.get(mk) || { provider: r.provider || '?', model: r.model_name || '?',
+    const mk = `${r.provider}|${r.current_model_name || r.model_name}`
+    const m = byModel.get(mk) || { provider: r.provider || '?', model: r.current_model_name || r.model_name || '?',
       request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0,
       input_price: r.input_price || 0, output_price: r.output_price || 0, cache_hit_price: r.cache_hit_price || 0,
       cost: 0 }
