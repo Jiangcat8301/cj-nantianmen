@@ -41,7 +41,7 @@
       </div>
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p class="text-xs text-gray-500 mb-1">{{ t('stats_cached_tokens') }}</p>
-        <p class="text-2xl font-bold text-blue-400">{{ formatNum(stats.total_cached_tokens) }}</p>
+        <p class="text-2xl font-bold text-cyan-400">{{ formatNum(stats.total_cached_tokens) }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p class="text-xs text-gray-500 mb-1">{{ t('stats_total_cost') }}</p>
@@ -135,7 +135,7 @@
               <td class="px-4 py-3 text-right">{{ g.request_count }}</td>
               <td class="px-4 py-3 text-right">{{ formatNum(g.input_tokens) }}</td>
               <td class="px-4 py-3 text-right">{{ formatNum(g.output_tokens) }}</td>
-              <td class="px-4 py-3 text-right text-blue-400">{{ formatNum(g.cached_tokens) }}</td>
+              <td class="px-4 py-3 text-right text-cyan-400">{{ formatNum(g.cached_tokens) }}</td>
               <td class="px-4 py-3 text-right text-amber-400">¥{{ g.cost.toFixed(4) }}</td>
             </tr>
             <!-- 展开的模型明细（每个 model 一行） -->
@@ -146,7 +146,7 @@
               <td class="px-4 py-2 text-right text-gray-400">{{ m.request_count }}</td>
               <td class="px-4 py-2 text-right text-gray-400">{{ formatNum(m.input_tokens) }}</td>
               <td class="px-4 py-2 text-right text-gray-400">{{ formatNum(m.output_tokens) }}</td>
-              <td class="px-4 py-2 text-right text-blue-400">{{ formatNum(m.cached_tokens) }}</td>
+              <td class="px-4 py-2 text-right text-cyan-400">{{ formatNum(m.cached_tokens) }}</td>
               <td class="px-4 py-2 text-right text-amber-400">¥{{ m.cost.toFixed(4) }}</td>
             </tr>
           </template>
@@ -177,6 +177,13 @@ const load = async () => {
     if (filters.value.range) p.range = filters.value.range
     const { data } = await api.getStats(p)
     stats.value = data
+    // ponytail: sync tray stats to current filter
+    window.win?.updateTrayStats({
+      input: data.total_input_tokens || 0,
+      output: data.total_output_tokens || 0,
+      cached: data.total_cached_tokens || 0,
+      cost: totalCost.value,
+    })
   } catch {}
 }
 

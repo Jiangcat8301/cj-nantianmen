@@ -49,7 +49,7 @@
               <td class="px-4 py-3 text-right text-gray-300 whitespace-nowrap">{{ fmt(k._stats?.output_tokens) }}</td>
               <td class="px-4 py-3 text-right text-cyan-400 whitespace-nowrap">{{ fmt(k._stats?.cached_tokens) }}</td>
               <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ formatDate(k.created_at) }}</td>
-              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ k.last_used_at ? formatDate(k.last_used_at) : t('not_used') }}</td>
+              <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ k.last_used_at ? formatDateTime(k.last_used_at) : t('not_used') }}</td>
               <td class="px-4 py-3">
                 <div class="flex gap-2">
                   <button v-if="k._stats?.rows?.length" @click="toggleDetail(k.id)" :title="expandedId === k.id ? t('collapse') : t('details')" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded whitespace-nowrap inline-flex items-center gap-1">
@@ -179,6 +179,15 @@ const fmt = formatToken
 
 // ponytail: extract yyyy-mm-dd only. Backend stores localtime, so no TZ shift.
 const formatDate = (s) => (s && typeof s === 'string') ? s.split(' ')[0].split('T')[0] : '-'
+// ponytail: full datetime yyyy-mm-dd hh:mm:ss for last_used_at
+const formatDateTime = (s) => {
+  if (!s || typeof s !== 'string') return '-'
+  const t = s.split('T')
+  if (t.length === 2) return t[0] + ' ' + t[1].split('.')[0].substring(0, 8)  // ISO
+  const parts = s.split(' ')
+  if (parts.length >= 2) return parts[0] + ' ' + parts[1]  // "2026-01-15 14:30:00"
+  return parts[0]  // "2026-01-15" only
+}
 
 const costRow = (r) => {
   const c = ((r.input_tokens||0)*(r.input_price||0) + (r.output_tokens||0)*(r.output_price||0) + (r.cached_tokens||0)*(r.cache_hit_price||0)) / 1_000_000

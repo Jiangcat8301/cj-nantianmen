@@ -11,7 +11,7 @@
         <div class="flex items-center gap-1.5 px-3 text-xs">
           <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
           <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.12</span>
+          <span class="text-gray-600">v0.2.13</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">
@@ -113,7 +113,7 @@ const i18n = {
  log_title: '通信日志', log_toggle: '启用日志', log_clear: '清空日志', log_clear_confirm: '确认清空所有通信日志?',
  log_time: '时间', log_user: '用户', log_provider: '供应商', log_model: '模型',
  log_tokens_in: '输入Token', log_tokens_out: '输出Token', log_tokens_cached: '缓存命中', log_status: '状态', log_count: '记录数', log_duration: '耗时', log_loading: '加载中...',
- log_rotation: '滚动记录', log_rotation_off: '未启用', log_rotation_hint: '保留最新', log_rotation_unit: '条',
+ log_rotation: '滚动记录', log_rotation_off: '未启用', log_rotation_hint: '保留最新', log_rotation_unit: '条', log_cache_hit_pct: '命中%',
  stats_all_users: '全部用户', db_volume: '数据库体积',
  },
   en: {
@@ -151,7 +151,7 @@ const i18n = {
  log_title: 'Communication Log', log_toggle: 'Enable Logging', log_clear: 'Clear Log', log_clear_confirm: 'Clear all communication logs?',
  log_time: 'Time', log_user: 'User', log_provider: 'Provider', log_model: 'Model',
  log_tokens_in: 'Input Tokens', log_tokens_out: 'Output Tokens', log_tokens_cached: 'Cached', log_status: 'Status', log_count: 'Records', log_duration: 'Duration', log_loading: 'Loading...',
- log_rotation: 'Rotation', log_rotation_off: 'Disabled', log_rotation_hint: 'Keep latest', log_rotation_unit: 'entries',
+ log_rotation: 'Rotation', log_rotation_off: 'Disabled', log_rotation_hint: 'Keep latest', log_rotation_unit: 'entries', log_cache_hit_pct: 'Cache Hit%',
  stats_all_users: 'All Users', db_volume: 'DB Volume',
   },
   ja: {
@@ -189,7 +189,7 @@ const i18n = {
  log_title: '通信ログ', log_toggle: 'ログ有効化', log_clear: 'ログ消去', log_clear_confirm: 'すべての通信ログを消去しますか?',
  log_time: '時刻', log_user: 'ユーザー', log_provider: 'プロバイダー', log_model: 'モデル',
  log_tokens_in: '入力Token', log_tokens_out: '出力Token', log_tokens_cached: 'キャッシュ', log_status: '状態', log_count: '件数', log_duration: '所要時間', log_loading: '読み込み中...',
- log_rotation: 'ローテーション', log_rotation_off: '無効', log_rotation_hint: '最新', log_rotation_unit: '件',
+ log_rotation: 'ローテーション', log_rotation_off: '無効', log_rotation_hint: '最新', log_rotation_unit: '件', log_cache_hit_pct: 'キャッシュ%',
  stats_all_users: '全ユーザー', db_volume: 'DB容量',
   },
 }

@@ -16,4 +16,6 @@ contextBridge.exposeInMainWorld('win', {
   // auto-start
   autostartGet: () => ipcRenderer.invoke('autostart:get'),
   autostartSet: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
+  // push stats from data panel to tray
+  updateTrayStats: (s) => ipcRenderer.send('update-tray-stats', s),
 })

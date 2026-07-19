@@ -9,7 +9,7 @@ import { prompt, askSecret } from './prompt.js'
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
 
-const CFG_DIR = path.join(os.homedir(), '.nantianmen')
+const CFG_DIR = path.join(os.homedir(), '.cj-nantianmen')
 const CFG_FILE = path.join(CFG_DIR, 'config.json')
 
 const loadCfg = () => fs.existsSync(CFG_FILE) ? JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')) : {}

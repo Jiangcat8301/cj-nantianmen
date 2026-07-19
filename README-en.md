@@ -21,7 +21,7 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.12](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) released** — 2026-07-18. Fixed streaming duration astronomical bug, precise TTFB timing, duration red threshold 1s→5s. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.12/nantianmen-0.2.12-win-x64.exe) (x64, 79 MB) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) (x64 + arm64)
+> 🚀 **[v0.2.13](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) released** — 2026-07-18. Unified data directory `~/.cj-nantianmen/`, removed legacy migration. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.13/nantianmen-0.2.13-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) (x64 + arm64)
 
 ---
 
@@ -43,13 +43,13 @@ Two management interfaces:
 
 **First-time startup**: server auto-creates `nantianmen-conf.json` (sqlite3 + localhost + admin password defaults to `admin`). Change password via `POST /api/admin/password/change`.
 
-**Shared data directory**: all three launchers write to the same cross-platform user-data subdirectory `cj-nantianmen`:
+**Shared data directory**: all three launchers write to the same home-directory subdir `~/.cj-nantianmen/` (cli/desktop/server share one `nantianmen-conf.json` + `nantianmen.db`):
 
 | OS | Path |
 |---|---|
-| Windows | `%APPDATA%\Roaming\cj-nantianmen\` |
-| macOS | `~/Library/Application Support/cj-nantianmen/` |
-| Linux | `~/.config/cj-nantianmen/` (XDG) |
+| Windows | `C:\Users\<you>\.cj-nantianmen\` |
+| macOS | `/Users/<you>/.cj-nantianmen/` |
+| Linux | `/home/<you>/.cj-nantianmen/` |
 
 conf + db files live here. `-c/-D` flags override for custom paths.
 
@@ -73,9 +73,9 @@ cj-nantianmen/
 
 After first startup, created files:
 nantianmen-conf.json          # host/port/password/salt/log_enabled/database/window_state
-nantianmen.db                 # SQLite file (default)
-communication_log.json        # comm log (when log_enabled=true)
-~/.nantianmen/config.json     # CLI client-side state
+nantianmen.db                 # SQLite file (default; includes communication_log table)
+communication_log.json        # Legacy comm log (pre-v0.2.7); auto-migrated to nantianmen.db on first run, then deleted
+~/.cj-nantianmen/config.json  # CLI client-side state
 ```
 
 ### Three Components

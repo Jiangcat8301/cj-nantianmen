@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.12](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) 已发布** — 2026-07-18。流式路径 duration 天文数字 Bug 修复、TTFB 计时精确定位、duration 红色阈值 1s→5s。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.12/nantianmen-0.2.12-win-x64.exe) (x64, 79 MB) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.12) (x64 + arm64)
+> 🚀 **[v0.2.13](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) 已发布** — 2026-07-18。统一数据目录 `~/.cj-nantianmen/`、移除 legacy migration。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.13/nantianmen-0.2.13-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.13) (x64 + arm64)
 
 ---
 
@@ -45,13 +45,13 @@
 
 **首次启动**：server 自动创建 `nantianmen-conf.json`（sqlite3 + 本机 host/port + 管理员密码自动设为 `admin`）。改密码走 `POST /api/admin/password/change`。
 
-**共享数据目录**：三端统一写到跨平台 user-data 子目录 `cj-nantianmen`：
+**共享数据目录**：三端统一写到家目录下的 `~/.cj-nantianmen/`（cli/desktop/server 全部共享同一份 `nantianmen-conf.json` + `nantianmen.db`）：
 
 | OS | 路径 |
 |---|---|
-| Windows | `%APPDATA%\Roaming\cj-nantianmen\` |
-| macOS | `~/Library/Application Support/cj-nantianmen/` |
-| Linux | `~/.config/cj-nantianmen/` (XDG) |
+| Windows | `C:\Users\<you>\.cj-nantianmen\` |
+| macOS | `/Users/<you>/.cj-nantianmen/` |
+| Linux | `/home/<you>/.cj-nantianmen/` |
 
 conf + db 文件在此目录。`-c/-D` 显式指定任意位置仍生效（dev 用法）。
 
@@ -75,9 +75,9 @@ cj-nantianmen/
 
 首次启动会创建（跨平台 user-data 子目录 `cj-nantianmen/`，由 launcher 决定写入；可在 Desktop Settings 改路径）：
 nantianmen-conf.json          # host/port/password/salt/log_enabled/database/window_state
-nantianmen.db                 # SQLite 数据文件（默认）
-communication_log.json        # 通信日志（log_enabled=true 时写入）
-~/.nantianmen/config.json     # CLI 客户端保存的 host/port/password_md5
+nantianmen.db                 # SQLite 数据文件（默认，含 communication_log 表）
+communication_log.json        # 通信日志（v0.2.7 之前的旧文件，首次启动会被自动迁移到 nantianmen.db 后删除）
+~/.cj-nantianmen/config.json  # CLI 客户端缓存（host/port/password_md5）
 ```
 
 ### 三组件职责
@@ -85,10 +85,10 @@ communication_log.json        # 通信日志（log_enabled=true 时写入）
 | 组件 | 语言 | 启动方式 | conf+db 落点 |
 |------|------|---------|----------|
 | **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js [-c conf -D db]` | user-data 子目录 `cj-nantianmen/`，无 flag 时 |
-| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` | 同上（Electron `app.getPath('userData')`） |
+| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` | 同上（`~/.cj-nantianmen/`） |
 | **cli** | Node.js (stdlib) + Bun compile | `cd cli && node index.js <command>` 或 `nantianmen-cli-*.exe` | 同上（探测 127.0.0.1:38271，未起则 fork） |
 
-**共同规则**：`nantianmen-conf.json` 与 `nantianmen.db` 永远落在跨平台 user-data 子目录 `cj-nantianmen/`，由 server 内 `defaultBaseDir()` 决定（Win %APPDATA%、macOS ~/Library/...、Linux XDG ~/.config）。`-c/-D` 显式传任意位置仍生效。
+**共同规则**：`nantianmen-conf.json` 与 `nantianmen.db` 永远落在 `~/.cj-nantianmen/`，由 server 内 `defaultBaseDir()` 决定（直接取 `os.homedir()` + `.cj-nantianmen`，跨平台一致）。`-c/-D` 显式传任意位置仍生效。
 
 ### 通信流程
 
@@ -149,7 +149,7 @@ cd desktop
 npm install
 npm run electron:dev          # dev：fork ../server，conf+db 写到 user-data/cj-nantianmen/
 npm run electron:build        # 出包到 ../releases/nantianmen-0.2.3-win-x64.exe
-# 双击 Nantianmen.exe，conf+db 落到 %APPDATA%\Roaming\cj-nantianmen\（持久）
+# 双击 Nantianmen.exe，conf+db 落到 ~/.cj-nantianmen/（持久）
 ```
 
 ## 技术栈

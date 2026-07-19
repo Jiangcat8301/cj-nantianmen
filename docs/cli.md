@@ -39,7 +39,7 @@ nantianmen log enable|disable|clear|config
 nantianmen settings          # 查看
 nantianmen settings set --port=8380  # 修改端口
 
-# 全局 flags 解析顺序：--flag > $NANTIANMEN_* > ~/.nantianmen/config.json > 报错
+# 全局 flags 解析顺序：--flag > $NANTIANMEN_* > ~/.cj-nantianmen/config.json > 报错
 ```
 
 **自动启动 server**：除 `help` / `quit` 外，每个子命令执行前先探测 `${HOST}:${PORT}/v1/health`。若未就绪，按 `--server-bin`（或 fallback 到 `../server/index.js`，或 `$NANTIANMEN_SERVER_BIN`）fork 一份子进程，detached 独立存在；CLI 退出不影响 server 寿命。
@@ -53,4 +53,4 @@ server 接受两个路径 flag：
 | `-c <path>` | `--config-path=<path>` | conf 文件路径（绝对或相对，相对以 server binary 目录为基准） |
 | `-D <path>` | `--database-path=<path>` | sqlite3 db 文件路径（同上） |
 
-不传：fallback 到跨平台 user-data 子目录 `cj-nantianmen/`（Win `%APPDATA%\Roaming\cj-nantianmen\`、macOS `~/Library/.../cj-nantianmen/`、Linux `~/.config/cj-nantianmen/`）。三端统一，CLI/Desktop/server 默认共享同一份数据。
+不传：fallback 到家目录下的 `.cj-nantianmen/`（Win `C:\Users\<you>\.cj-nantianmen\`、macOS `/Users/<you>/.cj-nantianmen/`、Linux `/home/<you>/.cj-nantianmen/`）。三端统一，CLI/Desktop/server 默认共享同一份数据。

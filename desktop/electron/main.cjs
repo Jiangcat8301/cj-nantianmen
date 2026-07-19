@@ -3,6 +3,7 @@ const path = require('path')
 const { fork } = require('child_process')
 const http = require('http')
 const fs = require('fs')
+const os = require('os')
 
 // ponytail: speed up Chromium cold start on Windows by skipping the GPU sandbox.
 // Nantianmen is a UI tool, no GPU compositing needed.
@@ -92,12 +93,9 @@ async function startServer() {
   const serverPath = getServerPath()
   // ponytail: ELECTRON_RUN_AS_NODE=1 so fork() runs Node.js, not another Electron window.
   // NANTIANMEN_LOCAL_MODE=1 so server skips admin auth for its parent process.
-  // ponytail: persistent user-data dir. Single subdir across all three launchers:
-  //   Windows: %APPDATA%\Roaming\cj-nantianmen\
-  //   macOS:   ~/Library/Application Support/cj-nantianmen/
-  //   Linux:   ~/.config/cj-nantianmen/  (XDG)
-  // Electron userData = appData + package.json#name (cj-nantianmen); matches conf.js defaultBaseDir.
-  const dataDir = app.getPath('userData')
+  // ponytail: persistent user-data dir. Unified across cli / desktop / standalone server.
+  // Always `~/.cj-nantianmen/` on every OS. cli uses the same path via its own conf.js defaultBaseDir.
+  const dataDir = path.join(os.homedir(), '.cj-nantianmen')
   try { fs.mkdirSync(dataDir, { recursive: true }) } catch {}
   const confPath = path.join(dataDir, 'nantianmen-conf.json')
   const dbPath = path.join(dataDir, 'nantianmen.db')
@@ -168,7 +166,8 @@ function createSplash() {
 
 // ponytail: persist window bounds via nantianmen-conf.json (shared with server).
 // Replaces window-state.json — same physical file, no race in practice.
-const confFile = path.join(app.getPath('userData'), 'nantianmen-conf.json')
+// Unified path: ~/.cj-nantianmen/nantianmen-conf.json (matches server conf.js).
+const confFile = path.join(os.homedir(), '.cj-nantianmen', 'nantianmen-conf.json')
 
 function readConf() {
   try { if (fs.existsSync(confFile)) return JSON.parse(fs.readFileSync(confFile, 'utf-8')) } catch {}
@@ -300,11 +299,15 @@ app.whenReady().then(async () => {
   }
   ipcMain.handle('get-tray-lang', () => trayLang)
   ipcMain.on('set-tray-lang', (_e, lang) => { trayLang = lang; buildTrayMenu() })
+  // ponytail: receive stats from data panel so tray matches current filter
+  ipcMain.on('update-tray-stats', (_e, s) => {
+    if (s) { dailyStats = s; buildTrayMenu() }
+  })
   let dailyStats = { input: 0, output: 0, cached: 0, cost: 0 }
   async function fetchDailyStats() {
     try {
       const s = await new Promise((resolve) => {
-        const req = http.get(`${SERVER_URL}/api/admin/stats?range=today`, (r) => {
+        const req = http.get(`${SERVER_URL}/api/admin/stats?range=7d`, (r) => {
           let d = ''
           r.on('data', (c) => d += c)
           r.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve(null) } })

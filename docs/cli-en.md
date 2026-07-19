@@ -38,7 +38,7 @@ nantianmen log enable|disable|clear|config
 nantianmen settings                        # view
 nantianmen settings set --port=8380        # change port
 
-# Global flag resolution: --flag > $NANTIANMEN_* > ~/.nantianmen/config.json > error
+# Global flag resolution: --flag > $NANTIANMEN_* > ~/.cj-nantianmen/config.json > error
 ```
 
 **Auto-start server**: before each subcommand (except `help` / `quit`), the CLI probes `${HOST}:${PORT}/v1/health`. If not reachable, it forks a subprocess via `--server-bin` (fallback `../server/index.js`, then `$NANTIANMEN_SERVER_BIN`), detached so the server outlives the CLI.
@@ -52,9 +52,9 @@ The server accepts two path flags:
 | `-c <path>` | `--config-path=<path>` | conf file path (absolute or relative to server binary directory) |
 | `-D <path>` | `--database-path=<path>` | sqlite3 db file path (same resolution) |
 
-When omitted, the paths fall back to the cross-platform user-data directory `cj-nantianmen/`:
-- Windows: `%APPDATA%\Roaming\cj-nantianmen\`
-- macOS: `~/Library/.../cj-nantianmen/`
-- Linux: `~/.config/cj-nantianmen/`
+When omitted, the paths fall back to the home-directory subdir `.cj-nantianmen/`:
+- Windows: `C:\Users\<you>\.cj-nantianmen\`
+- macOS: `/Users/<you>/.cj-nantianmen/`
+- Linux: `/home/<you>/.cj-nantianmen/`
 
 The three surfaces (CLI / Desktop / server) share the same data by default.

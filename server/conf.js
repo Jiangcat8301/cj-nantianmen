@@ -7,19 +7,10 @@ import crypto from 'node:crypto'
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
 
-// ponytail: cross-platform persistent user-data dir under subdir "cj-nantianmen".
-// Single source of truth — desktop uses app.getPath('appData') which lands on the
-// same path; cli + standalone server use this fallback (no Electron app obj here).
+// ponytail: unified data dir. One subdir across all three launchers (cli / desktop / standalone server).
+// Always `~/.cj-nantianmen/` on every OS. User explicitly chose this over platform-specific appData.
 function defaultBaseDir() {
-  if (process.platform === 'win32') {
-    const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
-    return path.join(base, 'cj-nantianmen')
-  }
-  if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', 'cj-nantianmen')
-  }
-  const xdg = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config')
-  return path.join(xdg, 'cj-nantianmen')
+  return path.join(os.homedir(), '.cj-nantianmen')
 }
 
 // ponytail: lazy init. setPaths() must be called by server/index.js BEFORE loadConf().
@@ -49,7 +40,7 @@ let _dirsReady = false
 function ensureDirs() {
   if (_dirsReady) return
   _dirsReady = true
-  // ponytail: appData dir may not exist yet on first run (Windows %APPDATA%\Roaming\cj-nantianmen\)
+  // ponytail: home dir may not exist yet on first run (e.g. fresh VM).
   try { fs.mkdirSync(path.dirname(getConfPath()), { recursive: true }) } catch {}
   try { fs.mkdirSync(path.dirname(getDefaultDbPath()), { recursive: true }) } catch {}
 }

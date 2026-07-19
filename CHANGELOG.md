@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.2.13] — 2026-07-18
+
+### Changed
+
+- **版本 Bump**：v0.2.12 → v0.2.13。
+
 ## [v0.2.12] — 2026-07-18
 
 ### Fixed
@@ -15,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 ### Changed
 
 - 日志页 duration 红色阈值从 1s → 5s。
+- **统一数据目录**：`~/.cj-nantianmen/` — server/cli/desktop 跨平台统一数据路径。
+- 移除 `communication_log.json` 旧版 migration 代码（`commlog.js` -40 行）。
 
 ## [v0.2.11] — 2026-07-18
 

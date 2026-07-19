@@ -1,0 +1,1 @@
+南天门 (NANTIANMEN) 是一个本地化多协议 LLM 代理网关。任何 Agent（Hermes / OpenClaw / Codex / 脚本）都可通过 OpenAI 或 Anthropic 协议接入，由南天门将请求转发到已注册的 LLM Provider（OpenAI / Anthropic / 火山引擎 / 任何兼容服务）。当 Agent 使用的协议与 Provider 不一致时，南天门自动进行**协议转换**（请求体 + 流式 SSE 实时转换），响应以流式透传（SSE pipe-through）原样返回，不缓冲、不截断。

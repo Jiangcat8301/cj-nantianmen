@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.2.13] — 2026-07-18
+
+### Changed
+
+- **Version bump**: v0.2.12 → v0.2.13.
+
 ## [v0.2.12] — 2026-07-18
 
 ### Fixed
@@ -15,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - Log page duration red threshold: 1s → 5s.
+- **Unified data directory**: `~/.cj-nantianmen/` — cross-platform data path for server/cli/desktop.
+- Dropped `communication_log.json` legacy migration code (`commlog.js` -40 lines).
 
 ## [v0.2.11] — 2026-07-18
 

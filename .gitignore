@@ -57,3 +57,4 @@ server/data/
 tools/
 .gitignore
 .githooks/
+.worktrees/

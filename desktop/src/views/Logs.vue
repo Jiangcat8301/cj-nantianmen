@@ -61,6 +61,7 @@
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_in') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_out') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_cached') || '缓存命中' }}</th>
+            <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_cache_hit_pct') || '命中%' }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_duration') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_status') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('th_actions') }}</th>
@@ -76,7 +77,8 @@
               <td class="py-2 px-2 text-xs">{{ l.model_name }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_input) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_output) }}</td>
-              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap">{{ fmt(l.tokens_cached) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ fmt(l.tokens_cached) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ cacheHitPct(l) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap" :class="durationClass(l.duration_ms)">
                 {{ formatDuration(l.duration_ms) }}
               </td>
@@ -92,7 +94,7 @@
             </tr>
             <!-- Inline detail panel -->
             <tr v-if="selected.has(l.request_id||i)">
-              <td colspan="11" class="bg-gray-800/50 border-b border-gray-700 p-4">
+              <td colspan="12" class="bg-gray-800/50 border-b border-gray-700 p-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <div class="flex items-center justify-between mb-1">
@@ -156,6 +158,7 @@ const totalPages = ref(1)
 const total = ref(0)
 
 const fmt = (n) => n ? n.toLocaleString() : '0'
+const cacheHitPct = (l) => l.tokens_input ? (Math.floor(l.tokens_cached / l.tokens_input * 10000) / 100) + '%' : '−'
 const pretty = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
 const copy = (text) => { navigator.clipboard?.writeText(typeof text === 'string' ? text : '') }
 // ponytail: duration formatter. null → '−' (gray). ms <1000 → 'Nms'. >=1000 → 'N.NNs' (red).
