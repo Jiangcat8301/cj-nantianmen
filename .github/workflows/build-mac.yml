@@ -1,7 +1,7 @@
 name: build-mac
 
-# ponytail: cross-compile macOS desktop EXE on macos-latest runner.
-# Triggers: push of vX.Y.Z tag, manual dispatch, or PR to main (sanity check).
+# ponytail: cross-compile macOS desktop DMG on macos-latest runner.
+# Output: a single arm64 DMG (we no longer ship x64). Triggers on vX.Y.Z tag, manual dispatch, or PR.
 on:
   push:
     tags: ['v*.*.*']
@@ -15,6 +15,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      # ponytail: sync desktop/package.json version from the pushed tag so the artifactName
+      # template (`nantianmen-${version}-mac-${arch}.${ext}`) produces 0.2.14 when the tag is
+      # v0.2.14. PR runs leave it untouched (github.ref_name is not a semver tag there).
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
+          echo "desktop/package.json version -> $(node -p "require('./package.json').version")"
 
       - uses: actions/setup-node@v4
         with:
@@ -34,33 +45,27 @@ jobs:
         run: npm ci
 
       # ponytail: build + electron-rebuild for Electron's Node ABI, then electron-builder --mac.
-      # Output goes to ../temp/ per package.json `directories.output`. The runner has no Windows
-      # EXE-copier, so we just upload everything in temp/ as an artifact.
-      - name: Build mac (dmg + zip, x64 + arm64)
+      # Output goes to ../temp/ per package.json `directories.output`. Single arch arm64 (see build.mac.target).
+      - name: Build mac (arm64 dmg only)
         working-directory: desktop
         run: npm run electron:build:mac
         env:
           # Skip code signing — no Apple Developer cert in CI. Builds ad-hoc signed binaries.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload mac artifacts
+      - name: Upload mac artifact
         uses: actions/upload-artifact@v4
         with:
           name: nantianmen-mac-${{ github.ref_name }}
           if-no-files-found: error
           retention-days: 14
-          path: |
-            temp/*.dmg
-            temp/*.zip
-            temp/mac*/**
+          path: temp/nantianmen-*-mac-arm64.dmg
 
-      # ponytail: attach the two DMGs to the GitHub Release so they survive past the
-      # 14-day artifact retention window. Glob by version derived from package.json
-      # so this works for any vX.Y.Z tag without editing the workflow each release.
-      # No `if:` — runs on every trigger; on PRs the upload is a no-op (no release exists).
-      - name: Attach DMGs to release
+      # ponytail: attach the arm64 DMG to the GitHub Release so it survives past the
+      # 14-day artifact retention window. Path is locked to arm64 dmg only.
+      # On PRs the upload is a no-op (no release exists).
+      - name: Attach arm64 DMG to release
         uses: softprops/action-gh-release@v2
         with:
-          files: temp/nantianmen-*-mac-*.dmg
+          files: temp/nantianmen-*-mac-arm64.dmg
           fail_on_unmatched_files: false
-

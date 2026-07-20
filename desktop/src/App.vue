@@ -9,9 +9,9 @@
       <div class="flex items-center" style="-webkit-app-region:no-drag">
         <!-- Server status indicator -->
         <div class="flex items-center gap-1.5 px-3 text-xs">
-          <span class="w-2 h-2 rounded-full" :class="serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
-          <span :class="serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverOnline ? t('online') : t('offline') }}</span>
-          <span class="text-gray-600">v0.2.13</span>
+          <span class="w-2 h-2 rounded-full" :class="serverMismatch ? 'bg-amber-500' : serverOnline ? 'bg-emerald-500' : 'bg-red-500'"></span>
+          <span :class="serverMismatch ? 'text-amber-400' : serverOnline ? 'text-emerald-400' : 'text-red-400'">{{ serverMismatch ? t('version_mismatch_short') : serverOnline ? t('online') : t('offline') }}</span>
+          <span class="text-gray-600">v{{ clientVersion }}</span>
         </div>
         <!-- Window controls -->
         <button @click="win?.minimize" class="titlebar-btn" :title="t('minimize')">
@@ -54,7 +54,17 @@
 
       <!-- Content -->
       <div class="flex-1 overflow-auto">
-        <router-view />
+        <div v-if="serverMismatch" class="h-full flex items-center justify-center p-8">
+          <div class="max-w-xl w-full bg-gray-800 border border-amber-700 rounded-lg p-6 text-center">
+            <h2 class="text-lg font-bold text-amber-400 mb-3">{{ t('version_mismatch_title') }}</h2>
+            <p class="text-sm text-gray-300 mb-5">{{ t('version_mismatch_desc') }}</p>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <div class="bg-gray-900 rounded p-3"><div class="text-gray-500">Desktop</div><div class="font-mono text-emerald-400">v{{ serverMismatch.clientVersion }}</div></div>
+              <div class="bg-gray-900 rounded p-3"><div class="text-gray-500">Server</div><div class="font-mono text-red-400">v{{ serverMismatch.serverVersion || 'unknown' }}</div></div>
+            </div>
+          </div>
+        </div>
+        <router-view v-else-if="serverStatusReady" />
       </div>
     </div>
     <Modal ref="modalRef" />
@@ -65,8 +75,12 @@
 import { ref, provide, onMounted, onUnmounted } from 'vue'
 import api from './lib/api'
 import Modal from './components/Modal.vue'
+import desktopPackage from '../package.json'
 
+const clientVersion = desktopPackage.version
 const serverOnline = ref(false)
+const serverMismatch = ref(null)
+const serverStatusReady = ref(false)
 const isMax = ref(false)
 const modalRef = ref(null)
 const lang = ref(localStorage.getItem('ntm-lang') || 'zh')
@@ -79,7 +93,7 @@ provide('modal', modalRef)
 // ponytail: nav labels do NOT include emoji here - emoji is in navItems[].icon to avoid double icon.
 const i18n = {
   zh: {
-    dashboard: '系统概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置', online: '在线', offline: '离线',
+    dashboard: '系统概览', models: '模型管理', users: '用户管理', stats: '数据统计', docs: 'API 文档', logs: '日志管理', settings: '系统设置', online: '在线', offline: '离线', version_mismatch_short: '版本不匹配', version_mismatch_title: 'Server 与 Desktop 版本不匹配', version_mismatch_desc: '已拒绝连接。请停止当前 Server，然后启动与 Desktop 相同版本的 Server。',
     minimize: '最小化', maximize: '最大化', close: '关闭',
     add_provider: '新增大模型供应商', health: '健康检查', edit: '编辑', delete: '删除', set_default: '设为默认', default_badge: '★ 默认', manual: '手动', disable_model: '停用模型', enable_model: '启用模型',
     fld_name: '名称', fld_name_hint: '⚠ 不能包含空格或下划线', fld_name_dup: '已存在同名供应商', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
@@ -118,7 +132,7 @@ const i18n = {
  stats_all_users: '全部用户', db_volume: '数据库体积',
  },
   en: {
-    dashboard: 'System Overview', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings', online: 'Online', offline: 'Offline',
+    dashboard: 'System Overview', models: 'Models', users: 'API Keys', stats: 'Statistics', docs: 'API Docs', logs: 'Comm Log', settings: 'Settings', online: 'Online', offline: 'Offline', version_mismatch_short: 'Version mismatch', version_mismatch_title: 'Server/Desktop Version Mismatch', version_mismatch_desc: 'Connection refused. Stop the current Server, then start the same version as this Desktop client.',
     minimize: 'Minimize', maximize: 'Maximize', close: 'Close',
     add_provider: 'Add Provider', health: 'Health Check', edit: 'Edit', delete: 'Delete', set_default: 'Set Default', default_badge: '★ Default', manual: 'Manual', disable_model: 'Disable Model', enable_model: 'Enable Model',
     fld_name: 'Name', fld_name_hint: '⚠ No spaces or underscores allowed', fld_name_dup: 'A provider with this name already exists', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
@@ -157,7 +171,7 @@ const i18n = {
  stats_all_users: 'All Users', db_volume: 'DB Volume',
   },
   ja: {
-    dashboard: 'システム概要', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定', online: 'オンライン', offline: 'オフライン',
+    dashboard: 'システム概要', models: 'モデル管理', users: 'ユーザー管理', stats: '統計', docs: 'APIドキュメント', logs: '通信ログ', settings: '設定', online: 'オンライン', offline: 'オフライン', version_mismatch_short: 'バージョン不一致', version_mismatch_title: 'Server/Desktop バージョン不一致', version_mismatch_desc: '接続を拒否しました。現在の Server を停止し、Desktop と同じバージョンを起動してください。',
     minimize: '最小化', maximize: '最大化', close: '閉じる',
     add_provider: 'プロバイダー追加', health: 'ヘルスチェック', edit: '編集', delete: '削除', set_default: 'デフォルト設定', default_badge: '★ デフォルト', manual: '手動', disable_model: 'モデル無効化', enable_model: 'モデル有効化',
     fld_name: '名称', fld_name_hint: '⚠ スペース・アンダースコア不可', fld_name_dup: '同名のプロバイダーが既に存在します', fld_base_url: 'API Base URL', fld_api_key: 'API Key',
@@ -225,10 +239,18 @@ const changeLang = () => {
 let healthPoll = null
 const checkHealth = async () => {
   try {
-    const r = await fetch('http://127.0.0.1:38271/v1/health')
-    serverOnline.value = r.ok
+    const status = win ? await win.serverStatus() : await fetch('http://127.0.0.1:38271/v1/health').then(async r => {
+      const data = await r.json()
+      const online = r.ok && data?.service === 'nantianmen'
+      return { online, compatible: online && data.version === clientVersion, clientVersion, serverVersion: data?.version || null }
+    })
+    serverOnline.value = status.compatible
+    serverMismatch.value = status.online && !status.compatible ? status : null
   } catch {
     serverOnline.value = false
+    serverMismatch.value = null
+  } finally {
+    serverStatusReady.value = true
   }
 }
 

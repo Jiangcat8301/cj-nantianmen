@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.js'
 import llmRoutes from './routes/llm.js'
 import apikeyRoutes from './routes/apikey.js'
 import providerRoutes from './routes/provider.js'
+import { SERVER_VERSION } from './version.js'
 
 // ponytail: parse -c / -D / --config-path / --database-path before any other init runs.
 // Desktop forks with explicit values; standalone server inherits defaults from binary dir.
@@ -74,7 +75,7 @@ const port = conf.initialized ? conf.server_port : 38271
 
 try {
   await fastify.listen({ host, port })
-  fastify.log.info(`Nantianmen v0.2.4 on http://${host}:${port} (init=${conf.initialized})`)
+  fastify.log.info(`Nantianmen v${SERVER_VERSION} on http://${host}:${port} (init=${conf.initialized})`)
   console.error('[MARKER] listen complete')
 } catch (e) {
   fastify.log.error(e)

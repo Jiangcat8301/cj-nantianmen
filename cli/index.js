@@ -6,8 +6,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { fork, spawn } from 'node:child_process'
 import { prompt, askSecret } from './prompt.js'
+import cliPackage from './package.json' with { type: 'json' }
 
 const md5 = (s) => crypto.createHash('md5').update(s).digest('hex')
+const CLIENT_VERSION = cliPackage.version
 
 const CFG_DIR = path.join(os.homedir(), '.cj-nantianmen')
 const CFG_FILE = path.join(CFG_DIR, 'config.json')
@@ -35,12 +37,21 @@ function flagValue(argv, ...names) {
 const HEALTH_TIMEOUT_MS = 1500
 async function probeHealth(host, port) {
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(false), HEALTH_TIMEOUT_MS)
-    fetch(`http://${host}:${port}/v1/health`).then((r) => {
+    const offline = { online: false, compatible: false, serverVersion: null }
+    const timer = setTimeout(() => resolve(offline), HEALTH_TIMEOUT_MS)
+    fetch(`http://${host}:${port}/v1/health`).then(async (r) => {
       clearTimeout(timer)
-      resolve(r.ok)
-    }).catch(() => { clearTimeout(timer); resolve(false) })
+      let data = null
+      try { data = await r.json() } catch {}
+      const online = r.ok && data?.service === 'nantianmen'
+      resolve({ online, compatible: online && data.version === CLIENT_VERSION, serverVersion: data?.version || null })
+    }).catch(() => { clearTimeout(timer); resolve(offline) })
   })
+}
+
+function rejectVersionMismatch(status) {
+  console.error(`✗ Server/Client version mismatch: CLI ${CLIENT_VERSION}, Server ${status.serverVersion || 'unknown'}. Stop the existing Server and start the matching version.`)
+  process.exit(1)
 }
 
 function resolveServerEntry() {
@@ -64,7 +75,9 @@ function resolveServerEntry() {
 // dir (server's defaultBaseDir handles platform-specific path) — same as desktop.
 // Don't override with launcher-local paths; the three launchers must share state.
 async function ensureServer(args) {
-  if (await probeHealth(args.host, args.port)) return 'already-up'
+  const existing = await probeHealth(args.host, args.port)
+  if (existing.compatible) return 'already-up'
+  if (existing.online) rejectVersionMismatch(existing)
   const serverEntry = resolveServerEntry()
   console.error(`(launching server from ${serverEntry})`)
   const nodeBin = process.platform === 'win32' ? 'node.exe' : 'node'
@@ -90,7 +103,9 @@ async function ensureServer(args) {
   })
   child.stderr?.on('data', () => { /* pino logs are noisy; swallow */ })
   for (let i = 0; i < 30; i++) {
-    if (await probeHealth(args.host, args.port)) return 'launched'
+    const status = await probeHealth(args.host, args.port)
+    if (status.compatible) return 'launched'
+    if (status.online) rejectVersionMismatch(status)
     await new Promise(r => setTimeout(r, 200))
   }
   console.error('✗ failed to start server within 6s')

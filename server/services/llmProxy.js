@@ -73,13 +73,9 @@ export function resolveModel(modelField) {
 async function getAssignedEntry(apiKeyId) {
   if (!apiKeyId) return null
   try {
-    // ponytail: v0.2.14 read assigned_model_id (FK), fallback to old TEXT field if id missing
-    const rows = await getDb().query('SELECT assigned_model_id, assigned_model FROM api_keys WHERE id=?', [apiKeyId])
+    const rows = await getDb().query('SELECT assigned_model_id FROM api_keys WHERE id=?', [apiKeyId])
     const id = rows[0]?.assigned_model_id
-    if (id) return resolveEntryFor({ assignedModelId: id, bodyModel: null })
-    const v = rows[0]?.assigned_model
-    if (!v) return null
-    return getEntry(v) || null  // returns null if assigned_model points to a deleted/disabled model
+    return id ? resolveEntryFor({ assignedModelId: id, bodyModel: null }) : null
   } catch { return null }
 }
 

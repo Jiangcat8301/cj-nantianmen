@@ -3,6 +3,7 @@ import { getDb } from '../db/index.js'
 import { getModelMap, resolveEntryFor } from '../services/modelMap.js'
 import { proxyRequest } from '../services/llmProxy.js'
 import * as stats from '../services/stats.js'
+import { SERVER_VERSION } from '../version.js'
 
 function sha256(s) { return crypto.createHash('sha256').update(s).digest('hex') }
 
@@ -62,6 +63,7 @@ export default async function llmRoutes(fastify) {
   fastify.get('/v1/health', async () => ({
     status: 'ok',
     service: 'nantianmen',
+    version: SERVER_VERSION,
     active_requests: stats.getActive(),
   }))
 

@@ -33,12 +33,12 @@ async function getKeyModels(apiKeyId) {
 }
 
 export default async function apikeyRoutes(fastify) {
-  // ponytail: LEFT JOIN assigned_model_id + fallback to legacy assigned_model TEXT (kept for compat).
+  // ponytail: assigned_model_id is the single source after startup migration drops legacy TEXT.
   // Also expose `authorized_models` so admin UI can render the per-key grant list in one round trip.
   fastify.get('/api/admin/api-keys', async () => {
     const rows = await getDb().query(
       `SELECT a.id, a.key, a.name, a.note, a.assigned_model_id,
-              COALESCE(am.model_name, a.assigned_model) AS assigned_model,
+              am.model_name AS assigned_model,
               am.provider_id AS assigned_provider_id,
               ap.name AS assigned_provider_name,
               datetime(a.created_at,'localtime') as created_at,
@@ -65,7 +65,7 @@ export default async function apikeyRoutes(fastify) {
     await setKeyModels(r.lastInsertRowid, model_ids)
     const rows = await getDb().query(
       `SELECT a.id, a.key, a.name, a.note, a.assigned_model_id,
-              COALESCE(am.model_name, a.assigned_model) AS assigned_model,
+              am.model_name AS assigned_model,
               datetime(a.created_at,'localtime') as created_at
        FROM api_keys a
        LEFT JOIN models am ON am.id = a.assigned_model_id
@@ -95,7 +95,7 @@ export default async function apikeyRoutes(fastify) {
     if (Array.isArray(model_ids)) await setKeyModels(req.params.id, model_ids)
     const rows = await getDb().query(
       `SELECT a.id, a.key, a.name, a.note, a.assigned_model_id,
-              COALESCE(am.model_name, a.assigned_model) AS assigned_model,
+              am.model_name AS assigned_model,
               datetime(a.created_at,'localtime') as created_at,
               datetime(a.last_used_at,'localtime') as last_used_at
        FROM api_keys a

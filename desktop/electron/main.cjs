@@ -4,6 +4,7 @@ const { fork } = require('child_process')
 const http = require('http')
 const fs = require('fs')
 const os = require('os')
+const { evaluateServerHealth, versionMismatchMessage } = require('./serverCompatibility.cjs')
 
 // ponytail: speed up Chromium cold start on Windows by skipping the GPU sandbox.
 // Nantianmen is a UI tool, no GPU compositing needed.
@@ -37,11 +38,11 @@ ipcMain.handle('autostart:set', (_e, enabled) => {
 
 // ponytail: server control IPC for Dashboard
 ipcMain.handle('server:status', async () => {
-  return { online: await checkServerHealth() }
+  return checkServerHealth()
 })
 ipcMain.handle('server:start', async () => {
   await startServer()
-  return { online: await checkServerHealth() }
+  return checkServerHealth()
 })
 ipcMain.handle('server:stop', async () => {
   stopServer()
@@ -52,7 +53,7 @@ ipcMain.handle('server:restart', async () => {
   stopServer()
   await new Promise(r => setTimeout(r, 500))
   await startServer()
-  return { online: await checkServerHealth() }
+  return checkServerHealth()
 })
 
 function getIcon() {
@@ -74,19 +75,25 @@ function getServerPath() {
 async function checkServerHealth() {
   return new Promise((resolve) => {
     const req = http.get(`${SERVER_URL}/v1/health`, (res) => {
-      res.resume()
-      resolve(res.statusCode === 200)
+      let body = ''
+      res.on('data', chunk => { body += chunk })
+      res.on('end', () => {
+        try { resolve(evaluateServerHealth(res.statusCode, JSON.parse(body))) }
+        catch { resolve(evaluateServerHealth(res.statusCode, null)) }
+      })
     })
-    req.on('error', () => resolve(false))
-    req.setTimeout(2000, () => { req.destroy(); resolve(false) })
+    req.on('error', () => resolve(evaluateServerHealth(0, null)))
+    req.setTimeout(2000, () => { req.destroy(); resolve(evaluateServerHealth(0, null)) })
   })
 }
 
 async function startServer() {
-  if (await checkServerHealth()) {
+  const existing = await checkServerHealth()
+  if (existing.compatible) {
     console.log('Server already running')
     return
   }
+  if (existing.online) throw new Error(versionMismatchMessage(existing))
 
   // ponytail: v0.2 - spawn Node.js server directly instead of Python uvicorn.
   // Bundled node_modules + index.js together with electron-builder extraResources.
@@ -143,10 +150,12 @@ async function startServer() {
   serverProcess.on('exit', (code) => console.log(`[server] exited with ${code}`))
 
   for (let i = 0; i < 30; i++) {
-    if (await checkServerHealth()) {
+    const status = await checkServerHealth()
+    if (status.compatible) {
       console.log('Server started successfully')
       return
     }
+    if (status.online) throw new Error(versionMismatchMessage(status))
     await new Promise(r => setTimeout(r, 500))
   }
   console.error('Server failed to start within 15s')
@@ -271,27 +280,16 @@ app.whenReady().then(async () => {
   async function updateTray() {
     let state = 'offline'
     try {
-      const ok = await checkServerHealth()
-      if (ok) {
-        const resp = await new Promise((resolve) => {
-          const req = http.get(`${SERVER_URL}/v1/health`, (r) => {
-            let d = ''
-            r.on('data', (c) => d += c)
-            r.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve(null) } })
-          })
-          req.on('error', () => resolve(null))
-          req.setTimeout(2000, () => { req.destroy(); resolve(null) })
-        })
-        if (resp && resp.active_requests > 0) state = 'active'
-        else state = 'online'
-      }
+      const status = await checkServerHealth()
+      if (status.compatible) state = status.activeRequests > 0 ? 'active' : 'online'
+      else if (status.online) state = 'mismatch'
     } catch { state = 'offline' }
 
     if (state !== lastState) {
-      const labels = { online: 'Online', offline: 'Offline', active: `Active (${resp?.active_requests || '?'})` }
+      const labels = { online: 'Online', offline: 'Offline', mismatch: 'Version mismatch', active: 'Active' }
       tray.setToolTip(`Nantianmen - ${labels[state]}`)
       lastState = state
-      serverOnline = state !== 'offline'
+      serverOnline = state === 'online' || state === 'active'
       buildTrayMenu()
     }
   }
@@ -324,6 +322,7 @@ app.whenReady().then(async () => {
   let dailyStats = { input: 0, output: 0, cached: 0, cost: 0 }
   async function fetchDailyStats() {
     try {
+      if (!(await checkServerHealth()).compatible) return
       const s = await new Promise((resolve) => {
         const req = http.get(`${SERVER_URL}/api/admin/stats?range=7d`, (r) => {
           let d = ''
