@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) 已发布** — 2026-07-19。模型授权系统 + DB 自动清理 + 未授权 403。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) (x64 + arm64)
+> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) 已发布** — 2026-07-20。严格 Server/Client 版本握手 + 用户管理修复 + build-mac 仅出 arm64 dmg。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-mac-arm64.dmg) (arm64)
 
 ---
 

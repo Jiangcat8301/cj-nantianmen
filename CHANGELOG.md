@@ -25,8 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 ### Fixed
 
-- **better-sqlite3 ABI 不匹配**：electron-rebuild 覆盖为 v22 后系统 Node v24 启动 server 报 `ERR_DLOPEN_FAILED` → `npm rebuild better-sqlite3` 临时修复（发布后 EXE 自带 Electron 运行时不受影响）。
-- **SCHEMA exec 异常**：`CREATE INDEX` 在 ALTER TABLE 之前执行导致 `no such column: model_id` → 索引移到 ALTER 之后。
+- **用户管理 SQL 残留 `assigned_model` 列**：数据库迁移删除 `api_keys.assigned_model` 后，`routes/apikey.js` GET/POST/PUT 与 `services/llmProxy.js` 仍读取该废弃列，导致 `/api/admin/api-keys` 返回 500。改为 LEFT JOIN `models` 表读取 `model_name` 作为 `assigned_model` 别名；隔离端口回归脚本 `server/test_apikey_routes.js` 验证修复。
+- **Server/Client 版本不一致静默运行**：`/v1/health` 新增 `version` 字段；Desktop `electron/serverCompatibility.cjs` 统一评估握手结果；版本不一致时 Desktop 主界面显示「Server 与 Desktop 版本不匹配」并拒绝加载业务页，托盘标记 `Version mismatch`；CLI 除 `help/quit` 外所有命令先握手，不匹配则退出码 1 并打印双方版本。LLM `/v1/*` 第三方调用不受 Client 版本限制。
+- **build-mac workflow 产物文件名错位**：CI 不会同步 `desktop/package.json` 的 `version`，曾导致 tag 推送后产物文件名仍为旧版本号。workflow 新增「Sync version from tag」步骤，确保 `nantianmen-*-mac-*.dmg` 文件名与 tag 一致。
 
 ## [v0.2.13] — 2026-07-18
 

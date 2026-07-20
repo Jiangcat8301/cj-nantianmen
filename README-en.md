@@ -21,7 +21,7 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) released** — 2026-07-19. Model authorization system + DB auto-cleanup + 403 for unauthorized models. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) (x64 + arm64)
+> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) released** — 2026-07-20. Strict Server/Client version handshake + user-management fix + build-mac ships arm64 dmg only. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-mac-arm64.dmg) (arm64)
 
 ---
 

@@ -25,8 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **better-sqlite3 ABI mismatch**: electron-rebuild overwrites with v22 ABI, causing `ERR_DLOPEN_FAILED` on system Node v24 → `npm rebuild better-sqlite3` as workaround (published EXE bundles Electron runtime, unaffected).
-- **SCHEMA exec exception**: `CREATE INDEX` ran before `ALTER TABLE`, causing `no such column: model_id` → indices moved to after ALTER.
+- **User-management SQL referencing removed `assigned_model` column**: After the migration dropped `api_keys.assigned_model`, `routes/apikey.js` GET/POST/PUT and `services/llmProxy.js` still read the legacy column, making `/api/admin/api-keys` return 500. Switched to LEFT JOIN `models` reading `model_name` aliased as `assigned_model`; added `server/test_apikey_routes.js` as a regression script.
+- **Silent Server/Client version mismatch**: `/v1/health` now returns `version`; Desktop `electron/serverCompatibility.cjs` centralizes handshake evaluation; on mismatch the main panel shows "Server/Desktop Version Mismatch" and refuses to load business pages, and the tray reports `Version mismatch`. CLI runs the handshake for every command except `help/quit` and exits with code 1 listing both versions on mismatch. LLM `/v1/*` third-party calls are unaffected by Client version.
+- **build-mac workflow artifact filename drift**: CI did not sync `desktop/package.json` version, so pushed tag names did not match DMG filenames. Added a "Sync version from tag" step so `nantianmen-*-mac-*.dmg` matches the tag.
 
 ## [v0.2.13] — 2026-07-18
 
