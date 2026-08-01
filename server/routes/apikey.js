@@ -117,7 +117,7 @@ export default async function apikeyRoutes(fastify) {
   // 端点 /v1/models 鉴权路径走 getModelMap(),map 本身已排除 is_disabled/deleted_at,前端看不见就用不到。
   fastify.get('/api/admin/api-keys/available-models', async () => {
     return await getDb().query(
-      `SELECT m.id, m.model_name, m.is_default, m.is_disabled, m.deleted_at,
+      `SELECT m.id, m.model_name, m.capability, m.is_default, m.is_disabled, m.deleted_at,
               p.id AS provider_id, p.name AS provider_name, p.protocol
        FROM models m
        JOIN providers p ON p.id = m.provider_id

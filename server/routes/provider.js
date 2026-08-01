@@ -116,9 +116,13 @@ export default async function providerRoutes(fastify) {
   })
 
   fastify.post('/api/admin/providers/:id/models', async (req, reply) => {
-    const { model_name } = req.body || {}
+    const { model_name, capability } = req.body || {}
     if (!model_name || !model_name.trim()) return reply.code(400).send({ error: 'model_name required' })
-    await getDb().run('INSERT OR IGNORE INTO models(provider_id, model_name, is_manual) VALUES (?,?,1)', [req.params.id, model_name.trim()])
+    // ponytail: v0.3.15 — capability is single-select (chat | embedding); default chat. SQLite ALTER pre-existing rows
+    // skipped the CHECK constraint, so legacy DBs accept any string until app-layer enforces.
+    const cap = capability || 'chat'
+    if (cap !== 'chat' && cap !== 'embedding') return reply.code(400).send({ error: 'capability must be chat or embedding' })
+    await getDb().run('INSERT OR IGNORE INTO models(provider_id, model_name, capability, is_manual) VALUES (?,?,?,1)', [req.params.id, model_name.trim(), cap])
     await rebuildModelMap()
     const rows = await getDb().query('SELECT * FROM models WHERE provider_id=? AND model_name=?', [req.params.id, model_name.trim()])
     return rows[0]

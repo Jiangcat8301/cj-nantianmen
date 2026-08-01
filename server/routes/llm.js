@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import { getDb } from '../db/index.js'
 import { getModelMap, resolveEntryFor } from '../services/modelMap.js'
-import { proxyRequest } from '../services/llmProxy.js'
+import { proxyRequest, proxyEmbeddingRequest } from '../services/llmProxy.js'
 import * as stats from '../services/stats.js'
 import { SERVER_VERSION } from '../version.js'
 
@@ -92,6 +92,16 @@ export default async function llmRoutes(fastify) {
     await checkModelAuthorized(req, reply)
     if (reply.sent) return
     return proxyRequest(req.body, 'anthropic', req.apiKeyId, reply)
+  })
+
+  // ponytail: v0.3.15 — embedding proxy. Same auth + per-key model authorization as chat, but body.model
+  // must be explicit (no auto/Nantianmen-default). Anthropic protocol returns 400 — no public embeddings API.
+  fastify.post('/v1/embeddings', async (req, reply) => {
+    await authApiKey(req, reply)
+    if (reply.sent) return
+    await checkModelAuthorized(req, reply)
+    if (reply.sent) return
+    return proxyEmbeddingRequest(req.body, req.apiKeyId, reply)
   })
 
   fastify.get('/api/admin/stats', async (req) => {

@@ -79,6 +79,9 @@ CREATE TABLE IF NOT EXISTS models (
   cache_hit_price REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT DEFAULT NULL,
+  -- ponytail: v0.3.15 — capability distinguishes chat vs embedding endpoints; CHECK on fresh installs only.
+  -- SQLite ALTER TABLE ADD COLUMN refuses CHECK (sqlite.org/lang_altertable.html), so legacy DBs get the column without CHECK; routes enforce values at the application layer (proxyEmbeddingRequest / api.addModel).
+  capability TEXT NOT NULL DEFAULT 'chat' CHECK(capability IN ('chat','embedding')),
   UNIQUE(provider_id, model_name)
 );
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -147,6 +150,8 @@ export class SqliteDatabase extends IDatabase {
     }
     // ponytail: communication_log.duration_ms — total wall time from request arrival to response
     try { this.db.exec(`ALTER TABLE communication_log ADD COLUMN duration_ms INTEGER DEFAULT NULL`) } catch {}
+    // ponytail: v0.3.15 — capability for existing models table (no CHECK, see SCHEMA comment).
+    try { this.db.exec(`ALTER TABLE models ADD COLUMN capability TEXT NOT NULL DEFAULT 'chat'`) } catch {}
     // ponytail: v0.2.14 — model_id 化 + 软删除 + api_key 授权表
     // 软删除字段: 软删后 is_default/deleted_at 仍生效, JOIN 拿历史名
     try { this.db.exec(`ALTER TABLE providers ADD COLUMN deleted_at TEXT DEFAULT NULL`) } catch {}

@@ -5,8 +5,10 @@ import { getDb } from '../db/index.js'
 let _map = {}
 let _defaultEntry = null
 
-function computeEndpoint(p) {
+function computeEndpoint(p, capability) {
   const base = p.base_url.replace(/\/+$/, '')
+  // ponytail: v0.3.15 — embedding models route to /embeddings; everything else keeps existing protocol-based path.
+  if (capability === 'embedding') return `${base}/embeddings`
   return p.protocol === 'openai' ? `${base}/chat/completions` : `${base}/v1/messages`
 }
 
@@ -33,10 +35,11 @@ export async function rebuildModelMap() {
     const entry = {
       __modelId: m.id,
       __isDefault: !!m.is_default,
+      capability: m.capability || 'chat',
       provider: p,
       model_name: m.model_name,
       protocol: p.protocol,
-      endpoint: computeEndpoint(p),
+      endpoint: computeEndpoint(p, m.capability || 'chat'),
       headers: computeHeaders(p),
     }
     next[key] = entry

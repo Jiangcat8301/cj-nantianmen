@@ -1,6 +1,6 @@
 {
   "name": "cj-nantianmen",
-  "version": "0.2.14",
+  "version": "0.3.15",
   "description": "Nantianmen LLM Proxy Gateway - Desktop UI",
   "type": "module",
   "main": "electron/main.cjs",

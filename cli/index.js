@@ -338,7 +338,8 @@ async function cmdProviders() {
     const pid = args[1] || await prompt('Provider id: ')
     const r = await call('GET', `/api/admin/providers/${pid}/models`)
     if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
-    for (const m of r.data) console.log(`${m.id}\t${m.model_name}\t${m.is_default ? '★default' : ''}\t${m.is_manual ? 'manual' : ''}\t${m.deleted_at ? 'DELETED' : ''}\tin:¥${m.input_price||0}\tout:¥${m.output_price||0}\tcache:¥${m.cache_hit_price||0}`)
+    // ponytail: v0.3.15 — capability column added between id and ★default for at-a-glance chat/embed awareness
+    for (const m of r.data) console.log(`${m.id}\t${m.model_name}\t${m.capability || 'chat'}\t${m.is_default ? '★default' : ''}\t${m.is_manual ? 'manual' : ''}\t${m.deleted_at ? 'DELETED' : ''}\tin:¥${m.input_price||0}\tout:¥${m.output_price||0}\tcache:¥${m.cache_hit_price||0}`)
     return
   }
   if (sub === 'models-refresh') {
@@ -350,8 +351,11 @@ async function cmdProviders() {
   if (sub === 'model-add') {
     const pid = args[1] || await prompt('Provider id: ')
     const name = args[2] || await prompt('Model name: ')
-    const r = await call('POST', `/api/admin/providers/${pid}/models`, { model_name: name })
-    console.log(r.status === 200 ? `✓ added id=${r.data.id}` : `✗ ${r.status}`)
+    // ponytail: v0.3.15 — single-select capability; default 'chat'. Accept 'embedding' or 'e'.
+    const capRaw = await prompt('Capability (chat|embedding) [chat]: ')
+    const capability = /^e(embedding)?$/i.test((capRaw || '').trim()) ? 'embedding' : 'chat'
+    const r = await call('POST', `/api/admin/providers/${pid}/models`, { model_name: name, capability })
+    console.log(r.status === 200 ? `✓ added id=${r.data.id} (${r.data.capability})` : `✗ ${r.status}`)
     return
   }
   if (sub === 'model-edit') {
@@ -491,7 +495,12 @@ async function cmdStats() {
   const r = await call('GET', '/api/admin/stats' + qs)
   if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
   const d = r.data
+  // ponytail: 蒋老师 2026-08-01 — embedding 调用次数单独计。累加 breakdown 里 capability='embedding' 行。
+  const embedReqs = (d.breakdown || []).filter(r => r.capability === 'embedding')
+    .reduce((s, r) => s + (r.request_count || 0), 0)
   console.log(`total: ${d.total_requests||0} reqs  in:${d.total_input_tokens||0}  out:${d.total_output_tokens||0}  cached:${d.total_cached_tokens||0}`)
+  // ponytail: embedding 行独立一行,跟 total 平级,方便一眼区分。
+  console.log(`embedding: ${embedReqs} reqs  (tokens/cost 不计,向量本体不落库)`)
   if (d.topModels?.length) {
     console.log('\nTop models:')
     for (const m of d.topModels) console.log(`  ${m.model}\treqs:${m.request_count}\tin:${m.input_tokens}\tout:${m.output_tokens}\tcached:${m.cached_tokens}\tcost:¥${calcCost(m).toFixed(4)}`)
@@ -502,6 +511,7 @@ async function cmdStats() {
   }
   // ponytail: aggregate breakdown by provider → model (matches desktop Stats.vue providerGroups).
   // per-api_key detail lives in `nantianmen apikey ls` + the Users management UI, not here.
+  // 蒋老师 2026-08-01:embedding 模型行 capability='embedding',打 [E] 前缀区分;不抢眼但能识别。
   const byProv = new Map()
   for (const s of (d.breakdown || [])) {
     const prov = s.provider || '?'
@@ -512,7 +522,7 @@ async function cmdStats() {
     g.cached = (g.cached || 0) + (s.cached_tokens || 0)
     g.cost = (g.cost || 0) + calcCost(s)
     const mn = s.model_name || '?'
-    let m = g.models.get(mn) || { model_name: mn }
+    let m = g.models.get(mn) || { model_name: mn, capability: s.capability || 'chat' }
     m.req = (m.req || 0) + (s.request_count || 0)
     m.in = (m.in || 0) + (s.input_tokens || 0)
     m.out = (m.out || 0) + (s.output_tokens || 0)
@@ -527,7 +537,10 @@ async function cmdStats() {
   for (const g of provList) {
     console.log(`  ${g.provider}\treqs:${g.req}\tin:${g.in}\tout:${g.out}\tcached:${g.cached}\tcost:¥${g.cost.toFixed(4)}`)
     const models = [...g.models.values()].sort((a, b) => b.req - a.req)
-    for (const m of models) console.log(`    ${m.model_name}\treqs:${m.req}\tin:${m.in}\tout:${m.out}\tcached:${m.cached}\tcost:¥${m.cost.toFixed(4)}`)
+    for (const m of models) {
+      const tag = m.capability === 'embedding' ? '[E] ' : '    '
+      console.log(`    ${tag}${m.model_name}\treqs:${m.req}\tin:${m.in}\tout:${m.out}\tcached:${m.cached}\tcost:¥${m.cost.toFixed(4)}`)
+    }
   }
 }
 
@@ -537,6 +550,39 @@ async function cmdDefaultModel() {
   if (!r.data) { console.log('(no default model set)'); return }
   console.log(`default: ${r.data.provider_name}_${r.data.model_name}  (${r.data.protocol})`)
   console.log(`id for /v1/models: Nantianmen-default`)
+}
+
+// ponytail: server lifecycle subcommand. start/status work standalone; stop/restart need server reachable.
+async function cmdServer() {
+  const sub = process.argv[3]
+  const args = resolveArgs()
+  if (sub === 'start') {
+    const existing = await probeHealth(args.host, args.port)
+    if (existing.compatible) { console.log(`✓ server already running on ${args.host}:${args.port} (v${existing.serverVersion})`); return }
+    if (existing.online) rejectVersionMismatch(existing)
+    const result = await ensureServer(args)
+    console.log(result === 'launched' ? `✓ server started on ${args.host}:${args.port}` : `✓ server already running`)
+  } else if (sub === 'stop') {
+    const existing = await probeHealth(args.host, args.port)
+    if (!existing.online) { console.error(`✗ no server running on ${args.host}:${args.port}`); process.exit(1) }
+    if (!existing.compatible) rejectVersionMismatch(existing)
+    const r = await call('POST', '/api/admin/server/shutdown', {})
+    console.log(r.status === 200 ? '✓ server stopped' : `✗ ${r.status} ${JSON.stringify(r.data)}`)
+  } else if (sub === 'restart') {
+    const existing = await probeHealth(args.host, args.port)
+    if (!existing.online) { console.error(`✗ no server running on ${args.host}:${args.port}`); process.exit(1) }
+    if (!existing.compatible) rejectVersionMismatch(existing)
+    const r = await call('POST', '/api/admin/server/restart', {})
+    console.log(r.status === 200 ? '✓ server restarting' : `✗ ${r.status} ${JSON.stringify(r.data)}`)
+  } else if (sub === 'status' || !sub) {
+    const s = await probeHealth(args.host, args.port)
+    if (s.compatible) console.log(`✓ online   ${args.host}:${args.port}  v${s.serverVersion}`)
+    else if (s.online) console.log(`⚠ mismatch  server v${s.serverVersion}, client v${CLIENT_VERSION}`)
+    else console.log(`✗ offline  ${args.host}:${args.port}`)
+  } else {
+    console.error('usage: nantianmen server [start|stop|restart|status]')
+    process.exit(1)
+  }
 }
 
 async function cmdQuit() { /* ponytail: alias exit, in case user types quit */ }
@@ -617,6 +663,7 @@ const CMDS = {
   log: cmdLog,
   'default-model': cmdDefaultModel, default_model: cmdDefaultModel,
   quit: cmdQuit,
+  server: cmdServer,
   help: () => console.log('commands:\n  ' + Object.keys(CMDS).filter(k => !['quit','help'].includes(k)).join('\n  ')),
 }
 
@@ -644,7 +691,7 @@ if (!fn) { console.error('unknown command:', sub); process.exit(1) }
 // ponytail: every command needs the server reachable. Probe first, launch if down,
 // then dispatch. setup/login/health are tolerated even if server is unreachable
 // (those help you get the server up in the first place).
-const SERVERLESS = new Set(['help', 'quit'])
+const SERVERLESS = new Set(['help', 'quit', 'server'])
 ;(async () => {
   const args = resolveArgs()
   if (!SERVERLESS.has(sub)) {

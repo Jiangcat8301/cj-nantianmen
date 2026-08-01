@@ -69,16 +69,19 @@
         </thead>
         <tbody>
           <template v-for="(l, i) in logs" :key="l.request_id || i">
-            <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+            <!-- ponytail: 蒋老师 2026-08-01 — embedding 日志用浅紫底 + 左边框区分,不抢眼。 -->
+            <tr class="border-b border-gray-800 hover:bg-gray-800/50"
+                :class="l.capability === 'embedding' ? 'bg-violet-900/10 border-l-2 border-l-violet-500/40 hover:bg-violet-900/20' : ''">
               <td class="py-2 px-2 text-gray-500 text-xs font-mono text-right">{{ l.id }}</td>
               <td class="py-2 px-2 text-gray-400 text-xs font-mono whitespace-nowrap">{{ l.time }}</td>
               <td class="py-2 px-2">{{ l.user_name || l.user_id || '-' }}</td>
               <td class="py-2 px-2">{{ l.provider_name }}</td>
               <td class="py-2 px-2 text-xs">{{ l.model_name }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_input) }}</td>
-              <td class="py-2 px-2 text-right font-mono text-xs">{{ fmt(l.tokens_output) }}</td>
-              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ fmt(l.tokens_cached) }}</td>
-              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ cacheHitPct(l) }}</td>
+              <!-- ponytail: v0.3.15 — embedding 模型只有 input tokens 含义,output/cached/命中率显示 '-' -->
+              <td class="py-2 px-2 text-right font-mono text-xs">{{ l.capability === 'embedding' ? '—' : fmt(l.tokens_output) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ l.capability === 'embedding' ? '—' : fmt(l.tokens_cached) }}</td>
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ l.capability === 'embedding' ? '—' : cacheHitPct(l) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap" :class="durationClass(l.duration_ms)">
                 {{ formatDuration(l.duration_ms) }}
               </td>

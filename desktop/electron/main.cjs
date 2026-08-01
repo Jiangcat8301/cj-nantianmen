@@ -15,8 +15,23 @@ if (process.platform === 'win32') {
 let mainWindow
 let tray = null
 let serverProcess = null
-const SERVER_PORT = 38271
-const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`
+
+// ponytail: read port from nantianmen-conf.json, fallback to 38271 if unconfigured.
+const confFile = path.join(os.homedir(), '.cj-nantianmen', 'nantianmen-conf.json')
+
+function readConf() {
+  try { if (fs.existsSync(confFile)) return JSON.parse(fs.readFileSync(confFile, 'utf-8')) } catch {}
+  return {}
+}
+
+function getServerPort() {
+  const c = readConf()
+  return c.server_port || 38271
+}
+
+function getServerUrl() {
+  return `http://127.0.0.1:${getServerPort()}`
+}
 
 // ponytail: window control IPC for frameless titlebar
 ipcMain.on('win:minimize', () => mainWindow?.minimize())
@@ -74,7 +89,7 @@ function getServerPath() {
 
 async function checkServerHealth() {
   return new Promise((resolve) => {
-    const req = http.get(`${SERVER_URL}/v1/health`, (res) => {
+    const req = http.get(`${getServerUrl()}/v1/health`, (res) => {
       let body = ''
       res.on('data', chunk => { body += chunk })
       res.on('end', () => {
@@ -192,14 +207,6 @@ function createSplash() {
 }
 
 // ponytail: persist window bounds via nantianmen-conf.json (shared with server).
-// Replaces window-state.json — same physical file, no race in practice.
-// Unified path: ~/.cj-nantianmen/nantianmen-conf.json (matches server conf.js).
-const confFile = path.join(os.homedir(), '.cj-nantianmen', 'nantianmen-conf.json')
-
-function readConf() {
-  try { if (fs.existsSync(confFile)) return JSON.parse(fs.readFileSync(confFile, 'utf-8')) } catch {}
-  return {}
-}
 
 function saveConf(patch) {
   const c = readConf()
@@ -324,7 +331,7 @@ app.whenReady().then(async () => {
     try {
       if (!(await checkServerHealth()).compatible) return
       const s = await new Promise((resolve) => {
-        const req = http.get(`${SERVER_URL}/api/admin/stats?range=7d`, (r) => {
+        const req = http.get(`${getServerUrl()}/api/admin/stats?range=7d`, (r) => {
           let d = ''
           r.on('data', (c) => d += c)
           r.on('end', () => { try { resolve(JSON.parse(d)) } catch { resolve(null) } })

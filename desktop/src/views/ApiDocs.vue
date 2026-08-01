@@ -58,7 +58,7 @@ const proxyEndpoints = [
   {
     method: 'POST', path: '/v1/chat/completions', desc: 'OpenAI Chat Completions 协议入站',
     example: `curl http://127.0.0.1:38271/v1/chat/completions \\
-  -H "Authorization: Bearer skm-your-api-key" \\
+  -H "Authorization: Bearer ***" \\
   -H "Content-Type: application/json" \\
   -d '{
     "model": "Nantianmen-default",
@@ -69,7 +69,7 @@ const proxyEndpoints = [
   {
     method: 'POST', path: '/v1/messages', desc: 'Anthropic Messages 协议入站',
     example: `curl http://127.0.0.1:38271/v1/messages \\
-  -H "x-api-key: skm-your-api-key" \\
+  -H "x-api-key: *** \\
   -H "anthropic-version: 2023-06-01" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -79,15 +79,26 @@ const proxyEndpoints = [
   }'`
   },
   {
+    // ponytail: v0.3.15 — /v1/embeddings proxy; OpenAI 格式透传,白名单字段,仅 OpenAI 协议 provider,计费只算 prompt_tokens。
+    method: 'POST', path: '/v1/embeddings', desc: 'OpenAI Embeddings 入站（仅 OpenAI 协议 provider；body.model 必须显式；assigned_model_id 不适用）',
+    example: `curl -X POST http://127.0.0.1:38271/v1/embeddings \\
+  -H "Authorization: Bearer ***" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "OpenAIProvider_text-embedding-3-small",
+    "input": "hello world"
+  }'`
+  },
+  {
     method: 'GET', path: '/v1/models', desc: '获取可用模型列表（带 Bearer 时按 key 授权过滤；不带或 key 无效时返回全量）',
-    example: `curl http://127.0.0.1:38271/v1/models \\\\\n  -H "Authorization: Bearer ***"`
+    example: `curl http://127.0.0.1:38271/v1/models \\\\
+  -H "Authorization: Bearer ***"`
   },
   {
     method: 'GET', path: '/v1/health', desc: 'Server 健康检查',
     example: `curl http://127.0.0.1:38271/v1/health`
   },
 ]
-
 // ponytail: admin endpoints require X-Admin-Password header (md5(password))
 // ponytail: every endpoint below ships a working curl example.
 const adminEndpoints = [

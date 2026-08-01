@@ -78,26 +78,30 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
     // topModels/topProviders are pre-aggregated to dedupe same provider+model across multiple keys (#4).
     // v0.2.14: LEFT JOIN via model_id (FK) — picks up renamed models automatically.
     // For legacy rows (model_id IS NULL), fall back to (provider_id, model_name) lookup to keep price stats.
-    const rows = await getDb().query(
-      `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
-              COALESCE(m.model_name, u.model_name) AS current_model_name,
-              COALESCE(m.input_price, m_legacy.input_price, 0) AS input_price,
-              COALESCE(m.output_price, m_legacy.output_price, 0) AS output_price,
-              COALESCE(m.cache_hit_price, m_legacy.cache_hit_price, 0) AS cache_hit_price,
-              SUM(u.request_count) AS request_count,
-              SUM(u.input_tokens) AS input_tokens,
-              SUM(u.output_tokens) AS output_tokens,
-              SUM(u.cached_tokens) AS cached_tokens
-       FROM usage_stats u
-       LEFT JOIN providers p ON u.provider_id = p.id
-       LEFT JOIN api_keys k ON u.api_key_id = k.id
-       LEFT JOIN models m ON u.model_id = m.id
-       LEFT JOIN models m_legacy ON u.model_id IS NULL AND u.provider_id = m_legacy.provider_id AND u.model_name = m_legacy.model_name
-       ${w}
-       GROUP BY u.provider_id, u.model_name, u.api_key_id
-       ORDER BY request_count DESC`,
-      params,
-    )
+    // ponytail: v0.3.15 — embedding 模型在 stats 中可见(只记 req_count,token/cost=0)。
+      // 蒋老师 2026-08-01 拍板: embedding 调用次数要计,token 不计,cost 自然为 0。
+      // 不再 HAVING capability='chat';embedding 行参与聚合,在按 token 排序时天然垫底。
+      const rows = await getDb().query(
+        `SELECT p.name AS provider, u.model_name, u.api_key_id, k.name AS key_name,
+                COALESCE(m.model_name, u.model_name) AS current_model_name,
+                COALESCE(m.input_price, m_legacy.input_price, 0) AS input_price,
+                COALESCE(m.output_price, m_legacy.output_price, 0) AS output_price,
+                COALESCE(m.cache_hit_price, m_legacy.cache_hit_price, 0) AS cache_hit_price,
+                COALESCE(m.capability, m_legacy.capability, 'chat') AS capability,
+                SUM(u.request_count) AS request_count,
+                SUM(u.input_tokens) AS input_tokens,
+                SUM(u.output_tokens) AS output_tokens,
+                SUM(u.cached_tokens) AS cached_tokens
+         FROM usage_stats u
+         LEFT JOIN providers p ON u.provider_id = p.id
+         LEFT JOIN api_keys k ON u.api_key_id = k.id
+         LEFT JOIN models m ON u.model_id = m.id
+         LEFT JOIN models m_legacy ON u.model_id IS NULL AND u.provider_id = m_legacy.provider_id AND u.model_name = m_legacy.model_name
+         ${w}
+         GROUP BY u.provider_id, u.model_name, u.api_key_id
+         ORDER BY request_count DESC`,
+        params,
+      )
 
   // ponytail: pre-aggregate by (provider, model) so the Top-5 panel doesn't show the same
   // provider/model multiple times when several API keys used it. One pass over `rows`.
@@ -134,8 +138,8 @@ export async function query({ provider_id, model_name, api_key_id, range }) {
     p.cost += rowCost(r)
     byProvider.set(pk, p)
   }
-  const topModels = [...byModel.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)).slice(0, 5)
-  const topProviders = [...byProvider.values()].sort((a, b) => (b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens)).slice(0, 5)
+  const topModels = [...byModel.values()].sort((a, b) => (b.request_count - a.request_count) || ((b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens))).slice(0, 5)
+  const topProviders = [...byProvider.values()].sort((a, b) => (b.request_count - a.request_count) || ((b.input_tokens + b.output_tokens) - (a.input_tokens + a.output_tokens))).slice(0, 5)
 
   let total_requests = 0, total_input_tokens = 0, total_output_tokens = 0, total_cached_tokens = 0
   for (const r of rows) {

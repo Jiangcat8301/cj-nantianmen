@@ -74,6 +74,9 @@
             <div v-for="m in (p.models || [])" :key="m.id" class="flex items-center justify-between py-1.5 px-3 bg-gray-750 rounded text-sm">
               <div class="flex items-center gap-2">
                 <span>{{ m.model_name }}</span>
+                <!-- ponytail: v0.3.15 — chat/embedding capability tag; embedding = blue, chat = muted gray -->
+                <span v-if="m.capability === 'embedding'" class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">embedding</span>
+                <span v-else class="text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400">chat</span>
                 <span v-if="m.deleted_at" class="text-xs text-red-400">{{ t('deleted_badge') }}</span>
                 <span v-else-if="m.is_disabled" class="text-xs text-red-400">{{ t('disabled_badge') }}</span>
                 <button @click="copyModelId(p.name, m.model_name)" class="text-gray-600 hover:text-emerald-400 text-xs inline-flex items-center" :title="t('copy')"><span class="iconfont icon-copy"></span></button>
@@ -130,6 +133,17 @@
         <h3 class="text-lg font-bold mb-4">{{ t('add_model') }}</h3>
         <div class="space-y-3">
           <input v-model="modelForm.model_name" :placeholder="t('fld_model_hint')" class="w-full px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" @keyup.enter="confirmAddModel" />
+          <div class="flex items-center gap-4 text-sm pt-1">
+            <span class="text-gray-400">{{ t('fld_capability') }}</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" value="chat" v-model="modelForm.capability" class="accent-emerald-500" />
+              <span>{{ t('cap_chat') }}</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" value="embedding" v-model="modelForm.capability" class="accent-blue-500" />
+              <span>{{ t('cap_embedding') }}</span>
+            </label>
+          </div>
         </div>
         <div class="flex justify-end gap-2 mt-4">
           <button @click="showAddModel = false" class="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 rounded">{{ t('btn_cancel') }}</button>
@@ -176,7 +190,7 @@ const showAdd = ref(false)
 const editing = ref(null)
 const form = ref({ name: '', protocol: 'openai', base_url: '', api_key: '' })
 const showAddModel = ref(false)
-const modelForm = ref({ providerId: null, model_name: '' })
+const modelForm = ref({ providerId: null, model_name: '', capability: 'chat' })
 const showEditModel = ref(false)
 const editModelForm = ref({ providerId: null, modelId: null, model_name: '', input_price: 0, output_price: 0, cache_hit_price: 0 })
 
@@ -210,7 +224,7 @@ const refreshModels = async (id) => {
 }
 
 const openAddModel = (providerId) => {
-  modelForm.value = { providerId, model_name: '' }
+  modelForm.value = { providerId, model_name: '', capability: 'chat' }
   showAddModel.value = true
 }
 
@@ -218,7 +232,8 @@ const confirmAddModel = async () => {
   const name = modelForm.value.model_name.trim()
   if (!name) return
   try {
-    await api.addModel(modelForm.value.providerId, name)
+    // ponytail: v0.3.15 — capability single-select; default chat if unset (legacy callers)
+    await api.addModel(modelForm.value.providerId, name, modelForm.value.capability || 'chat')
     showAddModel.value = false
     await fetchModels(modelForm.value.providerId)
   } catch (e) {

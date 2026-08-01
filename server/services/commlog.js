@@ -84,12 +84,15 @@ export async function list(filters = {}, page = 1, perPage = 0) {
   if (filters.user_id) { clauses.push('c.user_id = ?'); params.push(String(filters.user_id)) }
   const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : ''
   // ponytail: v0.2.14 LEFT JOIN via model_id (FK) — current_model_name reflects any rename.
-  const baseSelect = `c.id, c.request_id, c.time, c.user_id, c.user_name, c.provider_id, c.provider_name, c.model_id, c.model_name, COALESCE(m.model_name, c.model_name) AS current_model_name, c.tokens_input, c.tokens_output, c.tokens_cached, c.duration_ms, c.input, c.output, c.error_code, c.error_message`
-  const baseFrom = `communication_log c LEFT JOIN models m ON c.model_id = m.id`
+  // ponytail: v0.3.15 LEFT JOIN again to surface models.capability ('chat'|'embedding'); legacy JOIN covers rows
+  // whose model_id IS NULL (pre-v0.2.14 historical entries) so the Logs UI can still tell chat vs embedding.
+  const baseSelect = `c.id, c.request_id, c.time, c.user_id, c.user_name, c.provider_id, c.provider_name, c.model_id, c.model_name, COALESCE(m.model_name, m_legacy.model_name, c.model_name) AS current_model_name, COALESCE(m.capability, m_legacy.capability, 'chat') AS capability, c.tokens_input, c.tokens_output, c.tokens_cached, c.duration_ms, c.input, c.output, c.error_code, c.error_message`
+  const baseFrom = `communication_log c LEFT JOIN models m ON c.model_id = m.id LEFT JOIN models m_legacy ON c.model_id IS NULL AND m_legacy.provider_id = c.provider_id AND m_legacy.model_name = c.model_name AND m_legacy.deleted_at IS NULL`
   const mapRow = (r) => ({
     id: r.id, request_id: r.request_id, time: r.time, user_id: r.user_id, user_name: r.user_name,
     provider_id: r.provider_id, provider_name: r.provider_name,
     model_id: r.model_id, model_name: r.current_model_name || r.model_name,
+    capability: r.capability || 'chat',
     tokens_input: r.tokens_input, tokens_output: r.tokens_output, tokens_cached: r.tokens_cached,
     duration_ms: r.duration_ms,
     input: r.input, output: r.output,

@@ -26,7 +26,8 @@
     </div>
 
     <!-- Stat Cards -->
-    <div class="grid grid-cols-5 gap-4 mb-6">
+    <!-- ponytail: 6 cards. 蒋老师 2026-08-01:embedding 请求数要显示;放在总消费前(总消费前=index 4)。 -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p class="text-xs text-gray-500 mb-1">{{ t('stats_total_requests') }}</p>
         <p class="text-2xl font-bold text-emerald-400">{{ stats.total_requests || 0 }}</p>
@@ -42,6 +43,11 @@
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p class="text-xs text-gray-500 mb-1">{{ t('stats_cached_tokens') }}</p>
         <p class="text-2xl font-bold text-cyan-400">{{ formatNum(stats.total_cached_tokens) }}</p>
+      </div>
+      <!-- ponytail: Embedding 请求数独立卡,介于 cached_tokens 与 total_cost 之间。蒋老师 2026-08-01 拍板。 -->
+      <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <p class="text-xs text-gray-500 mb-1">{{ t('stats_embedding_requests') }}</p>
+        <p class="text-2xl font-bold text-violet-400">{{ totalEmbedReqs }}</p>
       </div>
       <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p class="text-xs text-gray-500 mb-1">{{ t('stats_total_cost') }}</p>
@@ -239,6 +245,11 @@ const totalCost = computed(() => {
   for (const r of (stats.value.breakdown || [])) c += calcCost(r)
   return c
 })
+
+// ponytail: 蒋老师 2026-08-01 — embedding 单独计调用次数,不计 token/cost。累加 breakdown 里 capability='embedding' 行。
+const totalEmbedReqs = computed(() => (stats.value.breakdown || [])
+  .filter(r => r.capability === 'embedding')
+  .reduce((s, r) => s + (r.request_count || 0), 0))
 
 const costForRow = (r) => '¥' + calcCost(r).toFixed(4)
 

@@ -17,7 +17,7 @@ export default {
   // Models
   getModels: (id) => api.get(`/providers/${id}/models`),
   refreshModels: (id) => api.post(`/providers/${id}/models/refresh`),
-  addModel: (id, name) => api.post(`/providers/${id}/models`, { model_name: name }),
+  addModel: (id, name, capability) => api.post(`/providers/${id}/models`, { model_name: name, capability: capability || 'chat' }),
   updateModel: (providerId, modelId, data) => api.put(`/providers/${providerId}/models/${modelId}`, data),
   setDefaultModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/default`),
   // ponytail: toggle is_disabled on a model — rebuilds modelMap so /v1/models reflects the change.

@@ -9,6 +9,13 @@ on:
   pull_request:
     branches: [main]
 
+# ponytail: softprops/action-gh-release@v2 needs `contents: write` to attach DMGs to the
+# GitHub release. Many orgs / older repos default GITHUB_TOKEN to read-only, which is
+# what produced the 403 "Resource not accessible by integration" on v0.2.14. Declaring it
+# here is the minimum diff that fixes it without touching repo Settings.
+permissions:
+  contents: write
+
 jobs:
   mac:
     runs-on: macos-latest

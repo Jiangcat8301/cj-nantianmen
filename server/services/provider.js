@@ -7,8 +7,28 @@ function validateName(name) {
   }
 }
 
+// ponytail: v0.3.15 — embed nested models so Dashboard can detect embedding capability
+// without a second round-trip. Excludes deleted models; keeps capability field for UI.
 async function listProviders() {
-  return getDb().query('SELECT * FROM providers ORDER BY id')
+  const providers = await getDb().query('SELECT * FROM providers WHERE deleted_at IS NULL ORDER BY id')
+  if (providers.length === 0) return providers
+  const ids = providers.map(p => p.id)
+  const placeholders = ids.map(() => '?').join(',')
+  const models = await getDb().query(
+    `SELECT id, provider_id, model_name, capability, is_default, is_disabled
+     FROM models
+     WHERE deleted_at IS NULL AND provider_id IN (${placeholders})
+     ORDER BY provider_id, id`,
+    ids,
+  )
+  const byP = new Map(providers.map(p => [p.id, p]))
+  for (const m of models) {
+    const p = byP.get(m.provider_id)
+    if (!p) continue
+    if (!Array.isArray(p.models)) p.models = []
+    p.models.push(m)
+  }
+  return providers
 }
 
 async function getProvider(id) {

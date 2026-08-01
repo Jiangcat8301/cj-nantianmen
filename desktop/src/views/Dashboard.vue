@@ -64,6 +64,7 @@
 
     <!-- Stats Cards (#2): 6 cards in one flex row, flex-1 average-distributed, no wrap at >=1000px. -->
     <!-- ponytail: DB Volume lives in the SAME flex container as the 5 stats — same type, same row. -->
+    <!-- ponytail: v0.3.15 — 7th card「今日 Embedding 请求」;embedding 计 req_count 不计 token (蒋老师 2026-08-01 拍板)。 -->
     <div class="flex gap-4 mb-6 [&>*]:flex-1 [&>*]:min-w-0 max-[999px]:flex-wrap max-[999px]:[&>*]:basis-[calc(25%-12px)] max-[999px]:[&>*]:flex-none">
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
         <p class="text-xs text-gray-500 mb-2 truncate">{{ t('provider_count') }}</p>
@@ -85,6 +86,10 @@
         <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_cost') }}</p>
         <p class="text-2xl font-bold text-emerald-400">¥{{ todayCost.toFixed(4) }}</p>
       </div>
+      <div v-if="hasEmbeddingModel" class="bg-gray-800 rounded-lg p-5 border border-gray-700">
+        <p class="text-xs text-gray-500 mb-2 truncate">{{ t('today_embedding_requests') || '今日 Embedding 请求' }}</p>
+        <p class="text-2xl font-bold text-emerald-400">{{ todayEmbedReqs }}</p>
+      </div>
       <div class="bg-gray-800 rounded-lg p-5 border border-gray-700">
         <p class="text-xs text-gray-500 mb-2">{{ t('db_volume') }}</p>
         <p class="text-2xl font-bold text-emerald-400">{{ dbSize }}</p>
@@ -94,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, inject, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
 import { calcCost, formatToken } from '../lib/format.js'
 
@@ -106,17 +111,29 @@ const keyCount = ref(0)
 const todayReqs = ref(0)
 const todayTokens = ref(0)
 const todayCost = ref(0)
+// ponytail: v0.3.15 — embedding 调用的今日次数单独展示。蒋老师:token 不计,调用次数要计。
+const todayEmbedReqs = ref(0)
 const defaultModel = ref(null)
 const dbSize = ref('—')
 const dbLogCount = ref(0)
+// ponytail: v0.3.15 — when at least one capability='embedding' model is registered, show the /v1/embeddings
+// endpoint row in the Server Endpoints list. Loaded alongside stats via the existing available-models endpoint.
+const hasEmbeddingModel = ref(false)
 let statsPoll = null
 
-const endpoints = [
-  { method: 'POST', url: 'http://127.0.0.1:38271/v1/chat/completions', tag: 'OpenAI', protocol: 'openai' },
-  { method: 'POST', url: 'http://127.0.0.1:38271/v1/messages', tag: 'Anthropic', protocol: 'anthropic' },
-  { method: 'GET', url: 'http://127.0.0.1:38271/v1/models', tag: 'Models', protocol: '' },
-  { method: 'GET', url: 'http://127.0.0.1:38271/v1/health', tag: 'Health', protocol: '' },
-]
+// ponytail: /v1/embeddings is conditionally appended — only when an embedding model exists in the system.
+const endpoints = computed(() => {
+  const base = [
+    { method: 'POST', url: 'http://127.0.0.1:38271/v1/chat/completions', tag: 'OpenAI', protocol: 'openai' },
+    { method: 'POST', url: 'http://127.0.0.1:38271/v1/messages', tag: 'Anthropic', protocol: 'anthropic' },
+    { method: 'GET', url: 'http://127.0.0.1:38271/v1/models', tag: 'Models', protocol: '' },
+    { method: 'GET', url: 'http://127.0.0.1:38271/v1/health', tag: 'Health', protocol: '' },
+  ]
+  if (hasEmbeddingModel.value) {
+    base.splice(2, 0, { method: 'POST', url: 'http://127.0.0.1:38271/v1/embeddings', tag: 'Embeddings', protocol: 'openai' })
+  }
+  return base
+})
 
 const loadStatus = async () => {
   if (!win) return
@@ -127,7 +144,7 @@ const loadStatus = async () => {
 const loadStats = async () => {
   try {
     const [{ data: providers }, { data: keys }, { data: stats }, { data: dm }] = await Promise.all([
-      api.listProviders(), api.listApiKeys(), api.getStats({ range: 'today' }), api.getDefaultModel()
+      api.listProviders(), api.listApiKeys(), api.getStats({ range: 'today' }), api.getDefaultModel(),
     ])
     providerCount.value = providers.length
     keyCount.value = keys.length
@@ -136,7 +153,17 @@ const loadStats = async () => {
     let cost = 0
     for (const r of (stats.breakdown || [])) cost += calcCost(r)
     todayCost.value = cost
+    // ponytail: 累加 capability='embedding' 行的请求数,用于 Dashboard 单独展示。
+    // 不动 todayReqs (它应该包含全部调用,chat+embedding);卡片明示"embedding"以示区分。
+    todayEmbedReqs.value = (stats.breakdown || [])
+      .filter(r => r.capability === 'embedding')
+      .reduce((s, r) => s + (r.request_count || 0), 0)
     defaultModel.value = dm
+    // ponytail: listProviders returns nested models with capability; check there to avoid
+    // a second round-trip (蒋老师: 「顾头不顾尾」批评 — 不再依赖 available-models endpoint).
+    hasEmbeddingModel.value = Array.isArray(providers) && providers.some(p =>
+      Array.isArray(p.models) && p.models.some(m => m.capability === 'embedding'),
+    )
     // ponytail: also load DB info
     const { data: db } = await api.getDbInfo()
     dbSize.value = formatBytes(db.size)

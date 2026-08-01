@@ -210,3 +210,96 @@ function makeStreamingResponse(resp, inboundProtocol, providerProtocol, model_na
     await logEntry({ apiKeyId, provider, modelName: model_name, modelId, upstreamBody, responseBody: outputBuf, inputTokens, outputTokens, cachedTokens, durationMs: ttfbMs })
   })()
 }
+
+// ponytail: v0.3.15 — /v1/embeddings proxy. OpenAI-format only, body-whitelist, no stream, no override.
+// assigned_model_id is chat-only (蒋老师 2026-07-20 拍板); body.model must be explicit. Anthropic protocol = 400.
+// 计费只算 input_tokens (prompt_tokens); commlog output 仅记元数据，向量本体不落库 (避免 1024-dim × N 次调用撑爆 DB)。
+// v0.2.14 增补: embedding 调用同样记 stats.record(req_count=1) + logEntry(input=原始 input, output=metadata)。
+// 只统计调用次数,不计 token/cost;向量本体永不落库。
+const EMBED_WHITELIST = new Set(['model', 'input', 'encoding_format', 'dimensions', 'user'])
+
+export async function proxyEmbeddingRequest(body, apiKeyId, reply) {
+  // (I-5) auto/Nantikanmen-default are chat-only virtual ids
+  if (!body?.model || body.model === 'auto' || body.model === 'Nantianmen-default') {
+    return reply.code(400).send({ error: '/v1/embeddings requires explicit model (no auto, no default)' })
+  }
+  // ponytail: 不走 assigned_model_id override — 蒋老师拍板 override 只影响 chat
+  const entry = resolveModel(body.model)
+  if (entry.capability !== 'embedding') {
+    return reply.code(400).send({ error: `model '${body.model}' is not an embedding model` })
+  }
+  // (I-2) Anthropic has no public embeddings API
+  if (entry.provider.protocol !== 'openai') {
+    return reply.code(400).send({ error: 'embedding only supports openai protocol' })
+  }
+  // (I-3) whitelist body fields — clients sending extras get upstream 400, predictable behavior
+  const upstreamBody = { model: entry.model_name }
+  for (const k of EMBED_WHITELIST) if (k !== 'model' && body[k] !== undefined) upstreamBody[k] = body[k]
+
+  // ponytail: 保留 agent 发送的真实 input, 用于 commlog 入参展示。
+  // 不序列化整 upstreamBody (model 字段会被改写为 entry.model_name, 不是用户传的值)。
+  const originalInput = body.input
+  // metadata: 描述请求结构 + 向量维度,用于 output 栏快速识别,不暴露向量本体。
+  const arrayLen = Array.isArray(originalInput) ? originalInput.length : (typeof originalInput === 'string' ? 1 : 0)
+
+  stats.acquire()
+  const t0 = Date.now()
+  // ponytail: 一个标记位,确保 acquire 一定对应一次 release,无论哪条路径抛异常都不会下溢。
+  let released = false
+  const safeRelease = () => { if (!released) { released = true; stats.release() } }
+  try {
+    const resp = await fetch(entry.endpoint, {
+      method: 'POST',
+      headers: entry.headers,
+      body: JSON.stringify(upstreamBody),
+      dispatcher: await getDispatcher(),
+    })
+    const durationMs = Date.now() - t0
+    if (!resp.ok) {
+      const t = await resp.text()
+      const errMsg = `Upstream ${resp.status}: ${t}`
+      // 失败也要记一次 stats + logEntry,失败计数同样有意义(蒋老师 2026-08-01 拍板:调用次数要计)。
+      stats.record({
+        api_key_id: apiKeyId, provider_id: entry.provider.id,
+        model_id: entry.__modelId, model_name: entry.model_name,
+        request_count: 1, input_tokens: 0, output_tokens: 0, cached_tokens: 0,
+      })
+      safeRelease()
+      await logEntry({
+        apiKeyId, provider: entry.provider, modelName: entry.model_name, modelId: entry.__modelId,
+        upstreamBody: { model: entry.model_name, input_count: arrayLen, encoding_format: upstreamBody.encoding_format || null },
+        responseBody: '',
+        inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs,
+        error: { code: resp.status, message: errMsg.slice(0, 500) },
+      })
+      throw new Error(errMsg)
+    }
+    const json = await resp.json()
+    // ponytail: 取首条 embedding 维度,作为 metadata.embedding_dim。完整 768-dim 数组不落库。
+    const dim = Array.isArray(json?.data?.[0]?.embedding) ? json.data[0].embedding.length : 0
+    const usage = json?.usage || {}
+    // 成功路径:记一次 stats + logEntry。token=0 (embedding 调用本身不计 token),但 req_count=1 必须计。
+    stats.record({
+      api_key_id: apiKeyId, provider_id: entry.provider.id,
+      model_id: entry.__modelId, model_name: entry.model_name,
+      request_count: 1, input_tokens: 0, output_tokens: 0, cached_tokens: 0,
+    })
+    safeRelease()
+    await logEntry({
+      apiKeyId, provider: entry.provider, modelName: entry.model_name, modelId: entry.__modelId,
+      // input = agent 发送的真实 input(JSON 字符串 / 字符串数组 / 数组)
+      upstreamBody: typeof originalInput === 'string' ? originalInput : JSON.stringify(originalInput),
+      // output = metadata (维度 + 用量 + 模型);向量本体不写
+      responseBody: JSON.stringify({
+        embedding_dim: dim, embedding_count: Array.isArray(json?.data) ? json.data.length : 0,
+        model: json?.model || entry.model_name, usage,
+      }),
+      inputTokens: 0, outputTokens: 0, cachedTokens: 0, durationMs,
+    })
+    return json
+  } catch (e) {
+    throw e
+  } finally {
+    safeRelease()
+  }
+}
