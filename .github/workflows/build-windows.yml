@@ -37,10 +37,11 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          # ponytail: cli/ has no package-lock.json (zero dependencies) — caching a
+          # non-existent file fails the step. Only desktop + server lock files.
           cache-dependency-path: |
             desktop/package-lock.json
             server/package-lock.json
-            cli/package-lock.json
 
       - name: Install desktop deps
         working-directory: desktop
@@ -90,20 +91,24 @@ jobs:
           node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
           echo "cli/package.json version -> $(node -p "require('./package.json').version")"
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: cli/package-lock.json
+          # ponytail: cli/ has no package-lock.json (zero dependencies) — caching a
+          # non-existent file fails the step. Only desktop + server lock files here.
+          cache-dependency-path: |
+            desktop/package-lock.json
+            server/package-lock.json
 
-      # ponytail: bun is the CLI bundler (per cli/package.json scripts.cli:build).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
       - name: Install cli deps
         working-directory: cli
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       # ponytail: reuse cli/package.json `cli:build` script — single source of truth for
       # bun --target=bun-windows-x64 + cp -r server into ../releases/server.
