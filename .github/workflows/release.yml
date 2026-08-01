@@ -1,0 +1,63 @@
+name: release
+
+# ponytail: unified release pipeline. Drives build-windows.yml + build-mac.yml in parallel
+# via workflow_run (the simpler pattern for fan-out from a tag push), then attaches a
+# canonical release body. Tag push only — manual dispatch also works.
+#
+# Why workflow_run + tag, not workflow_call:
+#   workflow_call requires the callee workflow to declare a `workflow_call` trigger,
+#   which would force build-windows.yml and build-mac.yml to also be reusable — extra
+#   surface for a project where each build is already self-contained. workflow_run +
+#   completed check is the minimum-diff approach: this job just observes the sibling
+#   builds and writes the release body if missing.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+# ponytail: contents:write needed for softprops/action-gh-release@v2 to upload assets
+# and update release body.
+permissions:
+  contents: write
+
+jobs:
+  body:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ponytail: extract the vX.Y.Z section from CHANGELOG.md to populate the release body.
+      # Bash heredoc into node avoids jq dependency for the regex extraction.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          node -e "
+            const fs=require('fs');
+            const t=process.argv[1];
+            const md=fs.readFileSync('CHANGELOG.md','utf8');
+            const esc=t.replace(/\\./g,'\\\\.');
+            const re=new RegExp('##\\\\s*\\\\[v?'+esc+'\\\\][^\\n]*\\\\n([\\\\s\\\\S]*?)(?=\\\\n##\\\\s|\\\\Z)');
+            const m=md.match(re);
+            process.stdout.write(m?m[1].trim():'Release '+t);
+          " "$TAG" > /tmp/notes.md
+          echo "Notes length: $(wc -c </tmp/notes.md) bytes"
+          {
+            echo "notes<<EOF"
+            cat /tmp/notes.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ponytail: release.yml is the canonical place to attach notes. The platform build
+      # workflows (build-windows.yml, build-mac.yml) attach their own artifacts via
+      # softprops/action-gh-release@v2 — those uploads work without this job, so this is
+      # a notes-only complement. fail_on_unmatched_files: false makes it idempotent.
+      - name: Update release body
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.notes }}
+          fail_on_unmatched_files: false
+          generate_release_notes: false

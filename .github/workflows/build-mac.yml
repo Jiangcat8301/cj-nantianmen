@@ -1,7 +1,7 @@
 name: build-mac
 
 # ponytail: cross-compile macOS desktop DMG on macos-latest runner.
-# Output: a single arm64 DMG (we no longer ship x64). Triggers on vX.Y.Z tag, manual dispatch, or PR.
+# Output: arm64 + amd64 DMGs (matrix). Triggers on vX.Y.Z tag, manual dispatch, or PR.
 on:
   push:
     tags: ['v*.*.*']
@@ -20,12 +20,20 @@ jobs:
   mac:
     runs-on: macos-latest
     timeout-minutes: 30
+    # ponytail: matrix over arm64 + amd64. Each arch gets its own upload + release attach.
+    # desktop/package.json `build.mac.arch` pins arm64 by default; the override step below
+    # patches it to x64 for the amd64 leg so electron-builder produces both DMGs from one
+    # package.json.
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
     steps:
       - uses: actions/checkout@v4
 
       # ponytail: sync desktop/package.json version from the pushed tag so the artifactName
-      # template (`nantianmen-${version}-mac-${arch}.${ext}`) produces 0.2.14 when the tag is
-      # v0.2.14. PR runs leave it untouched (github.ref_name is not a semver tag there).
+      # template (`nantianmen-${version}-mac-${arch}.${ext}`) produces 0.3.15 when the tag is
+      # v0.3.15. PR runs leave it untouched (github.ref_name is not a semver tag there).
       - name: Sync version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: desktop
@@ -33,6 +41,15 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
           node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
           echo "desktop/package.json version -> $(node -p "require('./package.json').version")"
+
+      # ponytail: x64 matrix leg rewrites build.mac.arch so electron-builder doesn't error
+      # on the hardcoded arm64. arm64 leg skips this step to keep build.mac.arch as-is.
+      - name: Override build.mac.arch for amd64 matrix leg
+        if: matrix.arch == 'x64'
+        working-directory: desktop
+        run: |
+          node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.build.mac.arch=['x64'];fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
+          echo "amd64 matrix leg: build.mac.arch -> x64"
 
       - uses: actions/setup-node@v4
         with:
@@ -52,8 +69,8 @@ jobs:
         run: npm ci
 
       # ponytail: build + electron-rebuild for Electron's Node ABI, then electron-builder --mac.
-      # Output goes to ../temp/ per package.json `directories.output`. Single arch arm64 (see build.mac.target).
-      - name: Build mac (arm64 dmg only)
+      # Output goes to ../temp/ per package.json `directories.output`. matrix.arch picks arm64 vs x64.
+      - name: Build mac (${{ matrix.arch }} dmg)
         working-directory: desktop
         run: npm run electron:build:mac
         env:
@@ -63,16 +80,16 @@ jobs:
       - name: Upload mac artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nantianmen-mac-${{ github.ref_name }}
+          name: nantianmen-mac-${{ matrix.arch }}-${{ github.ref_name }}
           if-no-files-found: error
           retention-days: 14
-          path: temp/nantianmen-*-mac-arm64.dmg
+          path: temp/nantianmen-*-mac-${{ matrix.arch }}.dmg
 
-      # ponytail: attach the arm64 DMG to the GitHub Release so it survives past the
-      # 14-day artifact retention window. Path is locked to arm64 dmg only.
+      # ponytail: attach the per-arch DMG to the GitHub Release so it survives past the
+      # 14-day artifact retention window. Path filters to current matrix arch only.
       # On PRs the upload is a no-op (no release exists).
-      - name: Attach arm64 DMG to release
+      - name: Attach ${{ matrix.arch }} DMG to release
         uses: softprops/action-gh-release@v2
         with:
-          files: temp/nantianmen-*-mac-arm64.dmg
+          files: temp/nantianmen-*-mac-${{ matrix.arch }}.dmg
           fail_on_unmatched_files: false

@@ -1,0 +1,120 @@
+name: build-windows
+
+# ponytail: cross-compile Windows desktop + CLI on windows-latest runner.
+# Output: 1 portable desktop EXE (x64) + 1 CLI bun-bundled EXE (x64).
+# Triggers on vX.Y.Z tag, manual dispatch, or PR.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+# ponytail: softprops/action-gh-release@v2 needs `contents: write` to attach EXEs.
+# Same rationale as build-mac.yml — token defaults to read-only on many orgs.
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # ponytail: sync desktop/package.json version from tag (same pattern as build-mac.yml).
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
+          echo "desktop/package.json version -> $(node -p "require('./package.json').version")"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            desktop/package-lock.json
+            server/package-lock.json
+            cli/package-lock.json
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm ci
+
+      - name: Install server deps (better-sqlite3 native source)
+        working-directory: server
+        run: npm ci
+
+      # ponytail: reuse desktop/package.json `electron:build` script — it already
+      # copies the EXE into ../releases/ and cleans temp/win-unpacked. Single source of truth.
+      - name: Build Windows desktop (x64 portable)
+        working-directory: desktop
+        run: npm run electron:build
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nantianmen-windows-desktop-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: releases/nantianmen-*-win-x64.exe
+
+      # ponytail: attach to GitHub Release so it survives past the 14-day artifact window.
+      - name: Attach desktop EXE to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: releases/nantianmen-*-win-x64.exe
+          fail_on_unmatched_files: false
+
+  cli:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # ponytail: sync cli/package.json version from tag (desktop does its own above).
+      - name: Sync version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: cli
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
+          echo "cli/package.json version -> $(node -p "require('./package.json').version")"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: cli/package-lock.json
+
+      # ponytail: bun is the CLI bundler (per cli/package.json scripts.cli:build).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install cli deps
+        working-directory: cli
+        run: npm ci
+
+      # ponytail: reuse cli/package.json `cli:build` script — single source of truth for
+      # bun --target=bun-windows-x64 + cp -r server into ../releases/server.
+      - name: Build Windows CLI (x64)
+        working-directory: cli
+        run: npm run cli:build
+
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nantianmen-windows-cli-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: releases/nantianmen-cli-*-win-x64.exe
+
+      - name: Attach CLI EXE to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: releases/nantianmen-cli-*-win-x64.exe
+          fail_on_unmatched_files: false
