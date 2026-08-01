@@ -112,15 +112,21 @@ jobs:
 
       # ponytail: reuse cli/package.json `cli:build` script — single source of truth for
       # bun --target=bun-windows-x64 + cp -r server into ../releases/server.
-      # shell: bash — windows-latest defaults to PowerShell; the cli:build script uses && and bash paths.
-      # PATH override — setup-bun installs to ~/.bun/bin which Git Bash doesn't auto-resolve.
-      # Use the explicit Windows path so bash can find bun.exe regardless of PATH resolution order.
+      # shell: pwsh — bun is installed by setup-bun into Windows PATH (C:\Users\runneradmin\.bun\bin),
+      # which PowerShell resolves natively. Git Bash doesn't resolve the Windows user PATH
+      # consistently (the earlier `$HOME/.bun/bin` export failed because $HOME in bash on
+      # the GitHub runner ≠ the runneradmin user home). PowerShell + Windows PATH = works.
+      # We can't run the cli:build script verbatim here — it uses bash && + cp -r syntax,
+      # so we replicate the same commands with PowerShell-native idioms.
       - name: Build Windows CLI (x64)
-        shell: bash
+        shell: pwsh
         working-directory: cli
         run: |
-          export PATH="$HOME/.bun/bin:$PATH"
-          npm run cli:build
+          $ErrorActionPreference = 'Stop'
+          bun build ./index.js --compile --target=bun-windows-x64 --outfile=../releases/nantianmen-cli-${{ github.ref_name }}-win-x64.exe
+          if (Test-Path ../releases/server) { Remove-Item -Recurse -Force ../releases/server }
+          Copy-Item -Recurse ../server ../releases/server
+          Get-ChildItem ../releases | Select-Object Name, Length
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
