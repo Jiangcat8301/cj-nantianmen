@@ -23,7 +23,14 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) 已发布** — 2026-07-20。严格 Server/Client 版本握手 + 用户管理修复 + build-mac 仅出 arm64 dmg。详见 [CHANGELOG](./CHANGELOG.md)。 [下载 Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [下载 macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-mac-arm64.dmg) (arm64)
+> 🚀 **[v0.3.15](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.3.15) 已发布** — 2026-08-01。OpenAI Embeddings 代理 + models.capability 字段 + 4 产物 release pipeline。详见 [CHANGELOG](./CHANGELOG.md)。
+>
+> | 产物 | 平台 | 架构 | 下载 |
+> | --- | --- | --- | --- |
+> | Desktop | Windows | x64 | [nantianmen-0.3.15-win-x64.exe (83 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-win-x64.exe) |
+> | CLI | Windows | x64 | [nantianmen-cli-v0.3.15-win-x64.exe (99 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-cli-v0.3.15-win-x64.exe) |
+> | Desktop | macOS | arm64 | [nantianmen-0.3.15-mac-arm64.dmg (119 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-arm64.dmg) |
+> | Desktop | macOS | x64 | [nantianmen-0.3.15-mac-x64.dmg (124 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-x64.dmg) |
 
 ---
 

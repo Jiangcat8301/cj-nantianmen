@@ -21,7 +21,14 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.2.14](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.2.14) released** — 2026-07-20. Strict Server/Client version handshake + user-management fix + build-mac ships arm64 dmg only. See [CHANGELOG](./CHANGELOG-en.md). [Download Windows EXE](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-win-x64.exe) (x64) | [Download macOS DMG](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.2.14/nantianmen-0.2.14-mac-arm64.dmg) (arm64)
+> 🚀 **[v0.3.15](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.3.15) released** — 2026-08-01. OpenAI Embeddings proxy + models.capability field + 4-asset release pipeline. See [CHANGELOG](./CHANGELOG-en.md).
+>
+> | Asset | Platform | Arch | Download |
+> | --- | --- | --- | --- |
+> | Desktop | Windows | x64 | [nantianmen-0.3.15-win-x64.exe (83 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-win-x64.exe) |
+> | CLI | Windows | x64 | [nantianmen-cli-v0.3.15-win-x64.exe (99 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-cli-v0.3.15-win-x64.exe) |
+> | Desktop | macOS | arm64 | [nantianmen-0.3.15-mac-arm64.dmg (119 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-arm64.dmg) |
+> | Desktop | macOS | x64 | [nantianmen-0.3.15-mac-x64.dmg (124 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-x64.dmg) |
 
 ---
 
