@@ -23,8 +23,10 @@ jobs:
       - uses: actions/checkout@v4
 
       # ponytail: sync desktop/package.json version from tag (same pattern as build-mac.yml).
+      # shell: bash — windows-latest defaults to PowerShell, but ${GITHUB_REF_NAME#v} is bash syntax.
       - name: Sync version from tag
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         working-directory: desktop
         run: |
           TAG="${GITHUB_REF_NAME#v}"
@@ -50,7 +52,9 @@ jobs:
 
       # ponytail: reuse desktop/package.json `electron:build` script — it already
       # copies the EXE into ../releases/ and cleans temp/win-unpacked. Single source of truth.
+      # shell: bash — windows-latest defaults to PowerShell; electron:build script uses bash paths.
       - name: Build Windows desktop (x64 portable)
+        shell: bash
         working-directory: desktop
         run: npm run electron:build
 
@@ -76,8 +80,10 @@ jobs:
       - uses: actions/checkout@v4
 
       # ponytail: sync cli/package.json version from tag (desktop does its own above).
+      # shell: bash — windows-latest defaults to PowerShell; ${GITHUB_REF_NAME#v} is bash syntax.
       - name: Sync version from tag
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         working-directory: cli
         run: |
           TAG="${GITHUB_REF_NAME#v}"
@@ -101,7 +107,9 @@ jobs:
 
       # ponytail: reuse cli/package.json `cli:build` script — single source of truth for
       # bun --target=bun-windows-x64 + cp -r server into ../releases/server.
+      # shell: bash — windows-latest defaults to PowerShell; the cli:build script uses && and bash paths.
       - name: Build Windows CLI (x64)
+        shell: bash
         working-directory: cli
         run: npm run cli:build
 

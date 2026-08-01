@@ -28,7 +28,9 @@ jobs:
       - uses: actions/checkout@v4
 
       # ponytail: extract the vX.Y.Z section from CHANGELOG.md to populate the release body.
-      # Bash heredoc into node avoids jq dependency for the regex extraction.
+      # Use a fixed sentinel (UNLIKELY_EOF_DELIMITER) for the heredoc — markdown bodies can
+      # contain the literal string "EOF" (e.g. in code fences) which breaks naive <<EOF heredocs.
+      # Writing to /tmp/notes.md first, then `cat >> $GITHUB_OUTPUT`, avoids delimiter collisions entirely.
       - name: Extract release notes from CHANGELOG.md
         id: notes
         run: |
@@ -43,10 +45,13 @@ jobs:
             process.stdout.write(m?m[1].trim():'Release '+t);
           " "$TAG" > /tmp/notes.md
           echo "Notes length: $(wc -c </tmp/notes.md) bytes"
+          # ponytail: append to GITHUB_OUTPUT as `name=value` (single line via key=value file).
+          # Avoids the heredoc-delimiter collision that bit us in the first attempt.
           {
-            echo "notes<<EOF"
+            echo "notes<<UNLIKELY_EOF_DELIMITER_X7Q"
             cat /tmp/notes.md
-            echo "EOF"
+            echo ""
+            echo "UNLIKELY_EOF_DELIMITER_X7Q"
           } >> "$GITHUB_OUTPUT"
 
       # ponytail: release.yml is the canonical place to attach notes. The platform build
