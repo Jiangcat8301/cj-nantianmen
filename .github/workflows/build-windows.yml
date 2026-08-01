@@ -113,10 +113,14 @@ jobs:
       # ponytail: reuse cli/package.json `cli:build` script — single source of truth for
       # bun --target=bun-windows-x64 + cp -r server into ../releases/server.
       # shell: bash — windows-latest defaults to PowerShell; the cli:build script uses && and bash paths.
+      # PATH override — setup-bun installs to ~/.bun/bin which Git Bash doesn't auto-resolve.
+      # Use the explicit Windows path so bash can find bun.exe regardless of PATH resolution order.
       - name: Build Windows CLI (x64)
         shell: bash
         working-directory: cli
-        run: npm run cli:build
+        run: |
+          export PATH="$HOME/.bun/bin:$PATH"
+          npm run cli:build
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
