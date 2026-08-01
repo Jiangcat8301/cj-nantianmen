@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.3.15] — 2026-07-29
+
+### Added
+- **`POST /v1/embeddings` proxy** — OpenAI-format Embeddings passthrough, OpenAI-protocol providers only; `assigned_model_id` does not apply, `body.model` must be explicit (no `auto` / `Nantianmen-default`), Anthropic protocol returns `400 embedding only supports openai protocol`; auth shares `authApiKey` + `checkModelAuthorized`; billing counts only `prompt_tokens`, `output_tokens` / `cached_tokens` recorded as 0; `communication_log.output` stores only metadata `{model, dim, count, format, tokens}` — vector body is never written to SQLite to prevent 1024-dim × N-call bloat
+- **`capability` model field** — `models.capability TEXT NOT NULL DEFAULT 'chat' CHECK(capability IN ('chat','embedding'))` (SQLite ALTER TABLE refuses CHECK, legacy DBs get the column without CHECK and rely on application-layer enforcement in `proxyEmbeddingRequest` / `api.addModel`); ALTER is idempotent, server startup auto-migrates existing DBs without manual SQL
+- **Providers.vue UI** — Add Model Modal gains a capability single-select radio (chat selected by default); the model list now shows a chat/embedding tag after the model name (embedding: blue `bg-blue-500/20 text-blue-300`; chat: muted gray `bg-gray-700 text-gray-400`)
+- **CLI `provider model-add`** — prompts `Capability (chat|embedding) [chat]:`, accepts `embedding` or `e`, empty input defaults to chat; `provider models` list output gains the capability column
+- **i18n keys (zh/en/ja)** — added `fld_capability` / `cap_chat` / `cap_embedding`
+- **docs/api.md + docs/api-en.md** — new `/v1/embeddings` section (auth, provider limits, billing, curl example, JSON response, error codes)
+- **docs/cli.md + docs/cli-en.md** — `provider model-add` description extended with the capability prompt
+
+### Migration
+- `models` table gains `capability TEXT NOT NULL DEFAULT 'chat'` column (idempotent ALTER); existing models default to 'chat' and `/v1/chat/completions` / `/v1/messages` behavior is unchanged
+- **No manual SQL required**; server startup detects and ALTERs automatically
+
 ## [v0.2.14] — 2026-07-19
 
 ### Added

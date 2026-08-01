@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.3.15] — 2026-07-29
+
+### Added
+- **`POST /v1/embeddings` 代理** — OpenAI 格式 Embeddings 透传，仅 OpenAI 协议 provider；`assigned_model_id` 不适用，`body.model` 必须显式（不接受 `auto` / `Nantianmen-default`），Anthropic 协议返回 `400 embedding only supports openai protocol`；鉴权复用 `authApiKey` + `checkModelAuthorized`；计费仅 `prompt_tokens`，`output_tokens` / `cached_tokens` 一律记 0；`communication_log.output` 仅存元数据 `{model, dim, count, format, tokens}`，向量本体不落库，避免 1024 维 × N 次调用撑爆 SQLite
+- **模型 `capability` 字段** — `models.capability TEXT NOT NULL DEFAULT 'chat' CHECK(capability IN ('chat','embedding'))`（SQLite ALTER TABLE 不支持 CHECK，老库 ALTER 落地时退化为无 CHECK，应用层 `proxyEmbeddingRequest` / `api.addModel` enforce）；新增 schema 列的 ALTER 幂等，旧库升级时 server 启动自动加列无需手动 SQL
+- **Providers.vue UI 改造** — Add Model Modal 加 capability 单选 radio（chat 默认勾选）；模型列表在模型名后显示 chat/embedding tag（embedding 蓝底灰字 `bg-blue-500/20 text-blue-300`、chat 灰底暗字 `bg-gray-700 text-gray-400`）
+- **CLI `provider model-add` 升级** — 交互提示 `Capability (chat|embedding) [chat]:`，接受 `embedding` 或 `e`，空输入默认 chat；`provider models` 列表输出新增 capability 列
+- **i18n 三语加键** — `fld_capability` / `cap_chat` / `cap_embedding`，zh/en/ja 同步
+- **docs/api.md + docs/api-en.md** — 新增 `/v1/embeddings` 完整段（鉴权、Provider 限制、计费、curl 示例、JSON 返回、错误码清单）
+- **docs/cli.md + docs/cli-en.md** — `provider model-add` 命令描述补充 capability 交互说明
+
+### Migration
+- 旧库 `models` 表新增 `capability TEXT NOT NULL DEFAULT 'chat'` 列（ALTER TABLE 幂等），已有模型 capability 默认 'chat'，不影响 `/v1/chat/completions` 与 `/v1/messages` 现有调用路径
+- **不需要手动 SQL**，server 启动自动检测并 ALTER
+
 ## [v0.2.14] — 2026-07-19
 
 ### Added

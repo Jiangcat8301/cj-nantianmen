@@ -2,6 +2,8 @@
 
 The Nantianmen CLI (`nantianmen`) is a command-line wrapper over the Admin API. Every subcommand except `help` / `quit` probes `${HOST}:${PORT}/v1/health` first and auto-forks a server subprocess when one isn't running.
 
+**Since v0.2.14**: every CLI subcommand performs a Server/Client **strict version handshake** first (compares the `/v1/health` `version` field against `cli/package.json` `version`). Mismatch → exit code 1 with both versions printed (e.g. `✗ Server/Client version mismatch: CLI 0.2.14, Server 0.2.13. Stop the existing Server and start the matching version.`). **LLM third-party calls are unaffected** — only CLI client commands trigger the handshake.
+
 ## Common Commands
 
 ```bash
@@ -19,7 +21,7 @@ nantianmen provider ls
 nantianmen provider add
 nantianmen provider models <pid>            # list models with pricing
 nantianmen provider models-refresh <pid>    # refresh from upstream
-nantianmen provider model-add <pid> <name>  # add manually
+nantianmen provider model-add <pid> <name>  # add manually (v0.3.15+ prompts Capability: chat|embedding [chat]; enter embedding or e)
 nantianmen provider model-edit <pid> <mid> --input=0.1 --output=0.5 --cache=0.01
 nantianmen provider default <pid> <mid>     # set as default
 

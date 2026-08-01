@@ -2,6 +2,8 @@
 
 南天门 CLI（`nantianmen`）是对 Admin API 的命令行封装。除 `help` / `quit` 外，每个子命令执行前会先探测 `${HOST}:${PORT}/v1/health`，未就绪时自动 fork server 子进程。
 
+**v0.2.14 起**：CLI 启动任何子命令前都会先做 Server/Client **严格版本握手**（读取 `/v1/health` 的 `version` 字段与 CLI 自身 `cli/package.json` 的 version 比对）。不匹配立即退出码 1 并打印双方版本（例如：`✗ Server/Client version mismatch: CLI 0.2.14, Server 0.2.13. Stop the existing Server and start the matching version.`）。**LLM 第三方调用不受影响**，仅 CLI 客户端命令触发。
+
 ## 常用命令
 
 ```bash
@@ -20,7 +22,7 @@ nantianmen provider ls
 nantianmen provider add
 nantianmen provider models <pid>            # 列出模型（含定价）
 nantianmen provider models-refresh <pid>    # 从上游刷新
-nantianmen provider model-add <pid> <name>  # 手动添加
+nantianmen provider model-add <pid> <name>  # 手动添加（v0.3.15+ 交互提示 Capability: chat|embedding [chat]，默认 chat；输入 embedding 或 e 切换）
 nantianmen provider model-edit <pid> <mid> --input=0.1 --output=0.5 --cache=0.01
 nantianmen provider default <pid> <mid>     # 设为默认
 
