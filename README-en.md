@@ -21,7 +21,7 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) released** — 2026-08-03. **Go rewrite of server + CLI**, Desktop spawns Go server, OpenAI Embeddings end-to-end verified, 5 bug fixes. See [CHANGELOG](./CHANGELOG-en.md).
+> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) released** — 2026-08-03. See [CHANGELOG](./CHANGELOG.md).
 >
 > | Asset | Platform | Arch | Size | SHA-256 | Download |
 > | --- | --- | --- | --- | --- | --- |
@@ -32,41 +32,6 @@ forwards the request to the corresponding celestial court, and translates the re
 > | Server | macOS x64 | — | 16.7 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
 > | CLI | macOS arm64 | — | 8.3 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
 > | CLI | macOS x64 | — | 8.9 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
-
----
-
-## 🆕 v0.4.23 — streaming tool_call fix
-
-In v0.4.21 the Go server would **silently swallow tool_calls arguments** when streaming with `tool_choice=required`: the `parseTokens` function panicked on slice bounds out of range whenever an SSE chunk contained unterminated `{...` JSON, triggering chi.Recoverer to close the connection and losing the tool_calls delta / finish_reason / `[DONE]` chunks entirely.
-
-v0.4.23 fix: one-line guard `if depth != 0 || end >= len(text) { return }` added after the bracket-matching loop. Verified 100% fixed with MiniMax-M3 + Deepseek-V4-Pro.
-
-## 🆕 v0.4.21 — Go rewrite
-
-From v0.4.21 the server and CLI are rewritten in **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)**. The legacy Node server (v0.3.15) runs in parallel for 3-6 months while we observe stability. v0.4.23 fixes the streaming tool_call panic bug (see above).
-
-### Why Go
-
-| Dimension | Node v0.3.15 | **Go v0.4.21** |
-|---|---|---|
-| Deployment | two files (`server/index.js` + `node_modules`) | **single static binary** |
-| Memory peak | 80-150 MB | **30-50 MB** |
-| Cold start | 1-2 s | **~150 ms** |
-| Cross-platform | target machine needs Node + `npm i` | **cross-compile in one command** |
-| Native deps | better-sqlite3 (needs node-gyp + MSVC) | **modernc.org/sqlite (pure Go, no cgo)** |
-| CLI artifact | `bun build --compile` | **`go build` directly** |
-| Icons | Electron handles it | **`rsrc -ico` → .syso auto-linked** |
-
-### Compatibility
-
-- HTTP endpoints (`/v1/*`, `/api/admin/*`) are **identical** to v0.3.15
-- DB schema is **100% compatible** — same `C:/Users/<you>/.cj-nantianmen/nantianmen.db` is shared
-- Desktop / CLI / Server all **share version `0.4.21`**, handshake rejects mismatches
-- The old v0.3.15 EXE keeps working; the DB does not conflict
-
-### Desktop integration
-
-Desktop embeds the Go server binary under `extraResources/server/`. At launch it `child_process.spawn`s the binary with env `NANTIANMEN_LOCAL_MODE=1` to skip admin auth (Desktop never sends a Bearer token); `before-quit` sends SIGTERM to shut it down.
 
 ---
 

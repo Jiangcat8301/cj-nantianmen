@@ -23,7 +23,7 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) 已发布** — 2026-08-03。**Go 重写 server + CLI**，Desktop spawn Go server，OpenAI Embeddings 端到端验证，5 bug 修复。详见 [CHANGELOG](./CHANGELOG.md)。
+> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) 已发布** — 2026-08-03。详见 [CHANGELOG](./CHANGELOG.md)。
 >
 > | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
 > | --- | --- | --- | --- | --- | --- |
@@ -34,41 +34,6 @@
 > | Server | macOS x64 | — | 16.7 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
 > | CLI | macOS arm64 | — | 8.3 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
 > | CLI | macOS x64 | — | 8.9 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
-
----
-
-## 🆕 v0.4.23 — streaming tool_call 修复
-
-v0.4.21 的 Go server 在 SSE 流里 `tool_choice=required` 时会**吞掉 tool_calls 参数**：`parseTokens` 函数在遇到不闭合 `{...` 的 chunk 时 panic，chi.Recoverer 关闭连接，导致 tool_calls delta / finish_reason / `[DONE]` 全部丢失。
-
-v0.4.23 修复：`parseTokens` 加 1 行越界检查（`if depth != 0 || end >= len(text) { return }`），已用 MiniMax-M3 + Deepseek-V4-Pro 验证 100% 修复。
-
-## 🆕 v0.4.21 — Go 重写
-
-v0.4.21 起 server 和 CLI 用 **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)** 重写。Node 版本（v0.3.15）双轨运行 3-6 个月观察稳定性。v0.4.23 修了 streaming tool_call panic bug（见上）。
-
-### 为什么 Go
-
-| 维度 | Node v0.3.15 | **Go v0.4.21** |
-|---|---|---|
-| 部署 | 双文件 (`server/index.js` + `node_modules`) | **单文件 static binary** |
-| 内存峰值 | 80-150 MB | **30-50 MB** |
-| 冷启动 | 1-2 秒 | **~150 毫秒** |
-| 跨平台 | 需目标平台装 Node + npm i | **cross-compile 一行命令** |
-| 原生依赖 | better-sqlite3 (需 node-gyp + MSVC) | **modernc.org/sqlite (pure Go, 无 cgo)** |
-| CLI 产物 | `bun build --compile` | **`go build` 直出** |
-| 图标 | Electron 自动 | **`rsrc -ico` → .syso 自动 link** |
-
-### 兼容性
-
-- HTTP 端点 (`/v1/*`、`/api/admin/*`) 与 v0.3.15 **完全一致**
-- DB schema **100% 兼容**，共用同一份 `C:/Users/<you>/.cj-nantianmen/nantianmen.db`
-- Desktop / CLI / Server **三端版本统一** `0.4.21`，握手校验不一致即拒绝
-- 旧 v0.3.15 EXE 可继续用，DB 不冲突
-
-### Desktop 集成
-
-Desktop 内嵌 Go server binary 到 `extraResources/server/`，启动时 `child_process.spawn` 拉起，env `NANTIANMEN_LOCAL_MODE=1` 跳过 admin auth（Desktop 不需要发 Bearer），关闭时 SIGTERM 收尾。
 
 ---
 
@@ -100,7 +65,7 @@ Desktop 内嵌 Go server binary 到 `extraResources/server/`，启动时 `child_
 
 conf + db 文件在此目录。`-c/-D` 显式指定任意位置仍生效（dev 用法）。
 
-## 架构（v0.4.23）
+## 架构
 
 ```
 cj-nantianmen/
