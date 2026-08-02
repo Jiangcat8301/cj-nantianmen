@@ -8,8 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 ## [v0.4.21] — 2026-08-02
 
 ### Changed — Go 重写 server/CLI（双轨 3-6 个月）
-- **server-go/（全新 Go 实现）**：服务端用 Go 1.26.3 + chi/v5 + modernc.org/sqlite（pure Go，无 cgo）重写，cross-compile 友好；HTTP router 沿用 Node server 既有 `/v1/*`、`/api/admin/*` 端点，DB schema 100% 兼容 v0.3.15
-- **CLI 切到 Go binary**：`server-go/cmd/nantianmen/` 提供 Go 版 CLI（`ClientVersion = 0.4.21`），握手校验 server 版本一致，不一致即退出码 1
+- **server/（全新 Go 实现）**：服务端用 Go 1.26.3 + chi/v5 + modernc.org/sqlite（pure Go，无 cgo）重写，cross-compile 友好；HTTP router 沿用 Node server 既有 `/v1/*`、`/api/admin/*` 端点，DB schema 100% 兼容 v0.3.15
+- **CLI 切到 Go binary**：`server/cmd/nantianmen/` 提供 Go 版 CLI（`ClientVersion = 0.4.21`），握手校验 server 版本一致，不一致即退出码 1
 - **Desktop spawn Go server**：`desktop/electron/main.cjs` 改用 `child_process.spawn` 启动 `extraResources` 里的 `server/nantianmen-server.exe`，env `NANTIANMEN_LOCAL_MODE=1` 跳过 admin auth；`before-quit` 钩子 SIGTERM 杀 Go 子进程
 - **三端版本统一**：desktop `0.4.21` / Go server `ServerVersion = 0.4.21` / Go CLI `ClientVersion = 0.4.21` / `cli/package.json` `0.4.21`；Node server（`server/`）维持 `0.3.15` 双轨运行
 - **PE 图标嵌入**：两枚 Go 二进制用 `rsrc -ico nantianmen.ico -arch amd64 -o icon.syso` 自动 link，Windows 资源管理器显示专属图标
@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 - **Desktop Stats 顶部 select「模型类型」**：「全部 / chat / embedding」，默认值「全部」，持久化到现有 `getUiFilters` 存储（与其他 select 同一套 `saveUiFilters` 接口）
 
 ### Fixed
-- **`-D <db_path>` flag 真正覆盖 conf**：`server-go` 启动时从 conf 读 `Database.Path`，现在 `-D` flag 在 LoadConf 之后 re-apply `c.Database.Path = *dbPath`，默认 DB 路径 `C:/Users/ASUS/.cj-nantianmen/nantianmen.db`
+- **`-D <db_path>` flag 真正覆盖 conf**：`server` 启动时从 conf 读 `Database.Path`，现在 `-D` flag 在 LoadConf 之后 re-apply `c.Database.Path = *dbPath`，默认 DB 路径 `C:/Users/ASUS/.cj-nantianmen/nantianmen.db`
 - **`NANTIANMEN_LOCAL_MODE=1` env 让 Go server 跳过 admin auth**：`var localMode bool` + `func init()` 从 env 读，匹配 Node server `server/auth.js` 行为；Desktop spawn 不再需要发 Bearer token
 - **SSE 流式响应缺 `\\n\\n` 分隔符**：`bufio.Scanner` 按 `\\n\\n` 切块并去分隔符，Go proxy 转发时主动补 `\\n\\n`，客户端 OpenAI SDK 能正常解析事件
 - **SSE 流不发 `data: [DONE]`**：原代码只在 anthropic→openai 转时补 `[DONE]`；openai→openai 路径（如 MiniMax-M3）现无条件发 `data: [DONE]\\n\\n`，避免客户端 `Provider returned an empty stream with no finish_reason` 报错

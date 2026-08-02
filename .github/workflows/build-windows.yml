@@ -27,7 +27,7 @@ jobs:
           # 1.23 is the latest stable; the module downgrades cleanly.
 
       - name: Build Go server (windows amd64)
-        working-directory: server-go
+        working-directory: server
         run: |
           go build -o ../releases/nantianmen-server-${{ github.ref_name }}-win-x64.exe ./cmd/nantianmen-server/
 
@@ -56,7 +56,7 @@ jobs:
           go-version: '1.23'
 
       - name: Build Go CLI (windows amd64)
-        working-directory: server-go
+        working-directory: server
         run: |
           go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-win-x64.exe ./cmd/nantianmen/
 
@@ -92,7 +92,7 @@ jobs:
           echo "desktop/package.json version -> $(node -p "require('./package.json').version")"
 
       # ponytail: download the Go server binary built by the `server` job.
-      # extraResources expects server-go/../releases/nantianmen-server-*.exe.
+      # extraResources expects server/../releases/nantianmen-server-*.exe.
       - name: Download Go server binary
         uses: actions/download-artifact@v4
         with:
@@ -109,15 +109,15 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      # ponytail: electron-builder reads extraResources from ../server-go/nantianmen-server.exe
+      # ponytail: electron-builder reads extraResources from ../server/nantianmen-server.exe
       # (see desktop/package.json L59-63). The binary must exist there before electron:build.
       # Copy the downloaded artifact to where extraResources expects it.
       - name: Place Go server for extraResources
         shell: bash
         run: |
-          mkdir -p server-go
-          cp releases/nantianmen-server-*-win-x64.exe server-go/nantianmen-server.exe
-          ls -lh server-go/nantianmen-server.exe
+          mkdir -p server
+          cp releases/nantianmen-server-*-win-x64.exe server/nantianmen-server.exe
+          ls -lh server/nantianmen-server.exe
 
       - name: Build Windows desktop (x64 portable)
         shell: bash

@@ -79,9 +79,9 @@ function getIcon() {
 
 function getServerPath() {
   // ponytail: Go server binary. In production it's in resources/server.
-  // In dev it's ../server-go relative to desktop/
+  // In dev it's ../server relative to desktop/
   const binName = process.platform === 'win32' ? 'nantianmen-server.exe' : 'nantianmen-server'
-  const devPath = path.join(__dirname, '..', '..', 'server-go', binName)
+  const devPath = path.join(__dirname, '..', '..', 'server', binName)
   const prodPath = path.join(process.resourcesPath, 'server', binName)
   const chosen = fs.existsSync(devPath) ? devPath : prodPath
   console.log('[ntm] getServerPath:', chosen, 'existsDev=', fs.existsSync(devPath), 'existsProd=', fs.existsSync(prodPath))

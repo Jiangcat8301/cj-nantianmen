@@ -32,7 +32,7 @@
       "icon": "nantianmen.ico",
       "extraResources": [
         {
-          "from": "../server-go/nantianmen-server.exe",
+          "from": "../server/nantianmen-server.exe",
           "to": "server/nantianmen-server.exe"
         }
       ]
@@ -54,7 +54,7 @@
       "icon": "nantianmen-logo.png",
       "extraResources": [
         {
-          "from": "../server-go/nantianmen-server",
+          "from": "../server/nantianmen-server",
           "to": "server/nantianmen-server"
         }
       ]

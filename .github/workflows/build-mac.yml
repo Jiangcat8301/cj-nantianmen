@@ -26,7 +26,7 @@ jobs:
           go-version: '1.23'
 
       - name: Cross-compile Go server (darwin arm64 + amd64)
-        working-directory: server-go
+        working-directory: server
         run: |
           GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-server-${{ github.ref_name }}-mac-arm64 ./cmd/nantianmen-server/
           GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-server-${{ github.ref_name }}-mac-x64 ./cmd/nantianmen-server/
@@ -61,7 +61,7 @@ jobs:
           go-version: '1.23'
 
       - name: Cross-compile Go CLI (darwin arm64 + amd64)
-        working-directory: server-go
+        working-directory: server
         run: |
           GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-arm64 ./cmd/nantianmen/
           GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-x64 ./cmd/nantianmen/
@@ -124,10 +124,10 @@ jobs:
       # main.cjs picks nantianmen-server (no .exe on macOS).
       - name: Place Go server for extraResources
         run: |
-          mkdir -p server-go
-          cp releases/nantianmen-server-*-mac-${{ matrix.arch }} server-go/nantianmen-server
-          chmod +x server-go/nantianmen-server
-          ls -lh server-go/nantianmen-server
+          mkdir -p server
+          cp releases/nantianmen-server-*-mac-${{ matrix.arch }} server/nantianmen-server
+          chmod +x server/nantianmen-server
+          ls -lh server/nantianmen-server
 
       - name: Vite build
         working-directory: desktop

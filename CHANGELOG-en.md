@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [v0.4.21] — 2026-08-02
 
 ### Changed — Go rewrite of server/CLI (dual-track 3-6 months)
-- **server-go/ (new Go implementation)**: server rewritten in Go 1.26.3 with chi/v5 router and modernc.org/sqlite (pure Go, no cgo); cross-compile friendly; HTTP router keeps the same `/v1/*` and `/api/admin/*` endpoints as the Node server, DB schema 100% compatible with v0.3.15
-- **CLI switched to Go binary**: `server-go/cmd/nantianmen/` ships the Go CLI (`ClientVersion = 0.4.21`); strict version handshake — exits with code 1 if server version does not match
+- **server/ (new Go implementation)**: server rewritten in Go 1.26.3 with chi/v5 router and modernc.org/sqlite (pure Go, no cgo); cross-compile friendly; HTTP router keeps the same `/v1/*` and `/api/admin/*` endpoints as the Node server, DB schema 100% compatible with v0.3.15
+- **CLI switched to Go binary**: `server/cmd/nantianmen/` ships the Go CLI (`ClientVersion = 0.4.21`); strict version handshake — exits with code 1 if server version does not match
 - **Desktop spawns Go server**: `desktop/electron/main.cjs` now uses `child_process.spawn` to launch `extraResources/server/nantianmen-server.exe` with env `NANTIANMEN_LOCAL_MODE=1` to bypass admin auth; `before-quit` hook sends SIGTERM to the Go child
 - **Version unified across three components**: desktop `0.4.21` / Go server `ServerVersion = 0.4.21` / Go CLI `ClientVersion = 0.4.21` / `cli/package.json` `0.4.21`; legacy Node server (`server/`) stays at `0.3.15` running in parallel
 - **PE icon embedded**: both Go binaries use `rsrc -ico nantianmen.ico -arch amd64 -o icon.syso` and `go build` auto-links the .syso; Windows Explorer shows the dedicated icon
