@@ -41,6 +41,7 @@ jobs:
           path: releases/nantianmen-server-*-mac-*
 
       - name: Attach server binaries to release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -75,6 +76,7 @@ jobs:
           path: releases/nantianmen-cli-*-mac-*
 
       - name: Attach CLI binaries to release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
