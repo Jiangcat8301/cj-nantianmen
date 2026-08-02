@@ -28,6 +28,10 @@ forwards the request to the corresponding celestial court, and translates the re
 > | Desktop | Windows | x64 | 83.6 MB | `2ccf0880...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
 > | Server (standalone) | Windows | x64 | 17.0 MB | `fd195114...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-win-x64.exe) |
 > | CLI | Windows | x64 | 9.1 MB | `5f9f8349...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-win-x64.exe) |
+> | Server | macOS arm64 | — | 16.0 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-arm64) |
+> | Server | macOS x64 | — | 16.7 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-x64) |
+> | CLI | macOS arm64 | — | 8.3 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-arm64) |
+> | CLI | macOS x64 | — | 8.9 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-x64) |
 
 ---
 
