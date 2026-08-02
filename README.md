@@ -94,25 +94,18 @@ Desktop 内嵌 Go server binary 到 `extraResources/server/`，启动时 `child_
 
 conf + db 文件在此目录。`-c/-D` 显式指定任意位置仍生效（dev 用法）。
 
-## 架构（v0.2.3）
+## 架构（v0.4.21）
 
 ```
 cj-nantianmen/
-├── server/         # Node.js Fastify 后端，可独立运行；与 desktop 共享一个进程
-│   ├── conf.js           # nantianmen-conf.json 单点配置 + 内存常驻
-│   ├── auth.js           # Bearer M 校验（md5(md5(pwd) + salt)）
-│   ├── index.js          # 入口：监听 + register routes
-│   ├── db/               # Database 抽象层 + SQLite3 实现 + MySQL impl（占位）
-│   ├── routes/           # admin / llm / provider / apikey
-│   └── services/         # provider / modelMap / llmProxy / protocol / stats / commlog
+├── server/         # Go 服务端（pure Go，chi/v5 + modernc.org/sqlite）
+│   ├── cmd/nantianmen-server/  # 入口
+│   └── internal/               # api / commlog / conf / db / llm / modelmap / stats
+├── cli/            # Go CLI（纯 stdlib，单文件）
+│   └── main.go
 ├── desktop/        # Electron + Vue3 + Vite + Tailwind 桌面管理
-│   └── electron/main.cjs # fork server/index.js（v0.2 无需 Python）
-├── cli/            # 单文件 Node.js CLI（无第三方依赖）
-│   ├── index.js          # subcommand dispatch + 解析 -P/--password
-│   └── prompt.js         # TTY / piped stdin 两种模式
+│   └── electron/main.cjs # spawn nantianmen-server.exe
 └── releases/       # 构建产物（不入 repo）
-
-首次启动会创建（跨平台 user-data 子目录 `cj-nantianmen/`，由 launcher 决定写入；可在 Desktop Settings 改路径）：
 nantianmen-conf.json          # host/port/password/salt/log_enabled/database/window_state
 nantianmen.db                 # SQLite 数据文件（默认，含 communication_log 表）
 communication_log.json        # 通信日志（v0.2.7 之前的旧文件，首次启动会被自动迁移到 nantianmen.db 后删除）
@@ -123,9 +116,9 @@ communication_log.json        # 通信日志（v0.2.7 之前的旧文件，首�
 
 | 组件 | 语言 | 启动方式 | conf+db 落点 |
 |------|------|---------|----------|
-| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js [-c conf -D db]` | user-data 子目录 `cj-nantianmen/`，无 flag 时 |
-| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` | 同上（`~/.cj-nantianmen/`） |
-| **cli** | Node.js (stdlib) + Bun compile | `cd cli && node index.js <command>` 或 `nantianmen-cli-*.exe` | 同上（探测 127.0.0.1:38271，未起则 fork） |
+| **server** | Go 1.26 + chi/v5 + modernc.org/sqlite | `cd server && go build -o ../releases/nantianmen-server.exe ./cmd/nantianmen-server/` | 同上（`~/.cj-nantianmen/`） |
+| **desktop** | Electron 33 + Vue3 + Vite | `cd desktop && npm install && npm run electron:dev` | 同上（`~/.cj-nantianmen/`） |
+| **cli** | Go (stdlib) | `cd cli && go build -o ../releases/nantianmen-cli.exe .` | 同上（探测 127.0.0.1:38271，未起则 spawn） |
 
 **共同规则**：`nantianmen-conf.json` 与 `nantianmen.db` 永远落在 `~/.cj-nantianmen/`，由 server 内 `defaultBaseDir()` 决定（直接取 `os.homedir()` + `.cj-nantianmen`，跨平台一致）。`-c/-D` 显式传任意位置仍生效。
 
@@ -165,8 +158,7 @@ CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
 
 ```bash
 cd server
-npm install
-node index.js [-c conf -D db]    # 默认：conf+db 在 user-data/cj-nantianmen/
+go build -o ../releases/nantianmen-server.exe ./cmd/nantianmen-server/
 # 启动后监听 http://127.0.0.1:38271，路由全部可用
 ```
 
@@ -174,12 +166,10 @@ node index.js [-c conf -D db]    # 默认：conf+db 在 user-data/cj-nantianmen/
 
 ```bash
 cd cli
-node index.js setup           # 无 server 时自动启动一份；写入 host/port/db/admin password
-node index.js health          # 探测 server（未运行则 fork）
-node index.js provider ls     # 列 provider
-
-# 或使用编译好的 exe
-nantianmen-cli-0.2.3-win-x64.exe setup
+go build -o ../releases/nantianmen-cli.exe .
+nantianmen-cli.exe setup           # 无 server 时自动 spawn；写入 host/port/db/admin password
+nantianmen-cli.exe health          # 探测 server（未运行则 spawn）
+nantianmen-cli.exe provider ls     # 列 provider
 ```
 
 ### Desktop
@@ -187,8 +177,8 @@ nantianmen-cli-0.2.3-win-x64.exe setup
 ```bash
 cd desktop
 npm install
-npm run electron:dev          # dev：fork ../server，conf+db 写到 user-data/cj-nantianmen/
-npm run electron:build        # 出包到 ../releases/nantianmen-0.2.14-win-x64.exe
+npm run electron:dev          # dev：spawn server binary，conf+db 写到 user-data/cj-nantianmen/
+npm run electron:build        # 出包到 ../releases/nantianmen-0.4.21-win-x64.exe
 # 双击 Nantianmen.exe，conf+db 落到 ~/.cj-nantianmen/（持久）
 ```
 
@@ -196,10 +186,10 @@ npm run electron:build        # 出包到 ../releases/nantianmen-0.2.14-win-x64.
 
 | 层 | 技术 |
 |----|------|
-| 后端 | Node.js 22+ / Fastify 4 / better-sqlite3 / Node fetch |
+| 后端 | Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go) |
 | 前端 | Electron / Vue 3 / Vite / Tailwind CSS |
-| CLI | Node.js (stdlib) + Bun compile 出 exe |
-| 数据库 | SQLite3 (WAL，better-sqlite3 同步 binding) |
+| CLI | Go (stdlib) |
+| 数据库 | SQLite3 (modernc.org/sqlite，pure-Go 实现) |
 | 配置 | 单文件 JSON，常驻内存 |
 
 ## 安全性
@@ -220,17 +210,14 @@ npm run electron:build        # 出包到 ../releases/nantianmen-0.2.14-win-x64.
 ## 测试
 
 ```bash
-# server 单元测试（20 步全过）
-cd server && node test_setup.js
-
-# CLI 端到端测试（10 步全过，包含 password 全链路验证）
-cd ../tools && node run-cli-e2e.js
+# Go server: build + vet
+cd server && go build ./... && go vet ./...
 ```
 
 ## 兼容性
 
 - Windows / Linux / macOS
-- Node.js 22+（必需；Server 与 CLI 都用 fetch API）
+- Go 1.23+（server + CLI）
 - Electron 33+（Desktop）
 
 ## License

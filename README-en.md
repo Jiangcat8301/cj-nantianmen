@@ -92,25 +92,18 @@ Two management interfaces:
 
 conf + db files live here. `-c/-D` flags override for custom paths.
 
-## Architecture (v0.2.3)
+## Architecture (v0.4.21)
 
 ```
 cj-nantianmen/
-├── server/         # Node.js Fastify backend, runs independently; shared with desktop
-│   ├── conf.js           # nantianmen-conf.json single-file config + memory-resident
-│   ├── auth.js           # Bearer M check: md5(md5(pwd) + salt)
-│   ├── index.js          # entry: listen + register routes
-│   ├── db/               # Database abstraction + SQLite3 impl + MySQL impl (placeholder)
-│   ├── routes/           # admin / llm / provider / apikey
-│   └── services/         # provider / modelMap / llmProxy / protocol / stats / commlog
+├── server/         # Go server (pure Go, chi/v5 + modernc.org/sqlite)
+│   ├── cmd/nantianmen-server/  # entrypoint
+│   └── internal/               # api / commlog / conf / db / llm / modelmap / stats
+├── cli/            # Go CLI (stdlib, single file)
+│   └── main.go
 ├── desktop/        # Electron + Vue3 + Vite + Tailwind desktop UI
-│   └── electron/main.cjs # fork server/index.js (v0.2 dropped Python)
-├── cli/            # Single-file Node.js CLI (no third-party deps)
-│   ├── index.js          # subcommand dispatch + parse -P/--password
-│   └── prompt.js         # TTY / piped stdin modes
+│   └── electron/main.cjs # spawn nantianmen-server
 └── releases/       # Build artifacts (not in repo)
-
-After first startup, created files:
 nantianmen-conf.json          # host/port/password/salt/log_enabled/database/window_state
 nantianmen.db                 # SQLite file (default; includes communication_log table)
 communication_log.json        # Legacy comm log (pre-v0.2.7); auto-migrated to nantianmen.db on first run, then deleted
@@ -121,9 +114,9 @@ communication_log.json        # Legacy comm log (pre-v0.2.7); auto-migrated to n
 
 | Component | Language | Startup |
 |-----------|----------|---------|
-| **server** | Node.js (Fastify + better-sqlite3) | `cd server && npm install && node index.js [-c conf -D db]` |
-| **desktop** | Node.js (Electron + Vue3) | `cd desktop && npm install && npm run electron:dev` |
-| **cli** | Node.js (stdlib) + Bun compile | `cd cli && node index.js <command>` or `nantianmen-cli-*.exe` |
+| **server** | Go 1.26 + chi/v5 + modernc.org/sqlite | `cd server && go build -o ../releases/nantianmen-server.exe ./cmd/nantianmen-server/` |
+| **desktop** | Electron 33 + Vue3 + Vite | `cd desktop && npm install && npm run electron:dev` |
+| **cli** | Go (stdlib) | `cd cli && go build -o ../releases/nantianmen-cli.exe .` |
 
 ### Communication Flow
 
@@ -161,8 +154,7 @@ Full command list: see [docs/cli-en.md](./docs/cli-en.md).
 
 ```bash
 cd server
-npm install
-node index.js [-c conf -D db]
+go build -o ../releases/nantianmen-server.exe ./cmd/nantianmen-server/
 # Listens on http://127.0.0.1:38271, all routes active
 ```
 
@@ -170,12 +162,10 @@ node index.js [-c conf -D db]
 
 ```bash
 cd cli
-node index.js setup           # writes host/port/db/admin password
-node index.js health          # check server status
-node index.js provider ls     # list providers
-
-# Or use compiled exe
-nantianmen-cli-0.2.3-win-x64.exe setup
+go build -o ../releases/nantianmen-cli.exe .
+nantianmen-cli.exe setup           # writes host/port/db/admin password
+nantianmen-cli.exe health          # check server status
+nantianmen-cli.exe provider ls     # list providers
 ```
 
 ### Desktop
@@ -183,18 +173,18 @@ nantianmen-cli-0.2.3-win-x64.exe setup
 ```bash
 cd desktop
 npm install
-npm run electron:dev          # dev: forks ../server
-npm run electron:build        # outputs ../releases/nantianmen-0.2.14-win-x64.exe
+npm run electron:dev          # dev: spawns server binary
+npm run electron:build        # outputs ../releases/nantianmen-0.4.21-win-x64.exe
 ```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Node.js 22+ / Fastify 4 / better-sqlite3 / Node fetch |
+| Backend | Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go) |
 | Frontend | Electron / Vue 3 / Vite / Tailwind CSS |
-| CLI | Node.js (stdlib) + Bun compile |
-| Database | SQLite3 (WAL, better-sqlite3 sync binding) |
+| CLI | Go (stdlib) |
+| Database | SQLite3 (modernc.org/sqlite, pure-Go implementation) |
 | Config | Single JSON file, memory-resident |
 
 ## Security
@@ -215,17 +205,14 @@ npm run electron:build        # outputs ../releases/nantianmen-0.2.14-win-x64.ex
 ## Tests
 
 ```bash
-# Server unit tests (20/20 PASS)
-cd server && node test_setup.js
-
-# CLI end-to-end (10/10 PASS, covers password chain)
-cd ../tools && node run-cli-e2e.js
+# Go server: build + vet
+cd server && go build ./... && go vet ./...
 ```
 
 ## Compatibility
 
 - Windows / Linux / macOS
-- Node.js 22+ (required; both Server and CLI use native fetch)
+- Go 1.23+ (server + CLI)
 - Electron 33+ (Desktop)
 
 ## License
