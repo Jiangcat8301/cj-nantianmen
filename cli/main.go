@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const ClientVersion = "0.4.21"
+const ClientVersion = "0.4.23"
 const ServerBinary = "nantianmen-server.exe"
 
 var cfgDir string

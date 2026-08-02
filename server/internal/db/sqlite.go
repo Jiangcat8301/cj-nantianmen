@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS communication_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   request_id TEXT NOT NULL,
   time TEXT NOT NULL,
-  user_id TEXT NOT NULL DEFAULT '',
+  user_id INTEGER NOT NULL DEFAULT 0,
   user_name TEXT NOT NULL DEFAULT '',
   provider_id INTEGER NOT NULL,
   provider_name TEXT NOT NULL DEFAULT '',
@@ -139,6 +139,8 @@ func runMigrations() {
 	instance.conn.Exec("UPDATE api_keys SET assigned_model_id = (SELECT id FROM models WHERE model_name = api_keys.assigned_model LIMIT 1) WHERE assigned_model IS NOT NULL AND assigned_model_id IS NULL")
 	instance.conn.Exec("UPDATE usage_stats SET model_id = (SELECT id FROM models WHERE model_name = usage_stats.model_name LIMIT 1) WHERE model_id IS NULL AND model_name != ''")
 	instance.conn.Exec("UPDATE communication_log SET model_id = (SELECT id FROM models WHERE model_name = communication_log.model_name LIMIT 1) WHERE model_id IS NULL AND model_name != ''")
+	// ponytail: user_id was TEXT in early v0.4 — clean any "N.0" strings to bare integers
+	instance.conn.Exec("UPDATE communication_log SET user_id = CAST(user_id AS INTEGER) WHERE user_id LIKE '%.0'")
 }
 
 func Get() *DB {

@@ -4,7 +4,7 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.4.21--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.4.23--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Go%201.26%20%2B%20chi%2Fv5-00ADD8)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20modernc.org%2Fsqlite-003B57)]()
@@ -23,23 +23,29 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.4.21](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.21) 已发布** — 2026-08-02。**Go 重写 server + CLI**，Desktop spawn Go server，OpenAI Embeddings 端到端验证，5 bug 修复。详见 [CHANGELOG](./CHANGELOG.md)。
+> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) 已发布** — 2026-08-03。**Go 重写 server + CLI**，Desktop spawn Go server，OpenAI Embeddings 端到端验证，5 bug 修复。详见 [CHANGELOG](./CHANGELOG.md)。
 >
 > | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | 83.6 MB | `2ccf0880...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | 17.0 MB | `fd195114...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-win-x64.exe) |
-> | CLI | Windows | x64 | 9.1 MB | `5f9f8349...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-win-x64.exe) |
-> | Server | macOS arm64 | — | 16.0 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-arm64) |
-> | Server | macOS x64 | — | 16.7 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-x64) |
-> | CLI | macOS arm64 | — | 8.3 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-arm64) |
-> | CLI | macOS x64 | — | 8.9 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-x64) |
+> | Desktop | Windows | x64 | 75.3 MB | `3353aa47...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 16.9 MB | `c451d3f7...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
+> | CLI | Windows | x64 | 9.0 MB | `a64f5f63...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-win-x64.exe) |
+> | Server | macOS arm64 | — | 16.0 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-arm64) |
+> | Server | macOS x64 | — | 16.7 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
+> | CLI | macOS arm64 | — | 8.3 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
+> | CLI | macOS x64 | — | 8.9 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
 
 ---
 
+## 🆕 v0.4.23 — streaming tool_call 修复
+
+v0.4.21 的 Go server 在 SSE 流里 `tool_choice=required` 时会**吞掉 tool_calls 参数**：`parseTokens` 函数在遇到不闭合 `{...` 的 chunk 时 panic，chi.Recoverer 关闭连接，导致 tool_calls delta / finish_reason / `[DONE]` 全部丢失。
+
+v0.4.23 修复：`parseTokens` 加 1 行越界检查（`if depth != 0 || end >= len(text) { return }`），已用 MiniMax-M3 + Deepseek-V4-Pro 验证 100% 修复。
+
 ## 🆕 v0.4.21 — Go 重写
 
-v0.4.21 起 server 和 CLI 用 **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)** 重写。Node 版本（v0.3.15）双轨运行 3-6 个月观察稳定性。
+v0.4.21 起 server 和 CLI 用 **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)** 重写。Node 版本（v0.3.15）双轨运行 3-6 个月观察稳定性。v0.4.23 修了 streaming tool_call panic bug（见上）。
 
 ### 为什么 Go
 
@@ -94,7 +100,7 @@ Desktop 内嵌 Go server binary 到 `extraResources/server/`，启动时 `child_
 
 conf + db 文件在此目录。`-c/-D` 显式指定任意位置仍生效（dev 用法）。
 
-## 架构（v0.4.21）
+## 架构（v0.4.23）
 
 ```
 cj-nantianmen/
@@ -178,7 +184,7 @@ nantianmen-cli.exe provider ls     # 列 provider
 cd desktop
 npm install
 npm run electron:dev          # dev：spawn server binary，conf+db 写到 user-data/cj-nantianmen/
-npm run electron:build        # 出包到 ../releases/nantianmen-0.4.21-win-x64.exe
+npm run electron:build        # 出包到 ../releases/nantianmen-0.4.23-win-x64.exe
 # 双击 Nantianmen.exe，conf+db 落到 ~/.cj-nantianmen/（持久）
 ```
 

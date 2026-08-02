@@ -23,7 +23,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const ServerVersion = "0.4.21"
+const ServerVersion = "0.4.23"
 
 var localMode bool
 
@@ -170,6 +170,14 @@ func stringOr(v interface{}, def string) string {
 		return s
 	}
 	return def
+}
+
+// ponytail: returns nil for empty/missing strings → COALESCE(NULL, col) preserves col
+func stringOrNil(v interface{}) interface{} {
+	if s, ok := v.(string); ok && s != "" {
+		return s
+	}
+	return nil
 }
 
 func coalesce(v, def interface{}) interface{} {
@@ -784,11 +792,11 @@ func RegisterApikeyRoutes(r chi.Router) {
 		id, _ := strconv.Atoi(chi.URLParam(r, "id"))
 		var body map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&body)
-		name, _ := body["name"].(string)
-		note, _ := body["note"].(string)
+		name := stringOrNil(body["name"])
+		note := stringOrNil(body["note"])
 		oldName, _ := body["old_name"].(string)
 		if name != "" && oldName != "" && name != oldName {
-			commlog.RenameUser(oldName, name)
+			commlog.RenameUser(oldName, name.(string))
 		}
 		if _, ok := body["assigned_model_id"]; ok {
 			var v interface{} = nil

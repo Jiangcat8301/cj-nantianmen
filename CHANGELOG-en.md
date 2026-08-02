@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.4.23] — 2026-08-03
+
+### Fixed
+- **streaming + tool_call parameter loss**: v0.4 Go server's `parseTokens` function would panic on slice bounds out of range when an SSE chunk contained unterminated `{...` JSON, triggering chi.Recoverer to close the HTTP connection and causing tool_calls delta / finish_reason / `[DONE]` to all be lost. Symptom: when a client streams with tool_choice=required, tool_calls.arguments was always an empty string. Fix: one-line guard `if depth != 0 || end >= len(text) { return }` added after the bracket-matching loop at line 304-317. Verified 100% fixed with MiniMax-M3 + Deepseek-V4-Pro.
+
 ## [v0.4.21] — 2026-08-02
 
 ### Changed — Go rewrite of server/CLI (dual-track 3-6 months)

@@ -48,7 +48,7 @@ func logEntry(entry map[string]interface{}) {
 	// gets them without adding 2 fields per call site.
 	if _, ok := entry["user_id"]; !ok {
 		if id, ok := entry["apiKeyId"].(int64); ok && id > 0 {
-			entry["user_id"] = fmt.Sprintf("%d.0", id)
+			entry["user_id"] = id
 			entry["user_name"] = getUserName(id)
 		}
 	}
@@ -302,6 +302,9 @@ func parseTokens(text, proto string, input, output, cached *int) {
 				break
 			}
 		}
+	}
+	if depth != 0 || end >= len(text) {
+		return // ponytail: streaming tool_call fix — unterminated JSON would panic on json.Unmarshal slice
 	}
 	var u map[string]interface{}
 	if err := json.Unmarshal([]byte(text[start:end+1]), &u); err != nil {

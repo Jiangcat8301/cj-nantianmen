@@ -2,7 +2,7 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.4.21--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.4.23--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Go%201.26%20%2B%20chi%2Fv5-00ADD8)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20modernc.org%2Fsqlite-003B57)]()
@@ -21,23 +21,29 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.4.21](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.21) released** — 2026-08-02. **Go rewrite of server + CLI**, Desktop spawns Go server, OpenAI Embeddings end-to-end verified, 5 bug fixes. See [CHANGELOG](./CHANGELOG-en.md).
+> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) released** — 2026-08-03. **Go rewrite of server + CLI**, Desktop spawns Go server, OpenAI Embeddings end-to-end verified, 5 bug fixes. See [CHANGELOG](./CHANGELOG-en.md).
 >
 > | Asset | Platform | Arch | Size | SHA-256 | Download |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | 83.6 MB | `2ccf0880...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | 17.0 MB | `fd195114...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-win-x64.exe) |
-> | CLI | Windows | x64 | 9.1 MB | `5f9f8349...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-win-x64.exe) |
-> | Server | macOS arm64 | — | 16.0 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-arm64) |
-> | Server | macOS x64 | — | 16.7 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-mac-x64) |
-> | CLI | macOS arm64 | — | 8.3 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-arm64) |
-> | CLI | macOS x64 | — | 8.9 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-mac-x64) |
+> | Desktop | Windows | x64 | 75.3 MB | `3353aa47...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 16.9 MB | `c451d3f7...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
+> | CLI | Windows | x64 | 9.0 MB | `a64f5f63...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-win-x64.exe) |
+> | Server | macOS arm64 | — | 16.0 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-arm64) |
+> | Server | macOS x64 | — | 16.7 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
+> | CLI | macOS arm64 | — | 8.3 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
+> | CLI | macOS x64 | — | 8.9 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
 
 ---
 
+## 🆕 v0.4.23 — streaming tool_call fix
+
+In v0.4.21 the Go server would **silently swallow tool_calls arguments** when streaming with `tool_choice=required`: the `parseTokens` function panicked on slice bounds out of range whenever an SSE chunk contained unterminated `{...` JSON, triggering chi.Recoverer to close the connection and losing the tool_calls delta / finish_reason / `[DONE]` chunks entirely.
+
+v0.4.23 fix: one-line guard `if depth != 0 || end >= len(text) { return }` added after the bracket-matching loop. Verified 100% fixed with MiniMax-M3 + Deepseek-V4-Pro.
+
 ## 🆕 v0.4.21 — Go rewrite
 
-From v0.4.21 the server and CLI are rewritten in **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)**. The legacy Node server (v0.3.15) runs in parallel for 3-6 months while we observe stability.
+From v0.4.21 the server and CLI are rewritten in **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)**. The legacy Node server (v0.3.15) runs in parallel for 3-6 months while we observe stability. v0.4.23 fixes the streaming tool_call panic bug (see above).
 
 ### Why Go
 
@@ -92,7 +98,7 @@ Two management interfaces:
 
 conf + db files live here. `-c/-D` flags override for custom paths.
 
-## Architecture (v0.4.21)
+## Architecture (v0.4.23)
 
 ```
 cj-nantianmen/
@@ -174,7 +180,7 @@ nantianmen-cli.exe provider ls     # list providers
 cd desktop
 npm install
 npm run electron:dev          # dev: spawns server binary
-npm run electron:build        # outputs ../releases/nantianmen-0.4.21-win-x64.exe
+npm run electron:build        # outputs ../releases/nantianmen-0.4.23-win-x64.exe
 ```
 
 ## Tech Stack

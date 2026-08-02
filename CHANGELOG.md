@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.4.23] — 2026-08-03
+
+### Fixed
+- **streaming + tool_call 参数吞没**：v0.4 Go server 的 `parseTokens` 函数在 SSE chunk 含未闭合 `{...` JSON 时会越界 panic，触发 chi.Recoverer 关闭 HTTP 连接，导致 tool_calls delta / finish_reason / `[DONE]` 全部丢失。表现：客户端 streaming 调用 tool_choice=required 时，tool_calls.arguments 永远是空字符串。修复方法：line 304-317 括号匹配循环后增加越界检查 `if depth != 0 || end >= len(text) { return }`（1 行）。已用 MiniMax-M3 + Deepseek-V4-Pro 验证 100% 修复。
+
 ## [v0.4.21] — 2026-08-02
 
 ### Changed — Go 重写 server/CLI（双轨 3-6 个月）
