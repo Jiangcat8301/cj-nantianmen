@@ -23,11 +23,11 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > 🚀 **[v0.4.21](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.21) released** — 2026-08-02. **Go rewrite of server + CLI**, Desktop spawns Go server, OpenAI Embeddings end-to-end verified, 5 bug fixes. See [CHANGELOG](./CHANGELOG-en.md).
 >
-> | Asset | Platform | Arch | Download |
-> | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | [nantianmen-0.4.21-win-x64.exe (84 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | [nantianmen-server-0.4.21-win-x64.exe (17 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-0.4.21-win-x64.exe) |
-> | CLI | Windows | x64 | [nantianmen-cli-0.4.21-win-x64.exe (9 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-0.4.21-win-x64.exe) |
+> | Asset | Platform | Arch | Size | SHA-256 | Download |
+> | --- | --- | --- | --- | --- | --- |
+> | Desktop | Windows | x64 | 83.6 MB | `2ccf0880...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 17.0 MB | `fd195114...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-win-x64.exe) |
+> | CLI | Windows | x64 | 9.1 MB | `5f9f8349...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-win-x64.exe) |
 
 ---
 

@@ -25,11 +25,11 @@
 
 > 🚀 **[v0.4.21](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.21) 已发布** — 2026-08-02。**Go 重写 server + CLI**，Desktop spawn Go server，OpenAI Embeddings 端到端验证，5 bug 修复。详见 [CHANGELOG](./CHANGELOG.md)。
 >
-> | 产物 | 平台 | 架构 | 下载 |
-> | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | [nantianmen-0.4.21-win-x64.exe (84 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | [nantianmen-server-0.4.21-win-x64.exe (17 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-0.4.21-win-x64.exe) |
-> | CLI | Windows | x64 | [nantianmen-cli-0.4.21-win-x64.exe (9 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-0.4.21-win-x64.exe) |
+> | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
+> | --- | --- | --- | --- | --- | --- |
+> | Desktop | Windows | x64 | 83.6 MB | `2ccf0880...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 17.0 MB | `fd195114...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-v0.4.21-win-x64.exe) |
+> | CLI | Windows | x64 | 9.1 MB | `5f9f8349...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-v0.4.21-win-x64.exe) |
 
 ---
 
