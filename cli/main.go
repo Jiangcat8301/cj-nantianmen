@@ -137,8 +137,8 @@ func resolveServerExe() string {
 	exeDir := filepath.Dir(os.Args[0])
 	candidates := []string{
 		filepath.Join(exeDir, ServerBinary),
-		filepath.Join(exeDir, "server-go", ServerBinary),
-		filepath.Join(exeDir, "..", "server-go", ServerBinary),
+		filepath.Join(exeDir, "server", ServerBinary),
+		filepath.Join(exeDir, "..", "server", ServerBinary),
 	}
 	for _, c := range candidates { if _, err := os.Stat(c); err == nil { return c } }
 	return ""

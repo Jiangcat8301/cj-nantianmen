@@ -1,4 +1,4 @@
-module server-go
+module nantianmen
 
 go 1.26.3
 

@@ -61,10 +61,10 @@ jobs:
           go-version: '1.23'
 
       - name: Cross-compile Go CLI (darwin arm64 + amd64)
-        working-directory: server
+        working-directory: cli
         run: |
-          GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-arm64 ./cmd/nantianmen/
-          GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-x64 ./cmd/nantianmen/
+          GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-arm64 .
+          GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-x64 .
           ls -lh ../releases/nantianmen-cli-*
 
       - name: Upload CLI artifacts
