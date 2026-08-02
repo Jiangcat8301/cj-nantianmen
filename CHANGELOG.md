@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 ### Fixed
 - **streaming + tool_call 参数吞没**：v0.4 Go server 的 `parseTokens` 函数在 SSE chunk 含未闭合 `{...` JSON 时会越界 panic，触发 chi.Recoverer 关闭 HTTP 连接，导致 tool_calls delta / finish_reason / `[DONE]` 全部丢失。表现：客户端 streaming 调用 tool_choice=required 时，tool_calls.arguments 永远是空字符串。修复方法：line 304-317 括号匹配循环后增加越界检查 `if depth != 0 || end >= len(text) { return }`（1 行）。已用 MiniMax-M3 + Deepseek-V4-Pro 验证 100% 修复。
+- **user_id 格式化为 "3.0" 字符串**：`proxy.go:logEntry` 将 api_key ID 用 `fmt.Sprintf("%d.0", id)` 格式化为 "3.0" 写入 communication_log.user_id（TEXT 列），导致日志管理和数据统计中用户显示为 "3.0" / "Key #3"。修复：`user_id` 存储为 int64，`user_id` 列类型从 TEXT 改为 INTEGER，新增启动时自动迁移清理旧 "N.0" 数据。
+- **分配/取消分配模型时 API Key 名称被清空**：`router.go` 的 PUT `/api/admin/api-keys/{id}` 将 `name`/`note` 解析为 Go 空字符串（而非 nil），导致 `COALESCE(?, name)` 被空串覆盖现有名称。修复：新增 `stringOrNil()` helper，请求未传 name 时传 nil → COALESCE 保留原有名称。
 
 ## [v0.4.21] — 2026-08-02
 

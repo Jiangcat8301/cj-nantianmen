@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - **streaming + tool_call parameter loss**: v0.4 Go server's `parseTokens` function would panic on slice bounds out of range when an SSE chunk contained unterminated `{...` JSON, triggering chi.Recoverer to close the HTTP connection and causing tool_calls delta / finish_reason / `[DONE]` to all be lost. Symptom: when a client streams with tool_choice=required, tool_calls.arguments was always an empty string. Fix: one-line guard `if depth != 0 || end >= len(text) { return }` added after the bracket-matching loop at line 304-317. Verified 100% fixed with MiniMax-M3 + Deepseek-V4-Pro.
+- **user_id formatted as "3.0"**: `proxy.go:logEntry` used `fmt.Sprintf("%d.0", id)` to write api_key IDs as "3.0" into communication_log.user_id (TEXT column), causing log management and stats to display "3.0" / "Key #3". Fix: store user_id as int64, change column type from TEXT to INTEGER, add auto-migration to clean old "N.0" data on startup.
+- **API Key name cleared on model assign/unassign**: `router.go` PUT `/api/admin/api-keys/{id}` parsed `name`/`note` as Go empty string (not nil), causing `COALESCE(?, name)` to overwrite existing names with empty string. Fix: add `stringOrNil()` helper — when name is not provided in the request, pass nil so COALESCE preserves the existing value.
 
 ## [v0.4.21] — 2026-08-02
 

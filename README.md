@@ -27,8 +27,8 @@
 >
 > | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | 75.3 MB | `3353aa47...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | 16.9 MB | `c451d3f7...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
+> | Desktop | Windows | x64 | 83.6 MB | `ec75e9d2...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 16.9 MB | `a89be92b...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
 > | CLI | Windows | x64 | 9.0 MB | `a64f5f63...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-win-x64.exe) |
 > | Server | macOS arm64 | — | 16.0 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-arm64) |
 > | Server | macOS x64 | — | 16.7 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
