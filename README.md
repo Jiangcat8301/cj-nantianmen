@@ -4,12 +4,12 @@
 >
 > *One Key to Summon All Models, Protocols Bent to Will*
 
-[![Status](https://img.shields.io/badge/status-v0.3.15--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.4.21--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
-[![Backend](https://img.shields.io/badge/backend-Node.js%2022%20%2B%20Fastify-339933)]()
-[![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20(better--sqlite3)-003B57)]()
+[![Backend](https://img.shields.io/badge/backend-Go%201.26%20%2B%20chi%2Fv5-00ADD8)]()
+[![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20modernc.org%2Fsqlite-003B57)]()
 [![Desktop](https://img.shields.io/badge/desktop-Electron%2033-47848F)]()
-[![CLI](https://img.shields.io/badge/CLI-Node.js%20%2B%20Bun%20compile-339933)]()
+[![CLI](https://img.shields.io/badge/CLI-Go%20binary-00ADD8)]()
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)]()
 
 当使用的供应商和模型较多时，即便通过外部工具，频繁修改各种智能体、应用的配置文件，切换不同情境下使用的模型，也是一件非常"不优雅"且"极其麻烦"的事情。我作了这个小工具，希望提供一个快速、简单、可审计地一站式供应商和模型切换方式。
@@ -23,14 +23,42 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.3.15](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.3.15) 已发布** — 2026-08-01。OpenAI Embeddings 代理 + models.capability 字段 + 4 产物 release pipeline。详见 [CHANGELOG](./CHANGELOG.md)。
+> 🚀 **[v0.4.21](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.21) 已发布** — 2026-08-02。**Go 重写 server + CLI**，Desktop spawn Go server，OpenAI Embeddings 端到端验证，5 bug 修复。详见 [CHANGELOG](./CHANGELOG.md)。
 >
 > | 产物 | 平台 | 架构 | 下载 |
 > | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | [nantianmen-0.3.15-win-x64.exe (83 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-win-x64.exe) |
-> | CLI | Windows | x64 | [nantianmen-cli-v0.3.15-win-x64.exe (99 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-cli-v0.3.15-win-x64.exe) |
-> | Desktop | macOS | arm64 | [nantianmen-0.3.15-mac-arm64.dmg (119 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-arm64.dmg) |
-> | Desktop | macOS | x64 | [nantianmen-0.3.15-mac-x64.dmg (124 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.3.15/nantianmen-0.3.15-mac-x64.dmg) |
+> | Desktop | Windows | x64 | [nantianmen-0.4.21-win-x64.exe (84 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-0.4.21-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | [nantianmen-server-0.4.21-win-x64.exe (17 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-server-0.4.21-win-x64.exe) |
+> | CLI | Windows | x64 | [nantianmen-cli-0.4.21-win-x64.exe (9 MB)](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.21/nantianmen-cli-0.4.21-win-x64.exe) |
+
+---
+
+## 🆕 v0.4.21 — Go 重写
+
+v0.4.21 起 server 和 CLI 用 **Go 1.26 + chi/v5 + modernc.org/sqlite (pure Go)** 重写。Node 版本（v0.3.15）双轨运行 3-6 个月观察稳定性。
+
+### 为什么 Go
+
+| 维度 | Node v0.3.15 | **Go v0.4.21** |
+|---|---|---|
+| 部署 | 双文件 (`server/index.js` + `node_modules`) | **单文件 static binary** |
+| 内存峰值 | 80-150 MB | **30-50 MB** |
+| 冷启动 | 1-2 秒 | **~150 毫秒** |
+| 跨平台 | 需目标平台装 Node + npm i | **cross-compile 一行命令** |
+| 原生依赖 | better-sqlite3 (需 node-gyp + MSVC) | **modernc.org/sqlite (pure Go, 无 cgo)** |
+| CLI 产物 | `bun build --compile` | **`go build` 直出** |
+| 图标 | Electron 自动 | **`rsrc -ico` → .syso 自动 link** |
+
+### 兼容性
+
+- HTTP 端点 (`/v1/*`、`/api/admin/*`) 与 v0.3.15 **完全一致**
+- DB schema **100% 兼容**，共用同一份 `C:/Users/<you>/.cj-nantianmen/nantianmen.db`
+- Desktop / CLI / Server **三端版本统一** `0.4.21`，握手校验不一致即拒绝
+- 旧 v0.3.15 EXE 可继续用，DB 不冲突
+
+### Desktop 集成
+
+Desktop 内嵌 Go server binary 到 `extraResources/server/`，启动时 `child_process.spawn` 拉起，env `NANTIANMEN_LOCAL_MODE=1` 跳过 admin auth（Desktop 不需要发 Bearer），关闭时 SIGTERM 收尾。
 
 ---
 

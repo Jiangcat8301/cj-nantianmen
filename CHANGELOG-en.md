@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v0.4.21] — 2026-08-02
+
+### Changed — Go rewrite of server/CLI (dual-track 3-6 months)
+- **server-go/ (new Go implementation)**: server rewritten in Go 1.26.3 with chi/v5 router and modernc.org/sqlite (pure Go, no cgo); cross-compile friendly; HTTP router keeps the same `/v1/*` and `/api/admin/*` endpoints as the Node server, DB schema 100% compatible with v0.3.15
+- **CLI switched to Go binary**: `server-go/cmd/nantianmen/` ships the Go CLI (`ClientVersion = 0.4.21`); strict version handshake — exits with code 1 if server version does not match
+- **Desktop spawns Go server**: `desktop/electron/main.cjs` now uses `child_process.spawn` to launch `extraResources/server/nantianmen-server.exe` with env `NANTIANMEN_LOCAL_MODE=1` to bypass admin auth; `before-quit` hook sends SIGTERM to the Go child
+- **Version unified across three components**: desktop `0.4.21` / Go server `ServerVersion = 0.4.21` / Go CLI `ClientVersion = 0.4.21` / `cli/package.json` `0.4.21`; legacy Node server (`server/`) stays at `0.3.15` running in parallel
+- **PE icon embedded**: both Go binaries use `rsrc -ico nantianmen.ico -arch amd64 -o icon.syso` and `go build` auto-links the .syso; Windows Explorer shows the dedicated icon
+
+### Why Go
+- **Simpler deployment**: single static binary; cross-compile produces Linux/macOS/Windows in one command — no Node, no node-gyp, no better-sqlite3 native build chain on user machines
+- **Lower memory footprint**: ~30-50 MB peak (Node 14/16 typically 80-150 MB at the same throughput)
+- **Faster startup**: ~150 ms vs Node ~1-2 s (Desktop shows "Server online" almost immediately on cold launch)
+- **No cgo cross-platform**: modernc.org/sqlite is pure-Go SQLite; Windows MSI/DMG installers no longer depend on the MSVC redistributable
+- **CLI distribution**: previously Node CLI needed `bun --compile` to produce a single-file EXE; Go CLI is just `GOOS=windows go build`
+
+### Added
+- **`POST /v1/embeddings` end-to-end verified**: LMStudio `text-embedding-nomic-embed-text-v1.5@f16` (model.id=859), 768-dim vectors, 2 inputs; DB writes `usage_stats` (`request_count=1`, `input_tokens/output_tokens/cached_tokens` all 0) and `communication_log` (raw text in `input`, `{embedding_dim, embedding_count, model, usage}` meta in `output`)
+- **CLI `stats --capability=chat|embedding|all`**: Go CLI stats filter by model capability (default `all`), mirroring the Desktop top select
+- **Desktop Stats top select "Model Type"**: `all / chat / embedding` (default `all`), persisted via the existing `getUiFilters` storage (same `saveUiFilters` interface as other selects)
+
+### Fixed
+- **`-D <db_path>` flag actually overrides conf**: previously the flag was silently ignored because `conf.SetPaths` stored the path in a package variable that `LoadConf` overwrote; now the flag is re-applied after `LoadConf`, default DB path `C:/Users/ASUS/.cj-nantianmen/nantianmen.db`
+- **`NANTIANMEN_LOCAL_MODE=1` env lets Go server skip admin auth**: a package-level `var localMode bool` is now initialized from the env via `func init()` in `router.go`, matching `server/auth.js` behavior in the Node server; Desktop spawn no longer needs to send a Bearer token
+- **SSE stream missing `\n\n` separator**: `bufio.Scanner` splits on `\n\n` and strips the delimiter; the Go proxy now writes back the trailing `\n\n` so OpenAI SDK clients can parse events correctly
+- **SSE stream missing `data: [DONE]`**: original code only injected `[DONE]` on the anthropic→openai conversion path; the openai→openai path (e.g. MiniMax-M3) now also writes `data: [DONE]\n\n` to avoid the client's `Provider returned an empty stream with no finish_reason` error
+- **`communication_log` INSERT NOT NULL failures**: the sparse `logEntry` map did not set `user_id / time / request_id`, and Go prepared statements do not honor schema `DEFAULT ''`; `FlushBuffer` now zeroes nil fields and marshals map fields to JSON strings for TEXT columns — fixes both chat and embedding paths simultaneously
+- **PE icon embedding**: Go binaries previously had no Windows resource table; now both contain RT_ICON(14) + RT_GROUP_ICON(12)
+- **SSE scanner buffer 64KB→8MB**: DeepSeek thinking blocks exceeded `bufio.Scanner`'s default 64KB cap, causing truncation. Bumped to 8MB (per-request allocation, GC'd on response completion)
+
+### Migration
+- **New installs**: download `releases/nantianmen-0.4.21-win-x64.exe` (Desktop) / `nantianmen-server-0.4.21-win-x64.exe` (standalone server) / `nantianmen-cli-0.4.21-win-x64.exe` (CLI). DB path stays at `C:/Users/ASUS/.cj-nantianmen/nantianmen.db` — no data migration required.
+- **Existing v0.3.15 users**: keep using `releases/nantianmen-0.3.15-win-x64.exe`; both servers share the same DB during the 3-6 month dual-track period. Switching the CLI to the Go binary unlocks `--capability` filtering immediately.
+
 ## [v0.3.15] — 2026-07-29
 
 ### Added

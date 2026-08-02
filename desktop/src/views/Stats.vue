@@ -23,6 +23,11 @@
         <option value="30d">{{ t('stats_30d') }}</option>
         <option value="">{{ t('stats_all') }}</option>
       </select>
+      <select v-model="filters.capability" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
+        <option value="">{{ t('capability_all') }}</option>
+        <option value="chat">chat</option>
+        <option value="embedding">embedding</option>
+      </select>
     </div>
 
     <!-- Stat Cards -->
@@ -169,7 +174,7 @@ import api from '../lib/api'
 import { calcCost, formatToken } from '../lib/format.js'
 
 const t = inject('t')
-const filters = ref({ provider: '', model: '', range: '7d' })
+const filters = ref({ provider: '', model: '', range: '7d', capability: '' })
 const stats = ref({})
 const providerList = ref([])
 const modelList = ref([])
@@ -181,6 +186,7 @@ const load = async () => {
     if (filters.value.provider) p.provider_id = filters.value.provider
     if (filters.value.model) p.model_name = filters.value.model
     if (filters.value.range) p.range = filters.value.range
+    if (filters.value.capability) p.capability = filters.value.capability
     const { data } = await api.getStats(p)
     stats.value = data
     // ponytail: sync tray stats to current filter
@@ -220,6 +226,7 @@ onMounted(async () => {
       if (data.stats.provider) filters.value.provider = data.stats.provider
       if (data.stats.model) filters.value.model = data.stats.model
       if (data.stats.range) filters.value.range = data.stats.range
+      if (data.stats.capability) filters.value.capability = data.stats.capability
     }
   } catch {}
   await loadProviders()
@@ -230,12 +237,13 @@ onMounted(async () => {
 onUnmounted(() => { if (poll) clearInterval(poll) })
 watch(() => filters.value.range, () => { load(); saveFilters() })
 watch(() => filters.value.model, () => { load(); saveFilters() })
+watch(() => filters.value.capability, () => { load(); saveFilters() })
 
 // ponytail: persist filters so they survive page navigation
 async function saveFilters() {
   try {
     const { data: current } = await api.getUiFilters()
-    await api.saveUiFilters({ ...current, stats: { provider: filters.value.provider, model: filters.value.model, range: filters.value.range } })
+    await api.saveUiFilters({ ...current, stats: { provider: filters.value.provider, model: filters.value.model, range: filters.value.range, capability: filters.value.capability } })
   } catch {}
 }
 

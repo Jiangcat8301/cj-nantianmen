@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electron')
 const path = require('path')
-const { fork } = require('child_process')
+const { spawn } = require('child_process')
 const http = require('http')
 const fs = require('fs')
 const os = require('os')
@@ -78,12 +78,13 @@ function getIcon() {
 }
 
 function getServerPath() {
-  // ponytail: bundled server path. In production it's in resources/server.
-  // In dev it's ../server relative to desktop/
-  const devPath = path.join(__dirname, '..', '..', 'server')
-  const prodPath = path.join(process.resourcesPath, 'server')
+  // ponytail: Go server binary. In production it's in resources/server.
+  // In dev it's ../server-go relative to desktop/
+  const binName = process.platform === 'win32' ? 'nantianmen-server.exe' : 'nantianmen-server'
+  const devPath = path.join(__dirname, '..', '..', 'server-go', binName)
+  const prodPath = path.join(process.resourcesPath, 'server', binName)
   const chosen = fs.existsSync(devPath) ? devPath : prodPath
-  console.log('[ntm] getServerPath: devPath=', devPath, 'prodPath=', prodPath, 'chosen=', chosen, 'existsDev=', fs.existsSync(devPath), 'existsProd=', fs.existsSync(prodPath))
+  console.log('[ntm] getServerPath:', chosen, 'existsDev=', fs.existsSync(devPath), 'existsProd=', fs.existsSync(prodPath))
   return chosen
 }
 
@@ -110,33 +111,30 @@ async function startServer() {
   }
   if (existing.online) throw new Error(versionMismatchMessage(existing))
 
-  // ponytail: v0.2 - spawn Node.js server directly instead of Python uvicorn.
-  // Bundled node_modules + index.js together with electron-builder extraResources.
-  const serverPath = getServerPath()
-  // ponytail: ELECTRON_RUN_AS_NODE=1 so fork() runs Node.js, not another Electron window.
-  // NANTIANMEN_LOCAL_MODE=1 so server skips admin auth for its parent process.
+  // ponytail: v0.4.21 — spawn Go server binary.
+  // Supports both --flag=value and --flag value forms (Go flag handles both natively).
+  // Passes --log-level=debug so desktop can capture startup details.
+  const serverBin = getServerPath()
   // ponytail: persistent user-data dir. Unified across cli / desktop / standalone server.
-  // Always `~/.cj-nantianmen/` on every OS. cli uses the same path via its own conf.js defaultBaseDir.
   const dataDir = path.join(os.homedir(), '.cj-nantianmen')
   try { fs.mkdirSync(dataDir, { recursive: true }) } catch {}
   const confPath = path.join(dataDir, 'nantianmen-conf.json')
   const dbPath = path.join(dataDir, 'nantianmen.db')
-  const confEnv = {
+  const env = {
     ...process.env,
-    ELECTRON_RUN_AS_NODE: '1',
     NANTIANMEN_LOCAL_MODE: '1',
   }
+  const args = ['--log-level=debug', '-c', confPath, '-D', dbPath]
   try {
-    const serverEntry = path.join(serverPath, 'index.js')
-    console.log('[ntm] forking:', serverEntry, 'cwd:', serverPath)
-    serverProcess = fork(
-      serverEntry,
-      ['-c', confPath, '-D', dbPath],
-      { cwd: serverPath, env: confEnv, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] },
+    console.log('[ntm] spawning:', serverBin, 'args:', args.join(' '))
+    serverProcess = spawn(
+      serverBin,
+      args,
+      { env, stdio: ['ignore', 'pipe', 'pipe'] },
     )
-    console.log('[ntm] fork pid:', serverProcess?.pid)
+    console.log('[ntm] spawn pid:', serverProcess?.pid)
   } catch (e) {
-    console.error('[ntm] fork failed:', e)
+    console.error('[ntm] spawn failed:', e)
     throw e
   }
 

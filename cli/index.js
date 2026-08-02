@@ -487,11 +487,25 @@ const calcCost = (r) =>
   + (r.cached_tokens || 0) * (r.cache_hit_price || 0) / 1_000_000
 
 async function cmdStats() {
-  // ponytail: support --range=today|7d|30d flag
+  // ponytail: support --range=today|7d|30d flag and --capability=chat|embedding
   const args = process.argv.slice(3)
-  const ri = args.indexOf('--range')
-  const range = ri !== -1 ? args[ri+1] : ''
-  const qs = range ? `?range=${range}` : ''
+  if (args.includes('-h') || args.includes('--help')) {
+    console.error('usage: nantianmen stats [--range=today|7d|30d|all] [--capability=chat|embedding]')
+    return
+  }
+  // ponytail: accept --flag=value and --flag value forms uniformly
+  const readFlag = (name) => {
+    const eq = args.find(a => a.startsWith(name + '='))
+    if (eq) return eq.slice(name.length + 1)
+    const i = args.indexOf(name)
+    return i !== -1 && i + 1 < args.length ? args[i + 1] : ''
+  }
+  const range = readFlag('--range')
+  const capability = readFlag('--capability')
+  const qp = []
+  if (range) qp.push(`range=${range}`)
+  if (capability) qp.push(`capability=${capability}`)
+  const qs = qp.length ? '?' + qp.join('&') : ''
   const r = await call('GET', '/api/admin/stats' + qs)
   if (r.status !== 200) { console.error('failed:', r.status); process.exit(1) }
   const d = r.data

@@ -1,7 +1,7 @@
 name: build-mac
 
-# ponytail: cross-compile macOS desktop DMG on macos-latest runner.
-# Output: arm64 + amd64 DMGs (matrix). Triggers on vX.Y.Z tag, manual dispatch, or PR.
+# ponytail: v0.4.21 — Go server cross-compile + Electron desktop DMG.
+# Output: arm64 + amd64 DMGs. Triggers on vX.Y.Z tag, manual dispatch, or PR.
 on:
   push:
     tags: ['v*.*.*']
@@ -9,21 +9,67 @@ on:
   pull_request:
     branches: [main]
 
-# ponytail: softprops/action-gh-release@v2 needs `contents: write` to attach DMGs to the
-# GitHub release. Many orgs / older repos default GITHUB_TOKEN to read-only, which is
-# what produced the 403 "Resource not accessible by integration" on v0.2.14. Declaring it
-# here is the minimum diff that fixes it without touching repo Settings.
 permissions:
   contents: write
 
 jobs:
+  # ponytail: cross-compile Go server for both macOS arches.
+  # Single job — Go cross-compile is fast, no need for matrix here.
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Cross-compile Go server (darwin arm64 + amd64)
+        working-directory: server-go
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-server-${{ github.ref_name }}-mac-arm64 ./cmd/nantianmen-server/
+          GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-server-${{ github.ref_name }}-mac-x64 ./cmd/nantianmen-server/
+          ls -lh ../releases/nantianmen-server-*
+
+      - name: Upload server artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nantianmen-mac-server-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: releases/nantianmen-server-*-mac-*
+
+  # ponytail: also cross-compile Go CLI for macOS.
+  cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Cross-compile Go CLI (darwin arm64 + amd64)
+        working-directory: server-go
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-arm64 ./cmd/nantianmen/
+          GOOS=darwin GOARCH=amd64 go build -o ../releases/nantianmen-cli-${{ github.ref_name }}-mac-x64 ./cmd/nantianmen/
+          ls -lh ../releases/nantianmen-cli-*
+
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nantianmen-mac-cli-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: releases/nantianmen-cli-*-mac-*
+
   mac:
+    needs: server
     runs-on: macos-latest
     timeout-minutes: 30
-    # ponytail: matrix over arm64 + amd64. Each arch gets its own upload + release attach.
-    # arch is passed to electron-builder via --${{ matrix.arch }} CLI flag (overrides
-    # package.json's hardcoded target arch). Earlier attempt rewrote package.json which
-    # broke — electron-builder rejects build.mac.arch (arch lives inside target[].arch).
     strategy:
       fail-fast: false
       matrix:
@@ -31,9 +77,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ponytail: sync desktop/package.json version from the pushed tag so the artifactName
-      # template (`nantianmen-${version}-mac-${arch}.${ext}`) produces 0.3.15 when the tag is
-      # v0.3.15. PR runs leave it untouched (github.ref_name is not a semver tag there).
       - name: Sync version from tag
         if: startsWith(github.ref, 'refs/tags/v')
         working-directory: desktop
@@ -42,43 +85,43 @@ jobs:
           node -e "const fs=require('fs');const p='package.json';const d=JSON.parse(fs.readFileSync(p,'utf8'));d.version='${TAG}';fs.writeFileSync(p,JSON.stringify(d,null,2)+'\n')"
           echo "desktop/package.json version -> $(node -p "require('./package.json').version")"
 
+      # ponytail: download the matching Go server binary for this matrix arch.
+      - name: Download Go server binary
+        uses: actions/download-artifact@v4
+        with:
+          name: nantianmen-mac-server-${{ github.ref_name }}
+          path: releases/
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: |
-            desktop/package-lock.json
-            server/package-lock.json
-            cli/package-lock.json
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Install desktop deps
         working-directory: desktop
         run: npm ci
 
-      - name: Install server deps (better-sqlite3 native source)
-        working-directory: server
-        run: npm ci
+      # ponytail: place the arch-matched Go server binary where extraResources expects it.
+      # main.cjs picks nantianmen-server (no .exe on macOS).
+      - name: Place Go server for extraResources
+        run: |
+          mkdir -p server-go
+          cp releases/nantianmen-server-*-mac-${{ matrix.arch }} server-go/nantianmen-server
+          chmod +x server-go/nantianmen-server
+          ls -lh server-go/nantianmen-server
 
-      # ponytail: vite build + electron-rebuild happen via package.json's electron:build:mac
-      # script. For the electron-builder step itself we invoke it directly with --${{ matrix.arch }}
-      # so each matrix leg produces the right arch DMG. CLI flag overrides package.json's arch.
       - name: Vite build
         working-directory: desktop
         run: npm run build
 
-      - name: Rebuild native deps (better-sqlite3) for Electron's Node ABI
-        working-directory: desktop
-        run: npx @electron/rebuild -m ../server -w better-sqlite3 -f
+      # ponytail: no better-sqlite3 rebuild needed — Go server is pure Go, no native Node deps.
+      # The old @electron/rebuild step is removed for v0.4.21.
 
-      # ponytail: matrix.arch picks arm64 vs x64. Pass --${{ matrix.arch }} as CLI flag to
-      # electron-builder — overrides package.json's hardcoded arch without touching source.
-      # (Earlier attempt rewrote build.mac.arch in package.json, but electron-builder rejects
-      # 'mac.arch' as unknown — arch belongs inside mac.target[].arch, not at mac level.)
       - name: Build mac (${{ matrix.arch }} dmg)
         working-directory: desktop
         run: npx electron-builder --mac --${{ matrix.arch }}
         env:
-          # Skip code signing — no Apple Developer cert in CI. Builds ad-hoc signed binaries.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload mac artifact
@@ -89,9 +132,6 @@ jobs:
           retention-days: 14
           path: temp/nantianmen-*-mac-${{ matrix.arch }}.dmg
 
-      # ponytail: attach the per-arch DMG to the GitHub Release so it survives past the
-      # 14-day artifact retention window. Path filters to current matrix arch only.
-      # On PRs the upload is a no-op (no release exists).
       - name: Attach ${{ matrix.arch }} DMG to release
         uses: softprops/action-gh-release@v2
         with:

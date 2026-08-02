@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.4.21] — 2026-08-02
+
+### Changed — Go 重写 server/CLI（双轨 3-6 个月）
+- **server-go/（全新 Go 实现）**：服务端用 Go 1.26.3 + chi/v5 + modernc.org/sqlite（pure Go，无 cgo）重写，cross-compile 友好；HTTP router 沿用 Node server 既有 `/v1/*`、`/api/admin/*` 端点，DB schema 100% 兼容 v0.3.15
+- **CLI 切到 Go binary**：`server-go/cmd/nantianmen/` 提供 Go 版 CLI（`ClientVersion = 0.4.21`），握手校验 server 版本一致，不一致即退出码 1
+- **Desktop spawn Go server**：`desktop/electron/main.cjs` 改用 `child_process.spawn` 启动 `extraResources` 里的 `server/nantianmen-server.exe`，env `NANTIANMEN_LOCAL_MODE=1` 跳过 admin auth；`before-quit` 钩子 SIGTERM 杀 Go 子进程
+- **三端版本统一**：desktop `0.4.21` / Go server `ServerVersion = 0.4.21` / Go CLI `ClientVersion = 0.4.21` / `cli/package.json` `0.4.21`；Node server（`server/`）维持 `0.3.15` 双轨运行
+- **PE 图标嵌入**：两枚 Go 二进制用 `rsrc -ico nantianmen.ico -arch amd64 -o icon.syso` 自动 link，Windows 资源管理器显示专属图标
+
+### Why Go
+- **部署简化**：single static binary，cross-compile 一行命令产出 Linux/macOS/Windows 三平台，无需在用户机器装 Node/Node-gyp/better-sqlite3 编译工具链
+- **内存占用低**：~30-50 MB 峰值（Node 14/16 通常 80-150 MB 同等流量）
+- **启动更快**：~150 ms vs Node ~1-2 s（冷启动 Desktop 立即见 Server online）
+- **无 cgo 跨平台**：modernc.org/sqlite 是 pure-Go SQLite，Windows MSI/DMG 安装包不再依赖 MSVC redistributable
+- **CLI 跨平台分发**：之前 Node CLI 需 `bun --compile` 才能产出单文件 EXE；Go CLI 直接 `GOOS=windows go build` 即产物
+
+### Added
+- **`POST /v1/embeddings` 端到端实测**：LMStudio `text-embedding-nomic-embed-text-v1.5@f16`（model.id=859），768 维向量，2 input；DB 写入 `usage_stats`（`request_count=1`，`input_tokens/output_tokens/cached_tokens` 全部 0）+ `communication_log`（`input` 存原文，`output` 存 `{embedding_dim, embedding_count, model, usage}` meta）
+- **CLI `stats --capability=chat|embedding|all`**：Go CLI 数据统计按模型 capability 过滤（默认全部），配合 Desktop 顶部 select 用法一致
+- **Desktop Stats 顶部 select「模型类型」**：「全部 / chat / embedding」，默认值「全部」，持久化到现有 `getUiFilters` 存储（与其他 select 同一套 `saveUiFilters` 接口）
+
+### Fixed
+- **`-D <db_path>` flag 真正覆盖 conf**：`server-go` 启动时从 conf 读 `Database.Path`，现在 `-D` flag 在 LoadConf 之后 re-apply `c.Database.Path = *dbPath`，默认 DB 路径 `C:/Users/ASUS/.cj-nantianmen/nantianmen.db`
+- **`NANTIANMEN_LOCAL_MODE=1` env 让 Go server 跳过 admin auth**：`var localMode bool` + `func init()` 从 env 读，匹配 Node server `server/auth.js` 行为；Desktop spawn 不再需要发 Bearer token
+- **SSE 流式响应缺 `\\n\\n` 分隔符**：`bufio.Scanner` 按 `\\n\\n` 切块并去分隔符，Go proxy 转发时主动补 `\\n\\n`，客户端 OpenAI SDK 能正常解析事件
+- **SSE 流不发 `data: [DONE]`**：原代码只在 anthropic→openai 转时补 `[DONE]`；openai→openai 路径（如 MiniMax-M3）现无条件发 `data: [DONE]\\n\\n`，避免客户端 `Provider returned an empty stream with no finish_reason` 报错
+- **`communication_log` INSERT NOT NULL 失败**：`logEntry` 稀疏 map 缺 `user_id / time / request_id` 字段，Go prepared stmt 不认 schema `DEFAULT ''`；`FlushBuffer` 入口给所有 nil 字段补零值，`map` 字段 marshal 成 JSON string 给 TEXT 列；chat + embedding 双路径同时修好
+- **PE 图标嵌入**：Go 二进制无 Windows 资源表，现在含 RT_ICON(14) + RT_GROUP_ICON(12)
+- **SSE scanner buffer 64KB→8MB**：DeepSeek thinking 块超 `bufio.Scanner` 默认 64KB 上限导致截断，`scanner.Buffer(make([]byte, 0, 1024*1024), 8*1024*1024)` 扩至 8MB（每次请求独立分配，响应结束 GC 回收）
+
+### Migration
+- **新装用户**：下载 `releases/nantianmen-0.4.21-win-x64.exe`（桌面）/ `nantianmen-server-0.4.21-win-x64.exe`（独立 server）/ `nantianmen-cli-0.4.21-win-x64.exe`（CLI），DB 路径沿用 v0.3.15 已有的 `C:/Users/ASUS/.cj-nantianmen/nantianmen.db`，无需数据迁移
+- **v0.3.15 老用户**：可继续用 v0.3.15 EXE（`releases/nantianmen-0.3.15-win-x64.exe`），DB 共享；双轨运行 3-6 个月观察稳定性，期间不强制迁移；CLI 切到 Go 版即可享受 `--capability` 过滤
+
 ## [v0.3.15] — 2026-07-29
 
 ### Added

@@ -36,6 +36,11 @@
         <option value="">{{ t('stats_all_users') || '全部用户' }}</option>
         <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
       </select>
+      <select v-model="filters.capability" @change="applyFilter" class="px-3 py-2 bg-gray-800 rounded border border-gray-700 text-sm">
+        <option value="">{{ t('capability_all') }}</option>
+        <option value="chat">chat</option>
+        <option value="embedding">embedding</option>
+      </select>
     </div>
 
     <!-- Top pagination -->
@@ -155,7 +160,7 @@ const selected = ref(new Set())
 const providers = ref([])
 const models = ref([])
 const users = ref([])
-const filters = ref({ provider_id: '', model_name: '', user_id: '' })
+const filters = ref({ provider_id: '', model_name: '', user_id: '', capability: '' })
 const page = ref(1)
 const totalPages = ref(1)
 const total = ref(0)
@@ -189,6 +194,7 @@ async function load() {
     if (filters.value.provider_id) p.provider_id = filters.value.provider_id
     if (filters.value.model_name) p.model_name = filters.value.model_name
     if (filters.value.user_id) p.user_id = filters.value.user_id
+    if (filters.value.capability) p.capability = filters.value.capability
     const { data } = await api.getCommLog(p)
     logs.value = data.rows || []
     total.value = data.total || 0
@@ -281,7 +287,7 @@ async function applyFilter() { page.value = 1; await load(); await saveFilters()
 async function saveFilters() {
   try {
     const { data: current } = await api.getUiFilters()
-    await api.saveUiFilters({ ...current, logs: { provider_id: filters.value.provider_id, model_name: filters.value.model_name, user_id: filters.value.user_id } })
+    await api.saveUiFilters({ ...current, logs: { provider_id: filters.value.provider_id, model_name: filters.value.model_name, user_id: filters.value.user_id, capability: filters.value.capability } })
   } catch {}
 }
 
@@ -294,6 +300,7 @@ onMounted(async () => {
       if (data.logs.provider_id) filters.value.provider_id = data.logs.provider_id
       if (data.logs.model_name) filters.value.model_name = data.logs.model_name
       if (data.logs.user_id) filters.value.user_id = data.logs.user_id
+      if (data.logs.capability) filters.value.capability = data.logs.capability
     }
   } catch {}
   await load()
