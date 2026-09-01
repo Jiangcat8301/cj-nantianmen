@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"server-go/internal/db"
+	"nantianmen/internal/db"
 )
 
 type Provider struct {

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"server-go/internal/db"
+	"nantianmen/internal/db"
 )
 
 type RecordInput struct {

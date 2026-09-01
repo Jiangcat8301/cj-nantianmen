@@ -11,12 +11,12 @@ import (
 	"strings"
 	"syscall"
 
-	"server-go/internal/api"
-	"server-go/internal/commlog"
-	"server-go/internal/conf"
-	"server-go/internal/db"
-	"server-go/internal/modelmap"
-	"server-go/internal/stats"
+	"nantianmen/internal/api"
+	"nantianmen/internal/commlog"
+	"nantianmen/internal/conf"
+	"nantianmen/internal/db"
+	"nantianmen/internal/modelmap"
+	"nantianmen/internal/stats"
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"server-go/internal/commlog"
-	"server-go/internal/conf"
-	"server-go/internal/db"
-	"server-go/internal/llm"
-	"server-go/internal/modelmap"
-	"server-go/internal/stats"
+	"nantianmen/internal/commlog"
+	"nantianmen/internal/conf"
+	"nantianmen/internal/db"
+	"nantianmen/internal/llm"
+	"nantianmen/internal/modelmap"
+	"nantianmen/internal/stats"
 
 	"github.com/go-chi/chi/v5"
 )

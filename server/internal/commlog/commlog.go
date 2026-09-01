@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"server-go/internal/conf"
-	"server-go/internal/db"
+	"nantianmen/internal/conf"
+	"nantianmen/internal/db"
 )
 
 var (
