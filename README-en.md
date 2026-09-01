@@ -21,17 +21,16 @@ forwards the request to the corresponding celestial court, and translates the re
 
 > One sentence: **a local gateway that lets every Agent access any LLM using any protocol — translation and accounting, all in one box.**
 
-> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) released** — 2026-08-03. See [CHANGELOG](./CHANGELOG.md).
+> 🚀 **[v0.5.1](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.5.1) released** — 2026-09-01. See [CHANGELOG](./CHANGELOG.md).
 >
 > | Asset | Platform | Arch | Size | SHA-256 | Download |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | 75.3 MB | `3353aa47...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | 16.9 MB | `c451d3f7...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
-> | CLI | Windows | x64 | 9.0 MB | `a64f5f63...` | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-win-x64.exe) |
-> | Server | macOS arm64 | — | 16.0 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-arm64) |
-> | Server | macOS x64 | — | 16.7 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
-> | CLI | macOS arm64 | — | 8.3 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
-> | CLI | macOS x64 | — | 8.9 MB | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
+> | Desktop | Windows | x64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-win-x64.exe) |
+> | CLI | Windows | x64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-win-x64.exe) |
+> | Desktop | macOS | arm64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-mac-arm64.dmg) |
+> | Server (standalone) | macOS | arm64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-mac-arm64) |
+> | CLI | macOS | arm64 | — | — | [Download](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-mac-arm64) |
 
 ---
 

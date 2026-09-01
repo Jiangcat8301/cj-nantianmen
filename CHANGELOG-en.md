@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+### Changed — macOS desktop: arm64 only (since v0.5.1)
+
+- **From v0.5.1 onward, macOS is built exclusively for arm64 (Apple Silicon); Intel Mac (amd64/x64) builds are dropped.**
+- `.github/workflows/build-mac.yml`: removed all `amd64` / `x64` GOARCH lines; the mac job no longer uses `strategy.matrix.arch: [arm64, x64]` and is pinned to `--arm64`; release uploads only include the arm64 artifacts.
+- `desktop/package.json`'s `mac.arch` is already `["arm64"]` — no change needed.
+- arm64 covers every Mac sold in the past ~5 years; Intel Mac users are a tiny minority. If x64 demand returns, restore the `strategy.matrix.arch` entries.
+- CI time roughly halved (mac job drops from 2 matrix runners to 1), saving GHA minutes.
+
 ### Fixed — FRPC custom domain verbatim + log pane
 
 - **Domain written verbatim to `customDomains`**: the old renderToml appended the frps serverAddr host as a root domain (`subdomain + "." + serverAddr-host`), forcing every user under the frps hostname and double-suffixing full-domain inputs like `nantianmen.ylpb360.com`. Fixed: `customDomains = [<user input verbatim>]`, nothing derived. frp's `customDomains` is a full-domain list with no relationship to serverAddr — frps host a.com + user vhost b.net is fully legal. `startFrpc()` now requires server_addr + server_port + a custom domain (HTTP mode can't route without customDomains). i18n `frpc_field_subdomain` → "Custom domain (full, e.g. b.net)" ×3 languages.

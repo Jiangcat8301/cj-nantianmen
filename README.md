@@ -23,17 +23,16 @@
 
 > 一句话：**一个本地网关，让所有 Agent 用任何协议访问任何 LLM，中间的翻译和记账它全包了。**
 
-> 🚀 **[v0.4.23](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.4.23) 已发布** — 2026-08-03。详见 [CHANGELOG](./CHANGELOG.md)。
+> 🚀 **[v0.5.1](https://github.com/Jiangcat8301/cj-nantianmen/releases/tag/v0.5.1) 已发布** — 2026-09-01。详见 [CHANGELOG](./CHANGELOG.md)。
 >
 > | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | 83.6 MB | `ec75e9d2...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-0.4.23-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | 16.9 MB | `a89be92b...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-win-x64.exe) |
-> | CLI | Windows | x64 | 9.0 MB | `a64f5f63...` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-win-x64.exe) |
-> | Server | macOS arm64 | — | 16.0 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-arm64) |
-> | Server | macOS x64 | — | 16.7 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-server-0.4.23-mac-x64) |
-> | CLI | macOS arm64 | — | 8.3 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-arm64) |
-> | CLI | macOS x64 | — | 8.9 MB | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.4.23/nantianmen-cli-0.4.23-mac-x64) |
+> | Desktop | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-win-x64.exe) |
+> | CLI | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-win-x64.exe) |
+> | Desktop | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-mac-arm64.dmg) |
+> | Server (standalone) | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-mac-arm64) |
+> | CLI | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-mac-arm64) |
 
 ---
 

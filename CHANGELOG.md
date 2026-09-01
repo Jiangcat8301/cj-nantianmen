@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0
 
 ## [v0.5.1] — 2026-08-20
 
+### Changed — macOS 桌面只发布 arm64 版（v0.5.1 起）
+
+- **从 v0.5.1 起，macOS 仅构建 arm64（Apple Silicon），不再构建 amd64 / x64（Intel Mac）**。
+- `.github/workflows/build-mac.yml`：删除 `amd64` / `x64` GOARCH 行；mac job 去掉 `strategy.matrix.arch: [arm64, x64]`，固定 `--arm64`；release 上传只保留 arm64 文件。
+- `desktop/package.json` 的 `mac.arch` 已是 `["arm64"]`，无需改动。
+- macOS arm64 已覆盖近 5 年所有在售 Mac，Intel Mac 用户极少。后续若需要 x64 版本，重新加 `strategy.matrix.arch` 即可。
+- CI 耗时减半（mac job 从 matrix 2 个 runner 降为 1 个），节省 GHA 分钟。
+
 ### Added — 默认 Embedding 模型（与默认 Chat 模型分离）
 
 - 新增 `is_default_embedding` 列（schema + migration），与 `is_default`（默认 Chat）独立。同一 model 行可同时为 default chat + default embedding。
