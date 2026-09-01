@@ -2,7 +2,7 @@
 
 > **One Key to Summon All Models, Protocols Bent to Will**
 
-[![Status](https://img.shields.io/badge/status-v0.4.23--alpha-blueviolet)]()
+[![Status](https://img.shields.io/badge/status-v0.5.1--alpha-blueviolet)]()
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Backend](https://img.shields.io/badge/backend-Go%201.26%20%2B%20chi%2Fv5-00ADD8)]()
 [![DB](https://img.shields.io/badge/db-SQLite3%20%2B%20modernc.org%2Fsqlite-003B57)]()
