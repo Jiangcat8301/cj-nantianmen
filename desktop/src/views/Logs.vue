@@ -67,6 +67,7 @@
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_out') }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_tokens_cached') || '缓存命中' }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_cache_hit_pct') || '命中%' }}</th>
+            <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_cost') || '花费' }}</th>
             <th class="py-2 px-2 whitespace-nowrap text-right">{{ t('log_duration') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('log_status') }}</th>
             <th class="py-2 px-2 whitespace-nowrap">{{ t('th_actions') }}</th>
@@ -87,6 +88,8 @@
               <td class="py-2 px-2 text-right font-mono text-xs">{{ l.capability === 'embedding' ? '—' : fmt(l.tokens_output) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ l.capability === 'embedding' ? '—' : fmt(l.tokens_cached) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-cyan-400">{{ l.capability === 'embedding' ? '—' : cacheHitPct(l) }}</td>
+              <!-- ponytail: v0.4.24 — USD cost captured at request time (model prices change later but stored cost is immutable). -->
+              <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap text-amber-400">{{ fmtCost(l.cost) }}</td>
               <td class="py-2 px-2 text-right font-mono text-xs whitespace-nowrap" :class="durationClass(l.duration_ms)">
                 {{ formatDuration(l.duration_ms) }}
               </td>
@@ -102,7 +105,7 @@
             </tr>
             <!-- Inline detail panel -->
             <tr v-if="selected.has(l.request_id||i)">
-              <td colspan="12" class="bg-gray-800/50 border-b border-gray-700 p-4">
+              <td colspan="13" class="bg-gray-800/50 border-b border-gray-700 p-4">
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <div class="flex items-center justify-between mb-1">
@@ -166,6 +169,13 @@ const totalPages = ref(1)
 const total = ref(0)
 
 const fmt = (n) => n ? n.toLocaleString() : '0'
+// ponytail: v0.4.24 — USD cost formatter. null/undefined → '−'. <0.01 → '<$0.01'. else '$N.NNNN'.
+const fmtCost = (c) => {
+  const n = Number(c)
+  if (!n) return '−'
+  if (n < 0.0001) return '>¥0.0001'
+  return '¥' + n.toFixed(4)
+}
 const cacheHitPct = (l) => l.tokens_input ? (Math.floor(l.tokens_cached / l.tokens_input * 10000) / 100) + '%' : '−'
 const pretty = (s) => { try { return JSON.stringify(JSON.parse(s), null, 2) } catch { return s } }
 const copy = (text) => { navigator.clipboard?.writeText(typeof text === 'string' ? text : '') }

@@ -5,6 +5,7 @@ const http = require('http')
 const fs = require('fs')
 const os = require('os')
 const { evaluateServerHealth, versionMismatchMessage } = require('./serverCompatibility.cjs')
+const frpc = require('./frpc.cjs')
 
 // ponytail: speed up Chromium cold start on Windows by skipping the GPU sandbox.
 // Nantianmen is a UI tool, no GPU compositing needed.
@@ -272,6 +273,8 @@ app.whenReady().then(async () => {
   // ponytail: show splash instantly so user knows app is launching.
   createSplash()
   await createWindow()
+  frpc.register()
+  frpc.autoStartIfEnabled()
   startServer().catch(e => console.error('Server start failed:', e))
   // System tray — use multi-resolution ICO (16/24/32/48/64/128/256) so Windows
   // picks the closest match to tray size (typically 16x16). PNG sometimes fails
@@ -313,10 +316,44 @@ app.whenReady().then(async () => {
   // ponytail: dynamic tray menu with start/stop + daily stats + i18n
   let serverOnline = false
   let trayLang = 'zh'
+  // ponytail: v0.5.0 — tray i18n grew; FRPC enable/disable + default-model submenu need labels.
   const trayLabels = {
-    zh: { show: '显示窗口', hide: '隐藏窗口', start: '启动服务', stop: '停止服务', quit: '退出' },
-    en: { show: 'Show', hide: 'Hide', start: 'Start Server', stop: 'Stop Server', quit: 'Quit' },
-    ja: { show: '表示', hide: '隠す', start: '起動', stop: '停止', quit: '終了' },
+    zh: {
+      show: '显示窗口', hide: '隐藏窗口', start: '启动服务', stop: '停止服务', quit: '退出',
+      frpcEnable: '启用 FRPC', frpcDisable: '停用 FRPC',
+      frpcEnableToggle: 'FRPC 公网穿透',
+      frpcStart: '启动 FRPC', frpcStop: '停止 FRPC',
+      setDefaultModel: '设置默认Chat模型',
+      setDefaultEmbeddingModel: '设置默认Embedding模型',
+      defaultModelNone: '(未设置)',
+      defaultModelCurrent: '✓ 当前默认',
+      priceFmt: (inP, outP) => `💰 输入 $${inP}/M  输出 $${outP}/M`,
+      defaultModelErr: '设置失败',
+    },
+    en: {
+      show: 'Show', hide: 'Hide', start: 'Start Server', stop: 'Stop Server', quit: 'Quit',
+      frpcEnable: 'Enable FRPC', frpcDisable: 'Disable FRPC',
+      frpcEnableToggle: 'FRP tunnel',
+      frpcStart: 'Start FRPC', frpcStop: 'Stop FRPC',
+      setDefaultModel: 'Set default chat model',
+      setDefaultEmbeddingModel: 'Set default embedding model',
+      defaultModelNone: '(none)',
+      defaultModelCurrent: '✓ current default',
+      priceFmt: (inP, outP) => `💰 in $${inP}/M  out $${outP}/M`,
+      defaultModelErr: 'set failed',
+    },
+    ja: {
+      show: '表示', hide: '隠す', start: '起動', stop: '停止', quit: '終了',
+      frpcEnable: 'FRPC を有効化', frpcDisable: 'FRPC を無効化',
+      frpcEnableToggle: 'FRP トンネル',
+      frpcStart: 'FRPC を起動', frpcStop: 'FRPC を停止',
+      setDefaultModel: 'デフォルトChatモデルを設定',
+      setDefaultEmbeddingModel: 'デフォルトEmbeddingモデルを設定',
+      defaultModelNone: '(未設定)',
+      defaultModelCurrent: '✓ 現在のデフォルト',
+      priceFmt: (inP, outP) => `💰 入力 $${inP}/M  出力 $${outP}/M`,
+      defaultModelErr: '設定に失敗',
+    },
   }
   ipcMain.handle('get-tray-lang', () => trayLang)
   ipcMain.on('set-tray-lang', (_e, lang) => { trayLang = lang; buildTrayMenu() })
@@ -348,7 +385,69 @@ app.whenReady().then(async () => {
     } catch {}
   }
   function fmtK(n) { if (n >= 1024*1024) return (n/(1024*1024)).toFixed(2)+'M'; if (n >= 1024) return (n/1024).toFixed(1)+'K'; return String(n) }
-  function buildTrayMenu() {
+
+  // ponytail: v0.5.0 — tray needs providers + default-model to build the picker submenu.
+  // Cached + invalidated by buildTrayMenu() callers; cheap because admin auth is already in-process.
+  let providersCache = null
+  function getProviders() {
+    if (providersCache && Date.now() - providersCache.fetchedAt < 5000) return Promise.resolve(providersCache.providers)
+    return new Promise((resolve) => {
+      const req = http.get(`${getServerUrl()}/api/admin/providers`, (r) => {
+        let d = ''
+        r.on('data', (c) => d += c)
+        r.on('end', () => {
+          try {
+            const list = JSON.parse(d)
+            providersCache = { fetchedAt: Date.now(), providers: list }
+            resolve(list)
+          } catch { resolve(null) }
+        })
+      })
+      req.on('error', () => resolve(null))
+      req.setTimeout(2000, () => { req.destroy(); resolve(null) })
+    })
+  }
+  function invalidateProviders() { providersCache = null }
+
+  function setDefaultModel(providerId, modelId) {
+    // server routes don't enforce auth on this endpoint (no chi middleware yet), so a plain PUT suffices.
+    return new Promise((resolve) => {
+      const req = http.request(`${getServerUrl()}/api/admin/providers/${providerId}/models/${modelId}/default`, { method: 'PUT' }, (r) => {
+        let d = ''
+        r.on('data', (c) => d += c)
+        r.on('end', () => {
+          invalidateProviders()
+          buildTrayMenu()
+          resolve(r.statusCode < 400)
+        })
+      })
+      req.on('error', () => resolve(false))
+      req.setTimeout(3000, () => { req.destroy(); resolve(false) })
+      req.end()
+    })
+  }
+
+  // ponytail: v0.5.1 — separate endpoint for default embedding model.
+  function setDefaultEmbeddingModel(providerId, modelId) {
+    return new Promise((resolve) => {
+      const req = http.request(`${getServerUrl()}/api/admin/providers/${providerId}/models/${modelId}/default-embedding`, { method: 'PUT' }, (r) => {
+        let d = ''
+        r.on('data', (c) => d += c)
+        r.on('end', () => {
+          invalidateProviders()
+          buildTrayMenu()
+          resolve(r.statusCode < 400)
+        })
+      })
+      req.on('error', () => resolve(false))
+      req.setTimeout(3000, () => { req.destroy(); resolve(false) })
+      req.end()
+    })
+  }
+
+  function fmtK(n) { if (n >= 1024*1024) return (n/(1024*1024)).toFixed(2)+'M'; if (n >= 1024) return (n/1024).toFixed(1)+'K'; return String(n) }
+
+  async function buildTrayMenu() {
     const s = dailyStats
     const L = trayLabels[trayLang] || trayLabels.zh
     const menu = [
@@ -357,11 +456,117 @@ app.whenReady().then(async () => {
       { type: 'separator' },
       { label: `📥 ${fmtK(s.input)}  📤 ${fmtK(s.output)}  💾 ${fmtK(s.cached)}  💰 $${s.cost.toFixed(3)}`, enabled: false },
       { type: 'separator' },
-      { label: L.quit, click: () => app.quit() },
     ]
+
+    // ponytail: v0.5.0 — FRPC tray entries. Only show when binary is downloaded (otherwise the
+    // user hasn't configured anything yet, so the entries would be misleading).
+    //
+    // Layout: a single checkbox-style `enabled` toggle + a start/stop that
+    // toggles based on whether the process is actually running. The previous
+    // version exposed both "启用" and "停用" as separate menu items, which is
+    // confusing — a switch is the right idiom.
+    if (frpc.hasBinary()) {
+      const frpcConf = frpc.getConf()
+      const enabled = frpcConf.enabled !== false
+      const running = frpc.isRunning()
+      // ponytail: native checkbox menu item. Clicking flips checked. We wire
+      // it to frpc.enable()/disable() so the config + process state stay in sync.
+      // start/stop is a separate row so users can launch frpc only after enabling.
+      menu.push({
+        label: L.frpcEnableToggle,  // "FRPC 公网穿透"
+        type: 'checkbox',
+        checked: enabled,
+        click: () => {
+          try {
+            if (enabled) {
+              frpc.disable()       // also kills the running process
+            } else {
+              frpc.enable()
+            }
+          } catch (e) { console.warn('[frpc tray]', e.message) }
+          setTimeout(buildTrayMenu, 200)
+        },
+      })
+      if (enabled) {
+        menu.push({ label: running ? L.frpcStop : L.frpcStart, click: () => {
+          try {
+            if (running) frpc.stop()
+            else frpc.start()  // may throw if config incomplete; let the user see the toast
+          } catch (e) { console.warn('[frpc tray]', e.message) }
+          setTimeout(buildTrayMenu, 200)
+        }})
+      }
+      menu.push({ type: 'separator' })
+    }
+
+    // ponytail: v0.5.1 — Two default-model pickers: chat + embedding.
+    //   chat submenu → enabled models with capability != embedding (legacy empty = chat)
+    //   embedding submenu → enabled models with capability == embedding
+    const providers = await getProviders().catch(() => null)
+    if (providers && providers.length) {
+      const chatSubs = providers.map((p) => {
+        const chatModels = (p.models || []).filter((m) => !m.is_disabled && m.capability !== 'embedding')
+        if (chatModels.length === 0) return null
+        return {
+          label: p.name,
+          submenu: chatModels.map((m) => {
+            const isDef = m.is_default === 1 || m.is_default === true
+            const priceLabel = (m.input_price > 0 || m.output_price > 0)
+              ? L.priceFmt(Number(m.input_price).toFixed(3), Number(m.output_price).toFixed(3))
+              : ''
+            const labelParts = [m.model_name]
+            if (isDef) labelParts.push(L.defaultModelCurrent)
+            if (priceLabel) labelParts.push(priceLabel)
+            return {
+              label: labelParts.join('   '),
+              click: async () => {
+                const ok = await setDefaultModel(p.id, m.id)
+                if (!ok) console.warn('[default-chat] set failed for', p.name, m.model_name)
+              },
+            }
+          }),
+        }
+      }).filter(Boolean)
+      if (chatSubs.length) {
+        menu.push({ label: L.setDefaultModel, submenu: chatSubs })
+      }
+      const embSubs = providers.map((p) => {
+        const embModels = (p.models || []).filter((m) => !m.is_disabled && m.capability === 'embedding')
+        if (embModels.length === 0) return null
+        return {
+          label: p.name,
+          submenu: embModels.map((m) => {
+            const isDef = m.is_default_embedding === 1 || m.is_default_embedding === true
+            const priceLabel = (m.input_price > 0 || m.output_price > 0)
+              ? L.priceFmt(Number(m.input_price).toFixed(3), Number(m.output_price).toFixed(3))
+              : ''
+            const labelParts = [m.model_name]
+            if (isDef) labelParts.push(L.defaultModelCurrent)
+            if (priceLabel) labelParts.push(priceLabel)
+            return {
+              label: labelParts.join('   '),
+              click: async () => {
+                const ok = await setDefaultEmbeddingModel(p.id, m.id)
+                if (!ok) console.warn('[default-embedding] set failed for', p.name, m.model_name)
+              },
+            }
+          }),
+        }
+      }).filter(Boolean)
+      if (embSubs.length) {
+        menu.push({ label: L.setDefaultEmbeddingModel, submenu: embSubs })
+      }
+      if (chatSubs.length || embSubs.length) {
+        menu.push({ type: 'separator' })
+      }
+    }
+
+    menu.push({ label: L.quit, click: () => app.quit() })
     tray.setContextMenu(Menu.buildFromTemplate(menu))
   }
   buildTrayMenu()
+  // ponytail: first call often races with server startup; retry once after 1.5s if no providers.
+  setTimeout(() => { if (!providersCache) buildTrayMenu() }, 1500)
 })
 
 app.on('window-all-closed', () => {
@@ -375,6 +580,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   app.isQuitting = true
+  frpc.shutdown()
   stopServer()
 })
 

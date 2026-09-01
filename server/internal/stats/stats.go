@@ -20,6 +20,7 @@ type RecordInput struct {
 	InputTokens  int
 	OutputTokens int
 	CachedTokens int
+	Cost         float64 // ponytail: v0.4.24 — USD at request time, written once, immune to later price edits
 }
 
 type bucketKey string
@@ -46,6 +47,7 @@ func Record(r RecordInput) {
 		cur.InputTokens += r.InputTokens
 		cur.OutputTokens += r.OutputTokens
 		cur.CachedTokens += r.CachedTokens
+		cur.Cost += r.Cost
 	} else {
 		cp := r
 		if cp.RequestCount == 0 {
@@ -74,8 +76,8 @@ func Flush() {
 	}
 	d := db.Get()
 	for _, r := range rows {
-		if _, err := d.Run("INSERT INTO usage_stats(api_key_id, provider_id, model_id, model_name, request_count, input_tokens, output_tokens, cached_tokens) VALUES (?,?,?,?,?,?,?,?)",
-			r.APIKeyID, r.ProviderID, r.ModelID, r.ModelName, r.RequestCount, r.InputTokens, r.OutputTokens, r.CachedTokens); err != nil {
+		if _, err := d.Run("INSERT INTO usage_stats(api_key_id, provider_id, model_id, model_name, request_count, input_tokens, output_tokens, cached_tokens, cost) VALUES (?,?,?,?,?,?,?,?,?)",
+			r.APIKeyID, r.ProviderID, r.ModelID, r.ModelName, r.RequestCount, r.InputTokens, r.OutputTokens, r.CachedTokens, r.Cost); err != nil {
 			log.Printf("[stats] flush insert error: %v", err)
 		}
 	}
@@ -164,7 +166,8 @@ func Query(q StatsQuery) (map[string]interface{}, error) {
 		"SUM(u.request_count) AS request_count, " +
 		"SUM(u.input_tokens) AS input_tokens, " +
 		"SUM(u.output_tokens) AS output_tokens, " +
-		"SUM(u.cached_tokens) AS cached_tokens " +
+		"SUM(u.cached_tokens) AS cached_tokens, " +
+		"SUM(u.cost) AS cost " +
 		"FROM usage_stats u " +
 		"LEFT JOIN providers p ON u.provider_id = p.id " +
 		"LEFT JOIN api_keys k ON u.api_key_id = k.id " +
@@ -179,11 +182,9 @@ func Query(q StatsQuery) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	rowCost := func(r db.Row) float64 {
-		return (float64(db.Int64(r["input_tokens"]))-float64(db.Int64(r["cached_tokens"])))*toFloat(r["input_price"])/1_000_000 +
-			float64(db.Int64(r["output_tokens"]))*toFloat(r["output_price"])/1_000_000 +
-			float64(db.Int64(r["cached_tokens"]))*toFloat(r["cache_hit_price"])/1_000_000
-	}
+	// ponytail: v0.4.24 — cost is summed from stored usage_stats.cost (price at request time),
+	// not recomputed from current model prices. Recomputing would silently rewrite history
+	// every time a provider edits a price.
 
 	type aggData struct {
 		Req, In, Out, Cached                           int64
@@ -203,7 +204,7 @@ func Query(q StatsQuery) (map[string]interface{}, error) {
 		m.In += db.Int64(r["input_tokens"])
 		m.Out += db.Int64(r["output_tokens"])
 		m.Cached += db.Int64(r["cached_tokens"])
-		m.Cost += rowCost(r)
+		m.Cost += toFloat(r["cost"])
 
 		pk := db.Str(r["provider"])
 		if pk == "" {
@@ -218,15 +219,17 @@ func Query(q StatsQuery) (map[string]interface{}, error) {
 		pa.In += db.Int64(r["input_tokens"])
 		pa.Out += db.Int64(r["output_tokens"])
 		pa.Cached += db.Int64(r["cached_tokens"])
-		pa.Cost += rowCost(r)
+		pa.Cost += toFloat(r["cost"])
 	}
 
 	var totalReq, totalIn, totalOut, totalCached int64
+	var totalCost float64
 	for _, r := range rows {
 		totalReq += db.Int64(r["request_count"])
 		totalIn += db.Int64(r["input_tokens"])
 		totalOut += db.Int64(r["output_tokens"])
 		totalCached += db.Int64(r["cached_tokens"])
+		totalCost += toFloat(r["cost"])
 	}
 
 	topModels := make([]map[string]interface{}, 0)
@@ -275,6 +278,7 @@ func Query(q StatsQuery) (map[string]interface{}, error) {
 		"total_input_tokens":  totalIn,
 		"total_output_tokens": totalOut,
 		"total_cached_tokens": totalCached,
+		"total_cost":         totalCost,
 		"breakdown":    rows,
 		"topModels":    topModels,
 		"topProviders": topProviders,

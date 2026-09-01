@@ -134,7 +134,8 @@
               <label v-for="m in availableModels" :key="m.id" class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
                 <input type="checkbox" :value="m.id" v-model="form.model_ids" class="accent-emerald-500" />
                 <span class="font-mono text-xs">{{ m.provider_name }}_{{ m.model_name }}</span>
-                <span v-if="m.is_default" class="text-[10px] text-emerald-400">★</span>
+                <span v-if="m.is_default" class="text-[10px] text-emerald-400">★Chat</span>
+                <span v-if="m.is_default_embedding" class="text-[10px] text-blue-400">★Emb</span>
                 <span v-if="m.deleted_at" class="text-[10px] text-red-400">{{ t('deleted_badge') }}</span>
                 <span v-else-if="m.is_disabled" class="text-[10px] text-red-400">{{ t('disabled_badge') }}</span>
               </label>
@@ -159,9 +160,10 @@
         <p class="text-xs text-gray-500 mb-3">{{ t('assign_model_v2_hint') }}</p>
         <div class="flex-1 overflow-y-auto space-y-1 mb-4 bg-gray-900 rounded p-2 max-h-96">
           <label v-for="m in assignCandidates" :key="m.id" class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-700/50 text-sm">
-            <input type="radio" :value="m.full_id" v-model="assignForm.model" class="accent-emerald-500" />
+            <input type="radio" :value="m.full_id" v-model="assignForm.model" :class="m.full_id === currentAssignedModel ? 'accent-amber-400' : 'accent-emerald-500'" />
             <span class="font-mono">{{ m.full_id }}</span>
-            <span v-if="m.is_default" class="text-xs text-emerald-400">★</span>
+            <span v-if="m.is_default" class="text-xs text-emerald-400">★Chat</span>
+            <span v-if="m.is_default_embedding" class="text-xs text-blue-400">★Emb</span>
           </label>
           <div v-if="assignCandidates.length === 0" class="text-xs text-gray-500 px-2 py-1.5">{{ t('assign_no_authorized') }}</div>
         </div>
@@ -197,6 +199,8 @@ const showAssign = ref(false)
 const assignForm = ref({ id: null, keyName: '', model: '' })
 // assignCandidates derived from the current row's authorized_models — pop only when modal opens.
 const assignCandidates = ref([])
+// ponytail: v0.4.24 — track the currently assigned model so its radio dot gets a distinct highlight color
+const currentAssignedModel = ref('')
 
 const fmt = formatToken
 
@@ -314,7 +318,8 @@ const deleteKey = async (id) => {
 
 // ponytail: v0.2.14 — assign only picks from this key's authorized models.
 const openAssign = (k) => {
-  assignForm.value = { id: k.id, keyName: k.name, model: k.assigned_model || '' }
+  assignForm.value = { id: k.id, keyName: k.name, model: k.assigned_model ? `${k.assigned_provider_name}_${k.assigned_model}` : '' }
+  currentAssignedModel.value = k.assigned_model ? `${k.assigned_provider_name}_${k.assigned_model}` : ''
   assignCandidates.value = (k.authorized_models || []).map(m => ({
     id: m.model_id,
     full_id: `${m.provider_name}_${m.model_name}`,

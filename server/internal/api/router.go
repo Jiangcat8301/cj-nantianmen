@@ -23,7 +23,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const ServerVersion = "0.4.23"
+const ServerVersion = "0.5.1"
 
 var localMode bool
 
@@ -206,7 +206,7 @@ func listProviders() []map[string]interface{} {
 	if len(ids) == 0 {
 		return rows
 	}
-	q := "SELECT id, provider_id, model_name, capability, is_default, is_disabled FROM models WHERE deleted_at IS NULL AND provider_id IN (?" + strings.Repeat(",?", len(ids)-1) + ") ORDER BY provider_id, id"
+	q := "SELECT id, provider_id, model_name, capability, is_default, is_default_embedding, is_disabled FROM models WHERE deleted_at IS NULL AND provider_id IN (?" + strings.Repeat(",?", len(ids)-1) + ") ORDER BY provider_id, id"
 	modelRows, _ := db.Get().Query(q, ids...)
 	byID := map[int64]int{}
 	for i, p := range rows {
@@ -613,11 +613,26 @@ func RegisterProviderRoutes(r chi.Router) {
 		created["models"] = models
 		all := listProviders()
 		if len(all) == 1 {
-			modelRows, _ := db.Get().Query("SELECT * FROM models WHERE provider_id=? ORDER BY id LIMIT 1", res.LastInsertRowID)
-			if len(modelRows) > 0 {
-				db.Get().Run("UPDATE models SET is_default=1 WHERE id=?", db.Int64(modelRows[0]["id"]))
-				modelmap.RebuildModelMap()
+			modelRows, _ := db.Get().Query("SELECT * FROM models WHERE provider_id=? ORDER BY id", res.LastInsertRowID)
+			for _, mr := range modelRows {
+				cap := db.Str(mr["capability"])
+				if cap == "" {
+					cap = "chat"
+				}
+				mid := db.Int64(mr["id"])
+				if cap == "chat" {
+					db.Get().Run("UPDATE models SET is_default=1 WHERE id=?", mid)
+					break
+				}
 			}
+			// ponytail: also auto-set the first embedding model as default embedding.
+			for _, mr := range modelRows {
+				if db.Str(mr["capability"]) == "embedding" {
+					db.Get().Run("UPDATE models SET is_default_embedding=1 WHERE id=?", db.Int64(mr["id"]))
+					break
+				}
+			}
+			modelmap.RebuildModelMap()
 		}
 		sendJSON(w, 200, created)
 	})
@@ -680,6 +695,21 @@ func RegisterProviderRoutes(r chi.Router) {
 			coalesce(body["output_price"], m["output_price"]),
 			coalesce(body["cache_hit_price"], m["cache_hit_price"]),
 			mid)
+		// ponytail: v0.5.1 — model settings now include capability (chat/embedding),
+		// not just pricing. Guard the two default flags: a default chat model can't
+		// become embedding (breaks Nantianmen-default), and vice-versa.
+		if c, ok := body["capability"].(string); ok && (c == "chat" || c == "embedding") {
+			if c == "embedding" && db.Int64(m["is_default"]) == 1 {
+				sendError(w, 400, "cannot set embedding: model is the default chat model")
+				return
+			}
+			if c == "chat" && db.Int64(m["is_default_embedding"]) == 1 {
+				sendError(w, 400, "cannot set chat: model is the default embedding model")
+				return
+			}
+			db.Get().Run("UPDATE models SET capability=? WHERE id=?", c, mid)
+			modelmap.RebuildModelMap()
+		}
 		updated, _ := db.Get().Query("SELECT * FROM models WHERE id=?", mid)
 		sendJSON(w, 200, updated[0])
 	})
@@ -718,6 +748,14 @@ func RegisterProviderRoutes(r chi.Router) {
 			sendJSON(w, 200, nil)
 		}
 	})
+	r.Get("/api/admin/default-embedding-model", func(w http.ResponseWriter, r *http.Request) {
+		rows, _ := db.Get().Query("SELECT p.name AS provider_name, m.model_name, p.protocol FROM models m JOIN providers p ON m.provider_id = p.id WHERE m.is_default_embedding = 1 AND m.deleted_at IS NULL LIMIT 1")
+		if len(rows) > 0 {
+			sendJSON(w, 200, rows[0])
+		} else {
+			sendJSON(w, 200, nil)
+		}
+	})
 	r.Put("/api/admin/providers/{id}/models/{modelId}/default", func(w http.ResponseWriter, r *http.Request) {
 		pid, _ := strconv.Atoi(chi.URLParam(r, "id"))
 		mid, _ := strconv.Atoi(chi.URLParam(r, "modelId"))
@@ -730,8 +768,37 @@ func RegisterProviderRoutes(r chi.Router) {
 			sendError(w, 400, "cannot set default: model is disabled")
 			return
 		}
+		// ponytail: default chat model must have chat capability (or legacy empty = chat).
+		cap := db.Str(rows[0]["capability"])
+		if cap != "" && cap != "chat" {
+			sendError(w, 400, "cannot set default chat: model is not a chat model")
+			return
+		}
 		db.Get().Exec("UPDATE models SET is_default=0")
 		db.Get().Run("UPDATE models SET is_default=1 WHERE id=?", mid)
+		modelmap.RebuildModelMap()
+		sendJSON(w, 200, rows[0])
+	})
+	r.Put("/api/admin/providers/{id}/models/{modelId}/default-embedding", func(w http.ResponseWriter, r *http.Request) {
+		pid, _ := strconv.Atoi(chi.URLParam(r, "id"))
+		mid, _ := strconv.Atoi(chi.URLParam(r, "modelId"))
+		rows, _ := db.Get().Query("SELECT * FROM models WHERE id=? AND provider_id=?", mid, pid)
+		if len(rows) == 0 {
+			sendError(w, 404, "not found")
+			return
+		}
+		if db.Int64(rows[0]["is_disabled"]) == 1 {
+			sendError(w, 400, "cannot set default embedding: model is disabled")
+			return
+		}
+		// ponytail: default embedding model must have embedding capability.
+		cap := db.Str(rows[0]["capability"])
+		if cap != "embedding" {
+			sendError(w, 400, "cannot set default embedding: model is not an embedding model")
+			return
+		}
+		db.Get().Exec("UPDATE models SET is_default_embedding=0")
+		db.Get().Run("UPDATE models SET is_default_embedding=1 WHERE id=?", mid)
 		modelmap.RebuildModelMap()
 		sendJSON(w, 200, rows[0])
 	})
@@ -750,10 +817,44 @@ func RegisterProviderRoutes(r chi.Router) {
 		if next == 1 && db.Int64(rows[0]["is_default"]) == 1 {
 			db.Get().Exec("UPDATE models SET is_default=0")
 		}
+		// ponytail: disabling a default embedding model also clears that flag.
+		if next == 1 && db.Int64(rows[0]["is_default_embedding"]) == 1 {
+			db.Get().Exec("UPDATE models SET is_default_embedding=0")
+		}
 		db.Get().Run("UPDATE models SET is_disabled=? WHERE id=?", next, mid)
 		modelmap.RebuildModelMap()
 		updated, _ := db.Get().Query("SELECT * FROM models WHERE id=?", mid)
 		sendJSON(w, 200, updated[0])
+	})
+	// ponytail: hard-delete a model row. Schema cascades:
+	//   api_key_models.model_id  ON DELETE CASCADE  → removes from every key's authorized list
+	//   api_keys.assigned_model_id ON DELETE SET NULL → cleared so proxy falls back to Nantianmen-default
+	//   usage_stats.model_id     ON DELETE SET NULL  → historical rows kept, model link nulled
+	// Default model is rejected so Nantianmen-default always resolves.
+	r.Delete("/api/admin/providers/{id}/models/{modelId}", func(w http.ResponseWriter, r *http.Request) {
+		pid, _ := strconv.Atoi(chi.URLParam(r, "id"))
+		mid, _ := strconv.Atoi(chi.URLParam(r, "modelId"))
+		rows, _ := db.Get().Query("SELECT id, is_default, is_default_embedding FROM models WHERE id=? AND provider_id=?", mid, pid)
+		if len(rows) == 0 {
+			sendError(w, 404, "not found")
+			return
+		}
+		if db.Int64(rows[0]["is_default"]) == 1 {
+			sendError(w, 400, "cannot delete default chat model")
+			return
+		}
+		// ponytail: embedding default model also protected from hard-delete.
+		if db.Int64(rows[0]["is_default_embedding"]) == 1 {
+			sendError(w, 400, "cannot delete default embedding model")
+			return
+		}
+		res, _ := db.Get().Run("DELETE FROM models WHERE id=?", mid)
+		modelmap.RebuildModelMap()
+		if res.Changes > 0 {
+			sendJSON(w, 200, map[string]string{"ok": "true"})
+			return
+		}
+		sendError(w, 404, "not found")
 	})
 }
 
@@ -828,7 +929,7 @@ func RegisterApikeyRoutes(r chi.Router) {
 		}
 	})
 	r.Get("/api/admin/api-keys/available-models", func(w http.ResponseWriter, r *http.Request) {
-		rows, _ := db.Get().Query("SELECT m.id, m.model_name, m.capability, m.is_default, p.id AS provider_id, p.name AS provider_name, p.protocol FROM models m JOIN providers p ON p.id = m.provider_id WHERE m.deleted_at IS NULL AND (m.is_disabled IS NULL OR m.is_disabled = 0) ORDER BY p.name, m.model_name")
+		rows, _ := db.Get().Query("SELECT m.id, m.model_name, m.capability, m.is_default, m.is_default_embedding, p.id AS provider_id, p.name AS provider_name, p.protocol FROM models m JOIN providers p ON p.id = m.provider_id WHERE m.deleted_at IS NULL AND (m.is_disabled IS NULL OR m.is_disabled = 0) ORDER BY p.name, m.model_name")
 		sendJSON(w, 200, rows)
 	})
 }
@@ -905,7 +1006,9 @@ func RegisterLLMRoutes(r chi.Router) {
 		var body map[string]interface{}
 		json.Unmarshal(bodyBytes, &body)
 		r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
-		if body["model"] == nil || body["model"] == "auto" || body["model"] == "Nantianmen-default" {
+		// ponytail: "Nantianmen-default-embedding" / "auto" → default embedding model.
+		// Empty model still rejected (legacy behavior for explicit-model callers).
+		if body["model"] == nil {
 			sendError(w, 400, "/v1/embeddings requires explicit model")
 			return
 		}

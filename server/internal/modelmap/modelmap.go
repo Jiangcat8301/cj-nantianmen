@@ -19,19 +19,24 @@ type Provider struct {
 }
 
 type Entry struct {
-	ModelID    int64     `json:"__modelId"`
-	IsDefault  bool      `json:"__isDefault"`
-	Capability string    `json:"capability"`
-	Provider   Provider  `json:"provider"`
-	ModelName  string    `json:"model_name"`
-	Protocol   string    `json:"protocol"`
-	Endpoint   string    `json:"endpoint"`
-	Headers    map[string]string `json:"headers"`
+	ModelID             int64     `json:"__modelId"`
+	IsDefault           bool      `json:"__isDefault"`
+	IsDefaultEmbedding  bool      `json:"__isDefaultEmbedding"`
+	Capability          string    `json:"capability"`
+	Provider            Provider  `json:"provider"`
+	ModelName           string    `json:"model_name"`
+	Protocol            string    `json:"protocol"`
+	Endpoint            string    `json:"endpoint"`
+	Headers             map[string]string `json:"headers"`
+	InputPrice          float64   `json:"input_price"`     // ponytail: USD per 1M tokens
+	OutputPrice         float64   `json:"output_price"`
+	CacheHitPrice       float64   `json:"cache_hit_price"`
 }
 
 var (
-	_map         = map[string]*Entry{}
-	_defaultEntry *Entry
+	_map                = map[string]*Entry{}
+	_defaultEntry       *Entry
+	_defaultEmbeddingEntry *Entry
 )
 
 func computeEndpoint(p Provider, capability string) string {
@@ -59,6 +64,18 @@ func computeHeaders(p Provider) map[string]string {
 	}
 }
 
+func toFloat(v interface{}) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int64:
+		return float64(n)
+	case int:
+		return float64(n)
+	}
+	return 0
+}
+
 func RebuildModelMap() error {
 	d := db.Get()
 	provRows, err := d.Query("SELECT * FROM providers")
@@ -82,6 +99,7 @@ func RebuildModelMap() error {
 	}
 	next := map[string]*Entry{}
 	var def *Entry
+	var defEmb *Entry
 	for _, m := range modelRows {
 		pid := db.Int64(m["provider_id"])
 		p, ok := pMap[pid]
@@ -93,23 +111,31 @@ func RebuildModelMap() error {
 			cap = "chat"
 		}
 		entry := &Entry{
-			ModelID:    db.Int64(m["id"]),
-			IsDefault:  db.Int64(m["is_default"]) == 1,
-			Capability: cap,
-			Provider:   p,
-			ModelName:  db.Str(m["model_name"]),
-			Protocol:   p.Protocol,
-			Endpoint:   computeEndpoint(p, cap),
-			Headers:    computeHeaders(p),
+			ModelID:            db.Int64(m["id"]),
+			IsDefault:          db.Int64(m["is_default"]) == 1,
+			IsDefaultEmbedding: db.Int64(m["is_default_embedding"]) == 1,
+			Capability:         cap,
+			Provider:           p,
+			ModelName:          db.Str(m["model_name"]),
+			Protocol:           p.Protocol,
+			Endpoint:           computeEndpoint(p, cap),
+			Headers:            computeHeaders(p),
+			InputPrice:         toFloat(m["input_price"]),
+			OutputPrice:        toFloat(m["output_price"]),
+			CacheHitPrice:      toFloat(m["cache_hit_price"]),
 		}
 		key := p.Name + "_" + entry.ModelName
 		next[key] = entry
 		if entry.IsDefault {
 			def = entry
 		}
+		if entry.IsDefaultEmbedding {
+			defEmb = entry
+		}
 	}
 	_map = next
 	_defaultEntry = def
+	_defaultEmbeddingEntry = defEmb
 	return nil
 }
 
@@ -122,6 +148,9 @@ func GetDefaultEntry() *Entry {
 		return e
 	}
 	return nil
+}
+func GetDefaultEmbeddingEntry() *Entry {
+	return _defaultEmbeddingEntry
 }
 func GetEntry(modelField string) *Entry { return _map[modelField] }
 
@@ -146,6 +175,22 @@ func ResolveModel(modelField string) (*Entry, error) {
 		e := GetDefaultEntry()
 		if e == nil {
 			return nil, fmt.Errorf("no models configured")
+		}
+		return e, nil
+	}
+	e := GetEntry(modelField)
+	if e == nil {
+		return nil, fmt.Errorf("unknown model: %s", modelField)
+	}
+	return e, nil
+}
+
+// ponytail: resolve model for /v1/embeddings. "Nantianmen-default-embedding" / "auto" / "" → default embedding model.
+func ResolveEmbeddingModel(modelField string) (*Entry, error) {
+	if modelField == "auto" || modelField == "Nantianmen-default-embedding" || modelField == "" {
+		e := GetDefaultEmbeddingEntry()
+		if e == nil {
+			return nil, fmt.Errorf("no default embedding model configured")
 		}
 		return e, nil
 	}

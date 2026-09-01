@@ -111,6 +111,17 @@ Admin client:
 CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
 ```
 
+## Public-Internet Tunneling (v0.5.0+)
+
+Nantianmen only listens on `127.0.0.1:38271` by default. To expose it to the public internet, the Desktop and CLI integrate [FRPC](https://github.com/fatedier/frp) as an independent child process:
+
+- **Desktop**: open the "Reverse Proxy" sidebar page → first visit, click "Download latest FRPC" (auto-pulls the platform-appropriate binary from GitHub releases and extracts it into `userData/frpc/`) → fill in the FRPS address / port / token / remote port / local port → "Start FRPC".
+- **CLI**: `nantianmen reverse-proxy download`, `nantianmen reverse-proxy config key=value ...`, `nantianmen reverse-proxy start | stop | status`.
+
+When `auto_start` is enabled, Desktop boots also spawn frpc; on Desktop exit `taskkill /T /F` kills the whole tree. FRPC is fully independent — its crash does not affect local `127.0.0.1:38271` access.
+
+⚠️ Some antivirus products (Defender SmartScreen, 360, AVG, …) flag `frpc.exe` as a potential threat and quarantine it automatically — a known issue with frp, see [issue #3637](https://github.com/fatedier/frp/issues/3637). If the binary disappears after download, whitelist `%APPDATA%\cj-nantianmen\frpc\frpc.exe` and click "Download latest FRPC" again. For production deployments we recommend FRPS `tls.force = true` plus an `allowPorts` allowlist.
+
 ## API Reference
 
 Full endpoint list: see [docs/api-en.md](./docs/api-en.md).

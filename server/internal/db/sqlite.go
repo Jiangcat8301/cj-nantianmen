@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS models (
   provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
   model_name TEXT NOT NULL,
   is_default INTEGER NOT NULL DEFAULT 0,
+  is_default_embedding INTEGER NOT NULL DEFAULT 0,
   is_manual INTEGER NOT NULL DEFAULT 0,
   is_disabled INTEGER NOT NULL DEFAULT 0,
   input_price REAL NOT NULL DEFAULT 0,
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS usage_stats (
   input_tokens INTEGER NOT NULL DEFAULT 0,
   output_tokens INTEGER NOT NULL DEFAULT 0,
   cached_tokens INTEGER NOT NULL DEFAULT 0,
+  cost REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS communication_log (
@@ -74,6 +76,7 @@ CREATE TABLE IF NOT EXISTS communication_log (
   tokens_input INTEGER NOT NULL DEFAULT 0,
   tokens_output INTEGER NOT NULL DEFAULT 0,
   tokens_cached INTEGER NOT NULL DEFAULT 0,
+  cost REAL NOT NULL DEFAULT 0,
   duration_ms INTEGER DEFAULT NULL,
   input TEXT NOT NULL DEFAULT '',
   output TEXT NOT NULL DEFAULT '',
@@ -120,6 +123,7 @@ func Init(path string) error {
 func runMigrations() {
 	cols := []struct{ table, col, typ string }{
 		{"models", "is_disabled", "INTEGER NOT NULL DEFAULT 0"},
+		{"models", "is_default_embedding", "INTEGER NOT NULL DEFAULT 0"},
 		{"models", "input_price", "REAL NOT NULL DEFAULT 0"},
 		{"models", "output_price", "REAL NOT NULL DEFAULT 0"},
 		{"models", "cache_hit_price", "REAL NOT NULL DEFAULT 0"},
@@ -130,12 +134,16 @@ func runMigrations() {
 		{"api_keys", "assigned_model_id", "INTEGER DEFAULT NULL"},
 		{"usage_stats", "model_id", "INTEGER DEFAULT NULL"},
 		{"communication_log", "model_id", "INTEGER DEFAULT NULL"},
+		{"usage_stats", "cost", "REAL NOT NULL DEFAULT 0"},
+		{"communication_log", "cost", "REAL NOT NULL DEFAULT 0"},
 	}
 	for _, c := range cols {
 		instance.conn.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", c.table, c.col, c.typ))
 	}
 	// Run legacy backfills (idempotent)
-	instance.conn.Exec("UPDATE models SET deleted_at = datetime('now') WHERE deleted=1 AND deleted_at IS NULL")
+	// ponytail: v0.4.24 bug fix — previous line `WHERE deleted=1` referenced a
+	// column that never existed in the schema. Removed. Modern schema uses
+	// deleted_at directly; nothing to backfill here.
 	instance.conn.Exec("UPDATE api_keys SET assigned_model_id = (SELECT id FROM models WHERE model_name = api_keys.assigned_model LIMIT 1) WHERE assigned_model IS NOT NULL AND assigned_model_id IS NULL")
 	instance.conn.Exec("UPDATE usage_stats SET model_id = (SELECT id FROM models WHERE model_name = usage_stats.model_name LIMIT 1) WHERE model_id IS NULL AND model_name != ''")
 	instance.conn.Exec("UPDATE communication_log SET model_id = (SELECT id FROM models WHERE model_name = communication_log.model_name LIMIT 1) WHERE model_id IS NULL AND model_name != ''")

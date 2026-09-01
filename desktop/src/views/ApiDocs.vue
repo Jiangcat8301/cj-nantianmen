@@ -135,9 +135,16 @@ const adminEndpoints = [
   { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}/toggle', desc: '启用/停用模型',
     example: `curl -X PUT http://127.0.0.1:38271/api/admin/providers/1/models/5/toggle \\
   -H "X-Admin-Password: <md5(your-admin-password)>"` },
-  { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}/default', desc: '设置默认模型',
+  { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}/default', desc: '设置默认Chat模型（仅 capability=chat）',
     example: `curl -X PUT http://127.0.0.1:38271/api/admin/providers/1/models/5/default \\
   -H "X-Admin-Password: <md5(your-admin-password)>"` },
+  { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}/default-embedding', desc: '设置默认Embedding模型（仅 capability=embedding）',
+    example: `curl -X PUT http://127.0.0.1:38271/api/admin/providers/1/models/8/default-embedding \\
+  -H "X-Admin-Password: <md5(your-admin-password)>"` },
+  { method: 'GET', path: '/api/admin/default-model', desc: '查询当前默认Chat模型',
+    example: `curl http://127.0.0.1:38271/api/admin/default-model` },
+  { method: 'GET', path: '/api/admin/default-embedding-model', desc: '查询当前默认Embedding模型',
+    example: `curl http://127.0.0.1:38271/api/admin/default-embedding-model` },
   { method: 'PUT', path: '/api/admin/providers/{id}/models/{mid}', desc: '编辑模型价格',
     example: `curl -X PUT http://127.0.0.1:38271/api/admin/providers/1/models/5 \\
   -H "X-Admin-Password: <md5(your-admin-password)>" \\

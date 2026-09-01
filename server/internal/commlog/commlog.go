@@ -12,12 +12,16 @@ import (
 )
 
 var (
-	buf        []map[string]interface{}
-	bufMu      sync.Mutex
-	flushTimer *time.Ticker
+	buf           []map[string]interface{}
+	bufMu         sync.Mutex
+	flushTimer    *time.Ticker
+	rotationTimer *time.Ticker
 )
 
-const flushInterval = 10 * time.Second
+const (
+	flushInterval    = 10 * time.Second
+	rotationInterval = 60 * time.Second
+)
 
 func InitBuffer() {
 	if flushTimer != nil {
@@ -29,6 +33,7 @@ func InitBuffer() {
 			FlushBuffer()
 		}
 	}()
+	initRotation()
 }
 
 func Append(entry map[string]interface{}) {
@@ -99,6 +104,7 @@ func FlushBuffer() {
 	// column type at flush time so logEntry callers can pass sparse maps.
 	strCols := []string{"request_id", "time", "user_id", "user_name", "model_name", "upstreamBody", "responseBody"}
 	intCols := []string{"modelId", "inputTokens", "outputTokens", "cachedTokens", "durationMs"}
+	costCols := []string{"cost"}
 
 	d := db.Get()
 	for _, e := range batch {
@@ -112,30 +118,49 @@ func FlushBuffer() {
 				e[k] = 0
 			}
 		}
+		for _, k := range costCols {
+			if e[k] == nil {
+				e[k] = float64(0)
+			}
+		}
 		var code, msg interface{}
 		if errMap, ok := e["error"].(map[string]interface{}); ok {
 			code = errMap["code"]
 			msg = errMap["message"]
 		}
 		if _, err := d.Run(
-			"INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_id, model_name, tokens_input, tokens_output, tokens_cached, duration_ms, input, output, error_code, error_message) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+			"INSERT INTO communication_log (request_id, time, user_id, user_name, provider_id, provider_name, model_id, model_name, tokens_input, tokens_output, tokens_cached, cost, duration_ms, input, output, error_code, error_message) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 			e["request_id"], e["time"], e["user_id"], e["user_name"],
 			e["provider_id"], e["provider_name"],
 			e["modelId"], e["modelName"],
 			e["inputTokens"], e["outputTokens"], e["cachedTokens"],
-			e["durationMs"], strCol(e, "upstreamBody"), strCol(e, "responseBody"),
+			e["cost"], e["durationMs"],
+			strCol(e, "upstreamBody"), strCol(e, "responseBody"),
 			code, msg,
 		); err != nil {
 			log.Printf("[commlog] flush insert error: %v", err)
 		}
 	}
-	if c := conf.GetConf(); c.LogRotationEnabled {
-		max := c.LogRotationMax
-		if max == 0 {
-			max = 500
-		}
-		TrimToMax(max)
+	// ponytail: v0.4.24 bug fix — trim used to fire on every flush with max=0
+	// defaulting to 500, wiping freshly-buffered rows. Rotation now runs in its
+	// own ticker (initRotation) gated on LogRotationEnabled && LogRotationMax > 0.
+}
+
+// ponytail: v0.4.24 — rotation ticker is independent of the flush hot path so
+// trim never races with in-flight inserts. Skipped when rotation is disabled.
+func initRotation() {
+	if c := conf.GetConf(); !c.LogRotationEnabled || c.LogRotationMax <= 0 {
+		return
 	}
+	if rotationTimer != nil {
+		return
+	}
+	rotationTimer = time.NewTicker(rotationInterval)
+	go func() {
+		for range rotationTimer.C {
+			TrimToMax(conf.GetConf().LogRotationMax)
+		}
+	}()
 }
 
 func TrimToMax(max int) int {
@@ -164,9 +189,10 @@ func mapRows(rows []db.Row) []map[string]interface{} {
 			"user_id": r["user_id"], "user_name": r["user_name"],
 			"provider_id": r["provider_id"], "provider_name": r["provider_name"],
 			"model_id": r["model_id"], "model_name": db.Str(r["current_model_name"]),
-			"capability": db.Str(r["capability"]),
+			"capability":  db.Str(r["capability"]),
 			"tokens_input": r["tokens_input"], "tokens_output": r["tokens_output"],
 			"tokens_cached": r["tokens_cached"], "duration_ms": r["duration_ms"],
+			"cost":  r["cost"],
 			"input": r["input"], "output": r["output"],
 		}
 		if c := db.Int64(r["error_code"]); c != 0 {
@@ -203,7 +229,7 @@ func List(filters map[string]interface{}, page, perPage int) (interface{}, error
 		where = "WHERE " + strings.Join(clauses, " AND ")
 	}
 
-	baseSelect := "c.id, c.request_id, c.time, c.user_id, c.user_name, c.provider_id, c.provider_name, c.model_id, c.model_name, COALESCE(m.model_name, m_legacy.model_name, c.model_name) AS current_model_name, COALESCE(m.capability, m_legacy.capability, 'chat') AS capability, c.tokens_input, c.tokens_output, c.tokens_cached, c.duration_ms, c.input, c.output, c.error_code, c.error_message"
+	baseSelect := "c.id, c.request_id, c.time, c.user_id, c.user_name, c.provider_id, c.provider_name, c.model_id, c.model_name, COALESCE(m.model_name, m_legacy.model_name, c.model_name) AS current_model_name, COALESCE(m.capability, m_legacy.capability, 'chat') AS capability, c.tokens_input, c.tokens_output, c.tokens_cached, c.cost, c.duration_ms, c.input, c.output, c.error_code, c.error_message"
 	baseFrom := "communication_log c LEFT JOIN models m ON c.model_id = m.id LEFT JOIN models m_legacy ON c.model_id IS NULL AND m_legacy.provider_id = c.provider_id AND m_legacy.model_name = c.model_name AND m_legacy.deleted_at IS NULL"
 
 	if perPage > 0 {

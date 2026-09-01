@@ -9,17 +9,28 @@
       </button>
     </div>
 
-    <!-- ponytail: default-model info card — clarifies Nantianmen-default routing with click-to-copy. -->
-    <div class="mb-6 bg-gray-800 rounded-lg border border-gray-700 px-4 py-3 flex items-center gap-3">
-      <span class="text-xs text-gray-400 whitespace-nowrap">默认模型：</span>
-      <code class="text-emerald-400 text-sm font-mono">Nantianmen-default</code>
-      <button @click="copyDefaultModel" class="text-gray-600 hover:text-emerald-400 transition" :title="t('copy')">
-        <!-- heroicons: clipboard-document (v0.2.10 inline SVG to avoid font-awesome dep) -->
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-        </svg>
-      </button>
-      <span class="text-xs text-gray-500 ml-2">选择该模型将自动路由到系统当前设置的默认模型中。</span>
+    <!-- ponytail: v0.5.1 — default-model info card: now two rows (chat + embedding). -->
+    <div class="mb-6 bg-gray-800 rounded-lg border border-gray-700 px-4 py-3 flex flex-col gap-2">
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-400 whitespace-nowrap">{{ t('default_chat_model') }}：</span>
+        <code class="text-emerald-400 text-sm font-mono">Nantianmen-default</code>
+        <button @click="copyDefaultModel('Nantianmen-default')" class="text-gray-600 hover:text-emerald-400 transition" :title="t('copy')">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+          </svg>
+        </button>
+        <span class="text-xs text-gray-500 ml-2">{{ t('default_chat_hint') }}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-400 whitespace-nowrap">{{ t('default_embedding_model') }}：</span>
+        <code class="text-blue-400 text-sm font-mono">Nantianmen-default-embedding</code>
+        <button @click="copyDefaultModel('Nantianmen-default-embedding')" class="text-gray-600 hover:text-blue-400 transition" :title="t('copy')">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+          </svg>
+        </button>
+        <span class="text-xs text-gray-500 ml-2">{{ t('default_embedding_hint') }}</span>
+      </div>
     </div>
 
     <!-- Provider List -->
@@ -84,10 +95,20 @@
                 <span v-if="m.input_price || m.output_price || m.cache_hit_price" class="text-xs text-gray-400 whitespace-nowrap">📥¥{{ m.input_price||0 }} 📤¥{{ m.output_price||0 }} 💾¥{{ m.cache_hit_price||0 }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span v-if="m.is_default" class="text-xs text-emerald-400">{{ t('default_badge') }}</span>
-                <button v-else :disabled="m.is_disabled" @click="setDefault(p.id, m.id)"
-                  class="text-xs hover:text-emerald-400 disabled:text-gray-700 disabled:cursor-not-allowed"
-                  :class="m.is_disabled ? 'text-gray-700' : 'text-gray-500'">{{ t('set_default') }}</button>
+                <!-- ponytail: v0.5.1 — default chat button only shown for chat models (capability=chat or empty legacy). -->
+                <template v-if="m.capability !== 'embedding'">
+                  <span v-if="m.is_default" class="text-xs text-emerald-400">{{ t('default_chat_badge') }}</span>
+                  <button v-else :disabled="m.is_disabled" @click="setDefault(p.id, m.id)"
+                    class="text-xs hover:text-emerald-400 disabled:text-gray-700 disabled:cursor-not-allowed"
+                    :class="m.is_disabled ? 'text-gray-700' : 'text-gray-500'">{{ t('set_default_chat') }}</button>
+                </template>
+                <!-- ponytail: v0.5.1 — default embedding button only shown for embedding models. -->
+                <template v-if="m.capability === 'embedding'">
+                  <span v-if="m.is_default_embedding" class="text-xs text-blue-400">{{ t('default_embedding_badge') }}</span>
+                  <button v-else :disabled="m.is_disabled" @click="setDefaultEmbedding(p.id, m.id)"
+                    class="text-xs hover:text-blue-400 disabled:text-gray-700 disabled:cursor-not-allowed"
+                    :class="m.is_disabled ? 'text-gray-700' : 'text-gray-500'">{{ t('set_default_embedding') }}</button>
+                </template>
                 <span class="text-xs text-gray-600" v-if="m.is_manual">{{ t('manual') }}</span>
                 <!-- ponytail: per-model disable toggle. disabled models stay visible (badge) so user can re-enable. -->
                 <button @click="toggleModel(p.id, m)" :title="m.is_disabled ? t('enable_model') : t('disable_model')"
@@ -95,6 +116,13 @@
                   :class="m.is_disabled ? 'bg-red-500/40' : 'bg-emerald-500/40'">
                   <span class="inline-block h-3 w-3 transform rounded-full bg-white transition"
                     :class="m.is_disabled ? 'translate-x-3.5' : 'translate-x-0.5'"></span>
+                </button>
+                <!-- ponytail: hard-delete model. Default chat OR default embedding models are rejected by server (400). -->
+                <button :disabled="m.is_default || m.is_default_embedding" @click="deleteModel(p.id, m)"
+                  :title="(m.is_default || m.is_default_embedding) ? t('delete_default_forbidden') : t('delete')"
+                  class="text-xs px-1.5 py-0.5 bg-red-900 hover:bg-red-800 rounded disabled:bg-gray-700 disabled:text-gray-600 disabled:cursor-not-allowed inline-flex items-center"
+                  :class="(m.is_default || m.is_default_embedding) ? 'opacity-40' : ''">
+                  <span class="iconfont icon-delete"></span>
                 </button>
               </div>
             </div>
@@ -157,6 +185,17 @@
       <div class="bg-gray-800 rounded-lg p-6 w-80 border border-gray-700">
         <h3 class="text-lg font-bold mb-4">{{ t('edit_model') }}: {{ editModelForm.model_name }}</h3>
         <div class="space-y-3">
+          <div class="flex items-center gap-4 text-sm">
+            <span class="text-gray-400">{{ t('fld_capability') }}</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" value="chat" v-model="editModelForm.capability" class="accent-emerald-500" />
+              <span>{{ t('cap_chat') }}</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" value="embedding" v-model="editModelForm.capability" class="accent-blue-500" />
+              <span>{{ t('cap_embedding') }}</span>
+            </label>
+          </div>
           <div>
             <label class="text-xs text-gray-400">{{ t('fld_input_price') }} ({{ t('per_million') }})</label>
             <input v-model.number="editModelForm.input_price" type="number" step="0.0001" min="0" class="w-full mt-1 px-3 py-2 bg-gray-900 rounded border border-gray-700 text-sm" />
@@ -192,7 +231,7 @@ const form = ref({ name: '', protocol: 'openai', base_url: '', api_key: '' })
 const showAddModel = ref(false)
 const modelForm = ref({ providerId: null, model_name: '', capability: 'chat' })
 const showEditModel = ref(false)
-const editModelForm = ref({ providerId: null, modelId: null, model_name: '', input_price: 0, output_price: 0, cache_hit_price: 0 })
+const editModelForm = ref({ providerId: null, modelId: null, model_name: '', capability: 'chat', input_price: 0, output_price: 0, cache_hit_price: 0 })
 
 const load = async () => {
   try { const { data } = await api.listProviders(); providers.value = data } catch {}
@@ -261,6 +300,17 @@ const setDefault = async (providerId, modelId) => {
   }
 }
 
+// ponytail: v0.5.1 — set default embedding model (separate endpoint from chat default).
+const setDefaultEmbedding = async (providerId, modelId) => {
+  try {
+    await api.setDefaultEmbeddingModel(providerId, modelId)
+    await load()
+    await fetchModels(providerId)
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
+}
+
 // ponytail: toggle is_disabled on the model row. Server rebuilds modelMap so /v1/models + dispatch update.
 // Only fetchModels needed — toggle doesn't change provider list or default model, just the model row.
 const toggleModel = async (providerId, m) => {
@@ -321,7 +371,7 @@ const deleteProvider = async (id) => {
 const closeModal = () => { showAdd.value = false; editing.value = null; form.value = { name: '', protocol: 'openai', base_url: '', api_key: '' } }
 
 const openEditModel = (providerId, m) => {
-  editModelForm.value = { providerId, modelId: m.id, model_name: m.model_name, input_price: m.input_price || 0, output_price: m.output_price || 0, cache_hit_price: m.cache_hit_price || 0 }
+  editModelForm.value = { providerId, modelId: m.id, model_name: m.model_name, capability: m.capability || 'chat', input_price: m.input_price || 0, output_price: m.output_price || 0, cache_hit_price: m.cache_hit_price || 0 }
   showEditModel.value = true
 }
 
@@ -331,6 +381,7 @@ const saveEditModel = async () => {
       input_price: editModelForm.value.input_price,
       output_price: editModelForm.value.output_price,
       cache_hit_price: editModelForm.value.cache_hit_price,
+      capability: editModelForm.value.capability,
     })
     showEditModel.value = false
     await fetchModels(editModelForm.value.providerId)
@@ -343,8 +394,23 @@ const copyModelId = (providerName, modelName) => {
   navigator.clipboard?.writeText(`${providerName}_${modelName}`)
 }
 
-// ponytail: copy Nantianmen-default to clipboard (the virtual default-model id).
-const copyDefaultModel = () => {
-  navigator.clipboard?.writeText('Nantianmen-default')
+// ponytail: hard-delete a model. Server cascades:
+//   1) api_key_models row drops → removed from every key's authorized list
+//   2) api_keys.assigned_model_id SET NULL → that key falls back to Nantianmen-default
+//   3) usage_stats / communication_log rows kept, just model_id nulled
+// Default model is blocked at server (400). Only fetchModels — list shape unchanged.
+const deleteModel = async (providerId, m) => {
+  if (!confirm(`确认删除模型 "${m.model_name}"？\n\n该模型会从所有 API Key 的授权列表中移除。\n如果某 API Key 被分配过该模型，将自动恢复使用 Nantianmen-default。`)) return
+  try {
+    await api.deleteModel(providerId, m.id)
+    await fetchModels(providerId)
+  } catch (e) {
+    alert('Error: ' + (e.response?.data?.error || e.message))
+  }
+}
+
+// ponytail: v0.5.1 — copy Nantianmen-default or Nantianmen-default-embedding to clipboard.
+const copyDefaultModel = (name) => {
+  navigator.clipboard?.writeText(name || 'Nantianmen-default')
 }
 </script>

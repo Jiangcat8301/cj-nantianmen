@@ -5,6 +5,156 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [v0.5.1] — 2026-08-20
+
+### Added — 默认 Embedding 模型（与默认 Chat 模型分离）
+
+- 新增 `is_default_embedding` 列（schema + migration），与 `is_default`（默认 Chat）独立。同一 model 行可同时为 default chat + default embedding。
+- 新增虚拟模型名 `Nantianmen-default-embedding`：`/v1/embeddings` body `model` 字段填此值即走默认 embedding 路由（类比 `Nantianmen-default` 走默认 chat）。
+- 新增 API：
+  - `GET /api/admin/default-embedding-model` — 查询当前默认 embedding 模型。
+  - `PUT /api/admin/providers/{id}/models/{mid}/default-embedding` — 设置默认 embedding 模型（仅 `capability=embedding` 通过）。
+- `PUT /default`（原设置默认模型）增加 `capability=chat` 校验：非 chat 模型返回 400。
+- `toggle` disable 时联动清除 `is_default_embedding`（与 chat default 同逻辑）；`delete` 拒绝删除 default embedding 模型（400）。
+- 首次创建 provider 时，自动选首个 chat 模型设 default chat + 首个 embedding 模型设 default embedding。
+- `GET /providers`（嵌套 models）+ `available-models` 查询返回 `is_default_embedding` 字段。
+
+### Changed — UI/CLI/i18n 文案适配双默认模型
+
+- Dashboard「默认模型」→「默认Chat模型」，下方新增「默认Embedding模型」信息块（blue 配色）。
+- Providers info card 改双行（chat emerald + embedding blue），各带 copy 按钮。
+- 模型列表按钮条件渲染：chat 模型显示「设为默认Chat模型」/「★ 默认Chat」；embedding 模型显示「设为默认Embedding模型」/「★ 默认Embedding」。delete 按钮 `:disabled` 同时检查两个 default 标志。
+- ApiKeys 列表 `★` 标记拆为 `★Chat`（emerald）/ `★Emb`（blue）。
+- Tray 菜单「设置默认模型」拆为两个子菜单：chat（仅 chat 模型）+ embedding（仅 embedding 模型）。
+- i18n（zh/en/ja）新增 8 key + 改 3 旧 key 语义（`default_provider_model`、`set_default`→`set_default_chat`、`default_badge`→`default_chat_badge`）。
+- CLI 新增 `models setdefault <pid> <mid>` + `models setdefault-embedding <pid> <mid>` 子命令；`ls` 输出加 `★default-emb` 标记。
+
+### Fixed — FRPC 自定义域名原样使用 + 日志窗
+
+- **域名原样写入 customDomains**：之前 renderToml 会拿 frps 的 serverAddr 的 host 当根域名拼二级域名（`subdomain + "." + serverAddr-host`），这强制所有用户挂在 frps 域名下，且用户填完整域名（如 `nantianmen.ylpb360.com`）时会被双重 suffix。修复：`customDomains = [用户填的原样]`，不派生任何东西。frp 的 `customDomains` 是完整域名列表，与 serverAddr 无关——frps host 是 a.com、用户 vhost 是 b.net 完全合法。`startFrpc()` 校验改为要求 server_addr + server_port + 自定义域名（HTTP 模式没有 customDomains 无法路由）。i18n 文案 `frpc_field_subdomain` 改成「自定义域名（完整，如 b.net）」三语。
+- **FRPC 日志滚动窗**：ReverseProxy 页底部新增 log 面板，显示 frpc stdout/stderr，最多保留 100 行（main 进程内存环形缓冲，滚动到底部自动跟随）。主进程把 stdio 从直接 pipe 到文件改成 pipe + 内存缓冲（`feedLogChunk` 按行切分），新增 IPC `frpc:log:get`；前端 `refreshLog()` 2s 轮询，按 `[E]/[W]/[I]` 着色。frpc 未运行时回退读 `frpc.log` 文件最后 100 行。三语 i18n 新增 `frpc_log_title` / `frpc_log_empty`。
+
+### Fixed — FRPC HTTP routing by subdomain (was `remotePort`)
+
+- frps HTTP 模式所有代理共用一个端口(典型 20080),按 `Host` 头路由 — `remotePort` 在 HTTP 模式下没用。之前的 `remote_port` 输入框 + toml `remotePort = ...` 写出去其实是空跑。
+- 改用 `subdomain`:用户填一个唯一子串(例 `jiangcat`),toml 生成 `subdomainHost = "jiangcat.<serverAddr-base>"` + `customDomains = [...]`。其他 nantianmen 用户填不同子串就能在同一 frps 上共存。
+- frpc 0.71.0 原生支持 `subdomainHost` / `customDomains`。
+- UI:`remote_port` 字段改为 `subdomain`(文本输入,placeholder `jiangcat`),`remote_port` 字段保留兼容(但不再使用)。`startFrpc()` 校验从 `server_addr+server_port+remote_port` 改成 `server_addr+server_port`(subdomain 可选)。
+- i18n:三语新增 `frpc_field_subdomain`(`子域名(必须唯一)` / `Subdomain (must be unique)` / `サブドメイン(必須ユニーク)`),`frpc_field_remote_port` 文案改成 `公网端口(HTTP模式无需填)` 系列。
+
+### Fixed — FRPC proxy type: `tcp` → `http`
+
+- 之前 `renderToml()` 写的是 `type = "tcp"`(裸 TCP 隧道)。TCP 模式 frps 那边只看到一条 client + 一个 raw TCP channel,**没办法 HTTP 路由到它**(没有 vhost / subdomain / path 匹配)。用户场景是从公网访问南天门的 OpenAI 兼容 `/v1/chat/completions` — 必须走 HTTP。
+- 改为 `type = "http"`,加 `customDomains = ["nantianmen.local"]` + `locations = ["/"]`。frps 在 `remotePort` 上暴露真实 HTTP endpoint,reverse-proxy 到本机 `127.0.0.1:localPort`。
+- frpc 0.71.0 原生支持 `type = "http"`(无需 plugin)。
+- 访问方式:从公网 `http://frps-ip:remotePort/`(或绑 domain 后用 `http://domain:remotePort/`)→ frps → frpc 隧道 → 本机南天门 server。
+
+## [v0.5.0] — 2026-08-20
+
+### Fixed — TRay FRPC 启用/停用 UI + 配置未填时的错误处理
+
+- **Tray FRPC 启用/停用改为 checkbox switch**：原 tray 菜单在 `enabled=true` 时同时显示"启用 FRPC"和"停用 FRPC"两个独立项，是 menu item 而不是 switch，用户期望是一个 toggle。修复：改成 Electron 原生 `type: 'checkbox'` 菜单项（label = "FRPC 公网穿透" / "FRP tunnel" / "FRP トンネル"），勾选状态镜像 `frpc.enabled`；点击切换走 `frpc.enable()/disable()`，disable 同时 kill 当前进程。`enabled=true` 时下方仍显示"启动/停止 FRPC"按钮（按运行状态切换文案）。三语 trayLabels 新增 `frpcEnableToggle`。
+- **"FRPC config incomplete" 错误体验差**：用户刚装 / 没填过 FRPS 配置就点"启用"，直接报 500-style 字符串错误，用户不知道下一步该干嘛。修复：tray `frpc.start()` 在配置不全时改为返回 `{ ok:false, reason:'config-incomplete', message: ... }`，不再 throw；同步广播 `frpc:open-settings` IPC → App.vue 监听 `onOpenSettings` → `window.location.hash='#/reverse-proxy'` 把用户跳到设置页。Vue 端 `start()` 收到结果时把 `reason` 映射成 i18n 文案 `frpc_err_config_incomplete`（zh「请先在下方填写 FRPC 服务器配置」/ en「Please fill in the FRP server fields below first」/ ja「先に下方の FRP サーバー設定を入力してください」）。三语 trayLabels/i18n 各加 1 个 key。`no-binary` 也走同样的 typed-error 模式（不再 throw）。
+
+### Fixed — 反向代理下载 UX 三个 bug
+
+- **下载期间无法取消**：原"下载中"按钮只有一个下载按钮 disabled 状态，无法中止 13.9 MB 的下载。修复：下载期间切换为红色「取消下载」按钮，点击触发 `AbortController.abort()` → main 进程立刻 destroy HTTPS request + 删半截 tmp 文件 + 广播 `frpc:download:state { cancelled:true }`，UI 立刻回到「下载」按钮态。三语 i18n 新增 `frpc_btn_cancel`（zh「取消下载」/ en「Cancel download」/ ja「ダウンロードをキャンセル」）。
+- **代理不生效**：原 `https.get(url)` 在 Windows 上不走系统代理，导致开了 1099 端口 SOCKS5 代理后 ETIMEDOUT 20.205.243.166。修复：
+  1. Electron main 启动时 `reg query HKCU\...\Internet Settings /v ProxyEnable,ProxyServer` 拿到 `127.0.0.1:1099`。
+  2. 用已经装好的 `https-proxy-agent` 包（Electron transitive dep，未新增 npm 依赖）构造 `HttpsProxyAgent`，替代 Node 不支持的 `HTTPS_PROXY` env var（Node <22 不解析此 env var 是已知行为）。
+  3. 优先级链：nantianmen-conf.json `proxy=custom` → `proxy=direct` → 系统代理（IE 注册表）→ 直连。
+  4. error 信息改为 `<code> <message>`（之前 ECONNRESET / ETIMEDOUT 只显示 "socket hang up"）。
+- **路由切换打断下载进度显示**：从「反向代理」切到「数据统计」再切回去，UI 不再显示"下载中"。修复：Electron 主进程维护 module-scope `downloadState`（`{active, startedAt, version, ok, cancelled, error}`），下载状态变化时 `BrowserWindow.getAllWindows().forEach` 广播 `frpc:download:state` IPC；renderer 侧 `onMounted` 调 `downloadState()` 拉当前 state 恢复显示，并在 `ReverseProxy.vue` 模板显示"切到其他页面不影响下载"提示。三语 i18n 新增 `frpc_keep_alive_hint`。
+- 新增 IPC channels：`frpc:cancelDownload`（取消）+ `frpc:downloadState`（查询）；preload 同步暴露。`module.exports` 加 `cancelDownload`。
+
+### Changed — 文案统一
+
+- 「FRPC 项目主页」→「FRP 项目主页」三语（zh/en/ja）。
+- 「通过 FRPC 将本地端口映射到你的公网 FRPS」→「通过 FRP Client 将本地端口映射到你的公网 FRP Server」三语。frp 官方项目名是 "frp"，"frpc" 和 "frps" 是 client/server binary 的可执行文件名，不是项目名；之前文案把可执行文件名当成项目名了。
+
+### Added — Titlebar 三 chip（FRPC / Server / 版本号）
+
+- Desktop 自定义标题栏右侧改为 3 个独立 chip，中间用 `border-r border-gray-700/50` 细分隔线，从左到右依次：
+  - **`FRPC` 状态**：4 态指示 — 未下载 / 已停用（灰）/ 已停止（琥珀）/ 运行中（绿）。
+  - **`Server` 状态**：沿用旧配色 — 在线（绿）/ 离线（红）/ 版本不匹配（琥珀）。
+  - **`版本 vX.Y.Z`**：mono 字体灰字，明确标明 desktop 客户端版本。
+- 新增 `frpcStatus` ref + 3 个 computed（`frpcDotClass` / `frpcTextClass` / `frpcLabel`）+ `refreshFrpcStatus()`。3 秒轮询 + IPC `frpc:status` 实时 hook（ReverseProxy 页面切换状态时立即刷新）。
+- 三语 i18n 新增 `frpc_titlebar_hint`（hover tooltip「点击侧栏「反向代理」管理 FRPC」）和 `version_label`（zh 「版本」/ en 「Version」/ ja 「バージョン」）。
+- **仅 desktop UI 改动**：server 与 CLI 不感知，跨端无 ABI 影响。
+
+### Build — v0.5.0 Windows artifacts**（SHA-256 锚点，便于以后 grep 比对）**
+| 产物 | size | SHA-256 |
+|---|---|---|
+| `nantianmen-server-v0.5.0-win-x64.exe` | 11.66 MB | `299a8df633e7415cf5de6ee6c6670781e8684039268d7f4d491bb18090f3281b` |
+| `nantianmen-0.5.0-win-x64.exe`（desktop portable，含 v0.5.0 server alias） | 79.08 MB | `ae7d1abbba636d848e310d62...` |
+- Server binary 用 `go build -ldflags="-s -w"` 去符号，比 v0.4.24（16.92 MB）瘦 5 MB。
+- Desktop 体积从 v0.4.24 (83.56 MB) 降到 **79.08 MB**（瘦了 4.5 MB，因为内嵌的 server 从 16.93 MB 瘦到 11.66 MB）。asar 内部新增 `electron/frpc.cjs` + `src/views/ReverseProxy.vue`，由 vite tree-shake 消化，无新增 node_modules 依赖。
+- asar verify 通过：FRPC IPC handler、`providersCache` 5s TTL、tray 标签三语字面量、Vue i18n key 全部已落盘。
+
+### Added — 托盘菜单 FRPC 启停 + 一键切换默认模型
+
+- **托盘菜单启用/停用 FRPC**：仅当检测到 `~/.cj-nantianmen/frpc/frpc.exe` 已下载时显示。启用状态分两态：`enabled=true` 显示「启动 FRPC / 停止 FRPC」+「停用 FRPC」(停用会 stop 进程并落 `enabled=false`)；`enabled=false` 显示「启用 FRPC」(只落 `enabled=true`，不自动起进程)。复用 `frpc.cjs` 现有 module exports，不新增 IPC handler。
+- **托盘菜单「设置默认模型」**：两层 submenu，第一层是 provider 名（按字母序），第二层是该 provider 下所有 `is_disabled=0` 的模型（跳过已禁用）。当前默认模型后跟 `✓ 当前默认` 标记（zh/en/ja 三语）。有价格字段（input/output_price）的模型在菜单行末尾追加 `💰 输入 $X/M  输出 $Y/M`。无价格字段时优雅隐藏价格行（providers 接口 schema 不返回价格，需要价格时改用 `GET /api/admin/models`）。
+- **后端复用 0 改动**：完全利用现有 `GET /api/admin/providers`（嵌套 models，含 `is_default`/`is_disabled`）和 `PUT /api/admin/providers/{id}/models/{modelId}/default`（server 自动清零其他 is_default 再设新 default，不需 auth，server 已在 chi 路由里无 middleware）。providers 列表 5s TTL 缓存 + 点击切换后立即 invalidate。
+- **trayLabels 三语扩展**：zh/en/ja 各加 6 个 key (`frpcEnable/frpcDisable/frpcStart/frpcStop/setDefaultModel/defaultModelCurrent/defaultModelNone/defaultModelErr` + `priceFmt` 函数)，沿用现有 dict inline 模式，无新依赖。
+
+### Added — FRPC 启用/停用切换（独立于"随南天门启动"）
+
+- 新增 **`frpc.enabled`** 配置字段：用户主动"启用/停用 FRPC"的总开关。停用 = 关进程 + 持久化 `enabled=false`；启用 = 持久化 `enabled=true`，进程状态由用户后续手动启动。配置中其他字段（server_addr / token / 端口等）原样保留。
+- **`enabled` 与 `auto_start` 解耦**：启用/停用只动 `enabled`，**不会**改变 `auto_start`。`auto_start=true + enabled=false` = 配好了但不希望跑；`auto_start=false + enabled=true` = 不自动跑但可手动启。
+- **Desktop**：反向代理页面新增「启用 / 停用」主按钮（替代旧的「启动 / 停止」位置）+ 三态状态指示（已停用灰 / 已停止琥珀 / 运行中绿）。启动 / 停止按钮仅在 `enabled=true` 时显示。停用点击会先 `frpc.stop()` 再落盘。三语 i18n 新增 `frpc_btn_enable` / `frpc_btn_disable` / `frpc_status_disabled`。
+- **CLI**：新增 `reverse-proxy enable` 和 `reverse-proxy disable` 子命令。`disable` 先 stop 再落 `enabled=false`；`enable` 只落 `enabled=true`。`status` 输出新增 `enabled` 字段。`config` 支持 `enabled=true|false`。help 文本更新。
+- **boot 行为变更**：desktop 启动时 `autoStartIfEnabled()` 增加 `if (!c.enabled) return` 早返回；legacy conf（无 `enabled` 字段）默认 `enabled=true` 兼容旧行为。
+
+### Added — 公网穿透 / FRPC 反向代理
+
+- **Desktop 新增「反向代理」侧栏页面**（路径 `/reverse-proxy`）。顶部说明 + FRPC GitHub 链接 + 大号「下载最新版 FRPC」按钮 + 进度条。下载完成后展开 6 字段配置表单（FRPS 地址/端口/Token、远程端口、本地端口）+ 「随南天门启动」开关 + 启动/停止按钮 + 状态指示（运行中 pid / 已停止）+ 二进制路径显示。三语 i18n（zh/en/ja）新增 17 个 keys。
+- **FRPC 二进制管理**：首次访问页面点「下载」从 GitHub releases `v0.71.0` 拉取当前平台对应 zip/tar.gz（macOS arm64/x64、Win amd64/arm64、Linux amd64/arm64），通过系统 `tar`（Win10 1803+ 自带 `tar.exe`）就地解压到 `userData/frpc/frpc[.exe]`。下载进度通过 IPC `frpc:download:progress` 节流（每 200ms 一次）推到渲染层。
+- **进程生命周期**：Electron 主进程 `electron/frpc.cjs` 负责 spawn/kill。`before-quit` 钩子确保 desktop 退出时优雅 stop（`taskkill /T /F` 杀整树）。`auto_start` 配置时 desktop boot 后自动 spawn，失败仅 `console.warn`，不阻断 desktop 启动。
+- **配置持久化**：`server/internal/conf/conf.go` 新增 `Frpc *FrpcConfig` 字段；desktop 通过 `frpc:conf:get|set` IPC 直接读写同一份 `~/.cj-nantianmen/nantianmen-conf.json`，无 API 调用，进程间自动同步。
+- **CLI 新增 `reverse-proxy` 子命令**（`download | start | stop | status | config`）。`config` 支持 `key=value` 多对（`server_addr`、`server_port`、`token`、`remote_port`、`local_port`、`auto_start`）；`status` 自动 redact token（`ab****23`）；配置存 CLI 自己的 `~/.cj-nantianmen/config.json`（与 server conf 解耦，无 server 也能用）。Help 文本加 `reverse-proxy`。
+- **架构隔离**：FRPC 完全独立子进程，零代码侵入 server（仅多一个 `FrpcConfig` JSON 字段）和 proxy 路径（LLM 调用不走 frp 隧道）。FRPC 挂掉不影响本地 127.0.0.1:38271 访问。
+- **⚠️ 注意**：部分杀软（Defender SmartScreen / 360 / AVG 等）会把 frpc.exe 标记为潜在威胁并自动 quarantine（frp README 已知问题 [issue #3637](https://github.com/fatedier/frp/issues/3637)）。下载后如发现 binary 消失，请把 `%APPDATA%\cj-nantianmen\frpc\frpc.exe` 加入杀软白名单后重新点击「下载最新版 FRPC」。
+
+### Security
+
+- FRPC 进程通过 token 鉴权接入 FRPS，token 在 `status`/`config` 输出中自动 redact（`ab****cd` 形式）。生产部署强烈建议 FRPS 配置 `tls.force = true` + `allowPorts` 白名单。
+
+## [v0.4.24] — 2026-08-11
+
+### Added — 模型删除（Desktop + CLI）
+- **Desktop 模型行删除按钮**：Providers.vue 每个模型行右侧新增红色删除按钮。默认模型按钮 disabled（半透明 + tooltip "默认模型不可删除"）；其他模型点击后弹确认对话框（"该模型会从所有 API Key 的授权列表中移除。如果某 API Key 被分配过该模型，将自动恢复使用 Nantianmen-default"），确认后调 `DELETE /api/admin/providers/{id}/models/{modelId}`。三语 i18n (`delete_default_forbidden`) 同步。
+- **Server 删除路由**：新增 `DELETE /api/admin/providers/{id}/models/{modelId}`，默认模型返回 400 `cannot delete default model`，硬删后调 `modelmap.RebuildModelMap()` 让 `/v1/models` 立刻反映。Schema cascade 行为自动生效：`api_key_models.model_id ON DELETE CASCADE` 移除该模型从所有 API Key 的授权列表；`api_keys.assigned_model_id ON DELETE SET NULL` 把被分配过该模型的 Key 的 override 清空，proxy 自动 fallback 到 Nantianmen-default；`usage_stats` / `communication_log` 历史行保留，`model_id` SET NULL 不影响 cost/usage 历史。
+- **CLI `models` 子命令**：新增 `models ls <provider-id>`（列出模型 + 能力 + ★default/disabled 徽章）和 `models rm <provider-id> <model-id>`（y/N 二次确认）。`providers ls` 输出末尾追加嵌套 model 数（`3 models`），方便 CLI 操作员决定要不要 drill down。Help 文本同步加 `models`。
+- **CLI 子命令 args 切片 bug fix**：`main()` 之前用 `os.Args[2:]` 给子命令 handler，flag value（如 `--port 40999`）也会被算进 sub args，导致 `providers ls`、`apikey ls` 等子命令接 `sub="40999"` 静默返回（exit 0、没输出）。改用 `subIdx` 记录 sub 在 os.Args 的位置，传 `os.Args[subIdx+1:]`，所有子命令统一受益。
+
+### Added — Cost 落库 + UI 花费列
+- **价格三件套 + cost 列**：`models` 加 `input_price` / `output_price` / `cache_hit_price`（REAL NOT NULL DEFAULT 0）；`usage_stats` 和 `communication_log` 各加 `cost REAL NOT NULL DEFAULT 0`。`RebuildModelMap` 启动回填 price，`modelmap.Entry` 暴露三件套。
+- **proxy 结束算 cost 并落库**：`proxy.go` 新增 `computeCost(entry, in, out, cached)`，按 `(uncached_input × input_price + output × output_price + cached × cache_hit_price) / 1M` 在请求结束时算 cost，代入 `stats.Record(...)` / `logEntry` 写入 `usage_stats.cost` 和 `communication_log.cost`。改价不会回溯污染历史。
+- **Desktop 日志管理「花费」列**：Logs.vue 在「命中%」之后新增「花费」列，`fmtCost` 格式：`0/null → −`、`<0.0001 → >¥0.0001`、`≥0.0001 → ¥0.XXXX`（4 位小数，¥ 符号）。三语 i18n (`log_cost`) 同步。
+- **CLI `stats` breakdown 加 cost 列**：stats 子命令的 total 行加 `cost: $X.XX`，breakdown 表新增 `cost` 列（7 列：provider / model / reqs / in / out / cached / cost），用 `toF()` 工具函数把 JSON number 转 float64。
+
+### Fixed
+- **FlushBuffer trim 误触发删 communication_log**：`commlog.go` 的 `FlushBuffer` 末尾在 `LogRotationEnabled=true && LogRotationMax=0` 时跑 `TrimToMax(500)`，**每次 flush 都执行**（10s tick），server 重启后高频写入导致最早行被批量 trim → WisUnite (pid=9) 7 行 + 其他老行集体失踪。修复：FlushBuffer 不再 trim，移到独立 `initRotation()` ticker（60s 一次），gate 改成 `LogRotationEnabled && LogRotationMax > 0`。
+- **`runMigrations` 死代码**：历史遗留 `UPDATE models SET deleted_at=datetime('now') WHERE deleted=1` 引用 schema 不存在的 `deleted` 列，Exec 静默吞错。删除该行，schema 用 `deleted_at` 替代。
+- **Desktop `log_cost` i18n 缺失**：缺 zh/en/ja 三语键值，中文版显示「花费」，与 `t('log_cost')` 兜底文案对齐。
+
+### Migration
+- **现有用户**：`runMigrations` 启动时自动加 `cost` 列；新装 EXE 直接生效。
+- **已生产运行的 v0.4.23 db**：手动 `ALTER TABLE` + `UPDATE` 单事务回填历史 cost（基于 `model_id = models.id` JOIN 价格），无需停 server：
+  ```sql
+  ALTER TABLE usage_stats ADD COLUMN cost REAL NOT NULL DEFAULT 0;
+  ALTER TABLE communication_log ADD COLUMN cost REAL NOT NULL DEFAULT 0;
+  UPDATE usage_stats SET cost = ROUND(
+    (input_tokens - cached_tokens) * m.input_price / 1000000.0
+    + output_tokens * m.output_price / 1000000.0
+    + cached_tokens * m.cache_hit_price / 1000000.0, 6)
+  FROM models m WHERE usage_stats.model_id = m.id
+    AND (m.input_price > 0 OR m.output_price > 0 OR m.cache_hit_price > 0);
+  -- 同理 communication_log。无价 model 留 cost=0。
+  ```
+- **WisUnite 历史数据恢复**：v0.4.23 trim bug 把 backup 之前 33 分钟的 256 行 communication_log（包括 WisUnite 7 行）误删。0.4.24 部署后用 `ATTACH DATABASE '<backup>.db' AS bkp` + 显式列名 INSERT 恢复 274 行（cost 默认 0），再跑回填 SQL 补全 cost。无 backup 覆盖的行无法恢复（WAL tombstone）。
+
 ## [v0.4.23] — 2026-08-03
 
 ### Fixed

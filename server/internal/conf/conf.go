@@ -17,19 +17,38 @@ var (
 )
 
 type Config struct {
-	Initialized         bool        `json:"initialized"`
-	ServerHost          string      `json:"server_host"`
-	ServerPort          int         `json:"server_port"`
-	Password            string      `json:"password"`
-	Salt                string      `json:"salt"`
-	LogEnabled          bool        `json:"log_enabled"`
-	LogRotationEnabled  bool        `json:"log_rotation_enabled"`
-	LogRotationMax      int         `json:"log_rotation_max"`
-	Proxy               string      `json:"proxy"`
-	ProxyURL            string      `json:"proxy_url"`
-	Database            DatabaseCfg `json:"database"`
-	UIFilters           interface{} `json:"ui_filters"`
-	WindowState         interface{} `json:"window_state"`
+	Initialized        bool        `json:"initialized"`
+	ServerHost         string      `json:"server_host"`
+	ServerPort         int         `json:"server_port"`
+	Password           string      `json:"password"`
+	Salt               string      `json:"salt"`
+	LogEnabled         bool        `json:"log_enabled"`
+	LogRotationEnabled bool        `json:"log_rotation_enabled"`
+	LogRotationMax     int         `json:"log_rotation_max"`
+	Proxy              string      `json:"proxy"`
+	ProxyURL           string      `json:"proxy_url"`
+	Database           DatabaseCfg `json:"database"`
+	UIFilters          interface{} `json:"ui_filters"`
+	WindowState        interface{} `json:"window_state"`
+	// ponytail: v0.5.0 — FRPC reverse-proxy (公网穿透). Desktop/CLI manage the child process;
+	// server only persists config so multi-process stays in sync via shared nantianmen-conf.json.
+	Frpc *FrpcConfig `json:"frpc,omitempty"`
+}
+
+// FrpcConfig is read by desktop/CLI; server itself does not touch frpc.
+// JSON tag-only struct — no validation here (process managers do their own).
+type FrpcConfig struct {
+	// ponytail: v0.5.0 — enabled is the user's "should this run?" toggle.
+	// It is independent from auto_start: enabled=false means "do not start
+	// frpc at all", while auto_start only governs whether desktop boot
+	// triggers an automatic spawn. Disabling preserves the rest of the config.
+	Enabled    bool   `json:"enabled"`
+	AutoStart  bool   `json:"auto_start"`
+	ServerAddr string `json:"server_addr,omitempty"` // FRPS public host
+	ServerPort int    `json:"server_port,omitempty"` // FRPS bindPort
+	Token      string `json:"token,omitempty"`       // FRPS auth token
+	RemotePort int    `json:"remote_port,omitempty"` // exposed port on FRPS
+	LocalPort  int    `json:"local_port,omitempty"`  // 南天门 listen port (default 38271)
 }
 
 type DatabaseCfg struct {

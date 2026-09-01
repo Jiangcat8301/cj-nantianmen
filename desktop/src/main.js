@@ -8,6 +8,7 @@ import Stats from './views/Stats.vue'
 import ApiDocs from './views/ApiDocs.vue'
 import Settings from './views/Settings.vue'
 import Logs from './views/Logs.vue'
+import ReverseProxy from './views/ReverseProxy.vue'
 import './style.css'
 import './iconfont.css'
 
@@ -22,6 +23,7 @@ const router = createRouter({
     { path: '/docs', component: ApiDocs },
     { path: '/settings', component: Settings },
     { path: '/logs', component: Logs },
+    { path: '/reverse-proxy', component: ReverseProxy },
   ],
 })
 

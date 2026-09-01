@@ -20,8 +20,14 @@ export default {
   addModel: (id, name, capability) => api.post(`/providers/${id}/models`, { model_name: name, capability: capability || 'chat' }),
   updateModel: (providerId, modelId, data) => api.put(`/providers/${providerId}/models/${modelId}`, data),
   setDefaultModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/default`),
+  // ponytail: v0.5.1 — set/get default embedding model (separate from chat default).
+  setDefaultEmbeddingModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/default-embedding`),
+  getDefaultEmbeddingModel: () => api.get('/default-embedding-model'),
   // ponytail: toggle is_disabled on a model — rebuilds modelMap so /v1/models reflects the change.
   toggleModel: (providerId, modelId) => api.put(`/providers/${providerId}/models/${modelId}/toggle`),
+  // ponytail: hard-delete a model. Schema cascades: removes from every api_key's authorized list,
+  // clears api_keys.assigned_model_id (proxy falls back to Nantianmen-default), keeps history rows.
+  deleteModel: (providerId, modelId) => api.delete(`/providers/${providerId}/models/${modelId}`),
 
   // API Keys
   listApiKeys: () => api.get('/api-keys'),

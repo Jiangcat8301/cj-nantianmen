@@ -22,6 +22,22 @@ var activeRequests atomic.Int64
 func GetActive() int64 { return activeRequests.Load() }
 func NowStr() string   { return time.Now().Format("2006-01-02 15:04:05") }
 
+// ponytail: v0.4.24 — compute USD cost at request time using the model entry's current prices.
+// Written into usage_stats.cost and communication_log.cost so later price edits don't rewrite history.
+// Formula: (input - cached) * input_price + output * output_price + cached * cache_hit_price, all / 1M.
+func computeCost(e *modelmap.Entry, input, output, cached int) float64 {
+	if e == nil {
+		return 0
+	}
+	inNonCached := float64(input - cached)
+	if inNonCached < 0 {
+		inNonCached = 0
+	}
+	return inNonCached*e.InputPrice/1_000_000 +
+		float64(output)*e.OutputPrice/1_000_000 +
+		float64(cached)*e.CacheHitPrice/1_000_000
+}
+
 func RandUUID() string {
 	b := make([]byte, 16)
 	rand.Read(b)
@@ -180,15 +196,18 @@ func ProxyRequest(body map[string]interface{}, inboundProtocol string, apiKeyID 
 		out = OpenaiRespToAnthropic(data)
 	}
 	outBytes, _ := json.Marshal(out)
+	cost := computeCost(entry, captured.InputTokens, captured.OutputTokens, captured.CachedTokens)
 	logEntry(map[string]interface{}{
 		"apiKeyId": apiKeyID, "provider": p, "modelName": entry.ModelName, "modelId": entry.ModelID,
 		"upstreamBody": upstreamBody, "responseBody": string(outBytes),
 		"inputTokens": captured.InputTokens, "outputTokens": captured.OutputTokens, "cachedTokens": captured.CachedTokens,
 		"durationMs": durationMs,
+		"cost": cost,
 	})
 	stats.Record(stats.RecordInput{
 		APIKeyID: apiKeyID, ProviderID: p.ID, ModelID: entry.ModelID, ModelName: entry.ModelName,
 		RequestCount: 1, InputTokens: captured.InputTokens, OutputTokens: captured.OutputTokens, CachedTokens: captured.CachedTokens,
+		Cost: cost,
 	})
 	activeRequests.Add(-1)
 	return out, nil
@@ -253,15 +272,18 @@ func handleStreamResponse(resp *http.Response, inbound, providerProto string, en
 		flusher.Flush()
 	}
 
+	cost := computeCost(entry, intok, outtok, cachedtok)
 	stats.Record(stats.RecordInput{
 		APIKeyID: apiKeyID, ProviderID: p.ID, ModelID: entry.ModelID, ModelName: entry.ModelName,
 		RequestCount: 1, InputTokens: intok, OutputTokens: outtok, CachedTokens: cachedtok,
+		Cost: cost,
 	})
 	activeRequests.Add(-1)
 	logEntry(map[string]interface{}{
 		"apiKeyId": apiKeyID, "provider": p, "modelName": entry.ModelName, "modelId": entry.ModelID,
 		"upstreamBody": upstreamBody, "responseBody": outputBuf,
 		"inputTokens": intok, "outputTokens": outtok, "cachedTokens": cachedtok, "durationMs": durationMs,
+		"cost": cost,
 	})
 	return nil, nil
 }
@@ -343,10 +365,9 @@ var embedWhitelist = map[string]bool{
 
 func ProxyEmbeddingRequest(body map[string]interface{}, apiKeyID int64, w http.ResponseWriter) (interface{}, error) {
 	model := fmt.Sprint(body["model"])
-	if model == "" || model == "auto" || model == "Nantianmen-default" {
-		return nil, fmt.Errorf("/v1/embeddings requires explicit model")
-	}
-	entry, err := modelmap.ResolveModel(model)
+	// ponytail: "Nantianmen-default-embedding" / "auto" / "" → default embedding model (server-side resolution).
+	// Explicit model name → resolved via modelmap as before.
+	entry, err := modelmap.ResolveEmbeddingModel(model)
 	if err != nil {
 		return nil, err
 	}
@@ -390,11 +411,13 @@ func ProxyEmbeddingRequest(body map[string]interface{}, apiKeyID int64, w http.R
 		activeRequests.Add(-1)
 		stats.Record(stats.RecordInput{
 			APIKeyID: apiKeyID, ProviderID: entry.Provider.ID, ModelID: entry.ModelID, ModelName: entry.ModelName, RequestCount: 1,
+			Cost: 0,
 		})
 		logEntry(map[string]interface{}{
 			"apiKeyId": apiKeyID, "provider": entry.Provider, "modelName": entry.ModelName, "modelId": entry.ModelID,
 			"upstreamBody": map[string]interface{}{"model": entry.ModelName, "input_count": arrayLen},
 			"responseBody": "", "inputTokens": 0, "outputTokens": 0, "cachedTokens": 0, "durationMs": durationMs,
+			"cost": 0,
 			"error": map[string]interface{}{"code": 0, "message": err.Error()},
 		})
 		return nil, err
@@ -405,11 +428,13 @@ func ProxyEmbeddingRequest(body map[string]interface{}, apiKeyID int64, w http.R
 		activeRequests.Add(-1)
 		stats.Record(stats.RecordInput{
 			APIKeyID: apiKeyID, ProviderID: entry.Provider.ID, ModelID: entry.ModelID, ModelName: entry.ModelName, RequestCount: 1,
+			Cost: 0,
 		})
 		logEntry(map[string]interface{}{
 			"apiKeyId": apiKeyID, "provider": entry.Provider, "modelName": entry.ModelName, "modelId": entry.ModelID,
 			"upstreamBody": map[string]interface{}{"model": entry.ModelName, "input_count": arrayLen},
 			"responseBody": "", "inputTokens": 0, "outputTokens": 0, "cachedTokens": 0, "durationMs": durationMs,
+			"cost": 0,
 			"error": map[string]interface{}{"code": resp.StatusCode, "message": fmt.Sprintf("Upstream %d: %s", resp.StatusCode, limitStr(string(bodyText), 500))},
 		})
 		return nil, fmt.Errorf("upstream %d: %s", resp.StatusCode, string(bodyText))
@@ -427,6 +452,7 @@ func ProxyEmbeddingRequest(body map[string]interface{}, apiKeyID int64, w http.R
 	}
 	stats.Record(stats.RecordInput{
 		APIKeyID: apiKeyID, ProviderID: entry.Provider.ID, ModelID: entry.ModelID, ModelName: entry.ModelName, RequestCount: 1,
+		Cost: 0,
 	})
 	activeRequests.Add(-1)
 	var inputStr string

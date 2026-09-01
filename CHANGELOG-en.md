@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+### Fixed — FRPC custom domain verbatim + log pane
+
+- **Domain written verbatim to `customDomains`**: the old renderToml appended the frps serverAddr host as a root domain (`subdomain + "." + serverAddr-host`), forcing every user under the frps hostname and double-suffixing full-domain inputs like `nantianmen.ylpb360.com`. Fixed: `customDomains = [<user input verbatim>]`, nothing derived. frp's `customDomains` is a full-domain list with no relationship to serverAddr — frps host a.com + user vhost b.net is fully legal. `startFrpc()` now requires server_addr + server_port + a custom domain (HTTP mode can't route without customDomains). i18n `frpc_field_subdomain` → "Custom domain (full, e.g. b.net)" ×3 languages.
+- **FRPC log pane**: ReverseProxy page now shows a scrollable log panel at the bottom — frpc stdout/stderr, capped at 100 lines (main-process in-memory ring buffer, auto-scrolls to bottom). Main now pipes frpc stdio into both the log file and an in-memory buffer (`feedLogChunk` line-splits); new IPC `frpc:log:get`. Frontend polls via `refreshLog()` every 2s and colors lines by `[E]/[W]/[I]`. When frpc isn't running it falls back to tailing the last 100 lines of `frpc.log`. Trilingual i18n adds `frpc_log_title` / `frpc_log_empty`.
+
+### Fixed — FRPC HTTP routing by subdomain (was `remotePort`)
+
+- frps HTTP mode shares one port (typically 20080) across all proxies and routes by `Host` header — `remotePort` is dead weight in HTTP mode. The previous `remote_port` form field + toml `remotePort = ...` were inert.
+- Switched to a `subdomain` field: the user enters a unique string (e.g. `jiangcat`) and the toml becomes `subdomainHost = "jiangcat.<serverAddr-base>"` + `customDomains = [...]`. Other Nantianmen users pick a different subdomain and coexist on the same frps.
+- frpc 0.71.0 supports `subdomainHost` / `customDomains` natively.
+- UI: `remote_port` form field replaced with a text `subdomain` field (placeholder `jiangcat`); the old `remote_port` key is preserved in the conf object for back-compat but ignored by the toml writer. `startFrpc()` now only requires `server_addr + server_port` (subdomain is optional).
+- i18n: three languages add `frpc_field_subdomain` (`子域名（必须唯一）` / `Subdomain (must be unique)` / `サブドメイン（必須ユニーク）`); `frpc_field_remote_port` copy updated to flag it as unused in HTTP mode.
+
+### Fixed — FRPC proxy type: `tcp` → `http`
+
+- `renderToml()` previously wrote `type = "tcp"` (a raw TCP tunnel). With TCP the frps only sees a client + a raw TCP channel — there's no way to route an HTTP request to it (no vhost / subdomain / path matching). The use case is public-internet access to Nantianmen's OpenAI-compatible `/v1/chat/completions`, which needs HTTP.
+- Switched to `type = "http"` with `customDomains = ["nantianmen.local"]` and `locations = ["/"]`. frps now exposes a real HTTP endpoint on `remotePort` and reverse-proxies it to `127.0.0.1:localPort` over the tunnel.
+- frpc 0.71.0 supports `type = "http"` natively (no plugin).
+- Access pattern: public `http://frps-ip:remotePort/` (or `http://domain:remotePort/` once a domain is bound) → frps → frpc tunnel → local Nantianmen server.
+
+## [v0.5.0] — 2026-08-20
+
+### Fixed — Tray FRPC enable/disable UI + better error handling
+
+- **Tray FRPC enable/disable is now a checkbox switch**: the previous tray menu exposed both "启用 FRPC" and "停用 FRPC" as independent menu items when `enabled=true`, which is two items where users expect a single toggle. Fix: replaced with Electron's native `type: 'checkbox'` menu item (label = "FRPC 公网穿透" / "FRP tunnel" / "FRP トンネル"). The check state mirrors `frpc.enabled`; clicking flips between `frpc.enable()` and `frpc.disable()` (disable also kills the running process). The `enabled=true` branch still shows the separate "Start/Stop FRPC" row whose label flips by `frpc.isRunning()`. Trilingual trayLabels gains `frpcEnableToggle`.
+- **"FRPC config incomplete" had a hostile error message**: a fresh install with no FRPS fields would surface `Error invoking remote method 'frpc:start': Error: FRPC config incomplete (server_addr / server_port / remote_port required)` and leave the user stuck. Fix: `frpc.start()` now returns typed `{ ok:false, reason:'config-incomplete', message: ... }` instead of throwing, AND fires `frpc:open-settings` IPC. App.vue's `onOpenSettings` listener sets `window.location.hash='#/reverse-proxy'` to route the user to the settings page. Vue's `start()` translates `reason` to the new i18n key `frpc_err_config_incomplete`. Trilingual trayLabels / i18n add one key each. `no-binary` follows the same typed pattern (also no longer throws).
+
+### Fixed — Reverse-proxy download UX bugs (3 fixes)
+
+- **No cancel button during download**: the original "downloading" state only disabled the start button, leaving users stuck watching a 13.9 MB download finish even when they realized they hit the wrong button. Fix: while `downloading` is true the button now renders as a red **「取消下载」** that triggers `AbortController.abort()` — main immediately destroys the HTTPS request, deletes the partial tmp file, and broadcasts `frpc:download:state { cancelled:true }`. The UI snaps back to the green download button. Trilingual i18n adds `frpc_btn_cancel`.
+- **Proxy not honoured**: `https.get(url)` was bypassing the OS proxy entirely, so users with a 1099-port proxy got `ETIMEDOUT 20.205.243.166`. Fix:
+  1. Electron main reads `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings` (ProxyEnable / ProxyServer) at startup to discover `127.0.0.1:1099`.
+  2. Uses the already-installed `https-proxy-agent` package (Electron transitive dep — **no new npm dep added**) to construct an `HttpsProxyAgent`. Node <22's native `https.get` does NOT honour `HTTPS_PROXY` env vars — that's why just setting the env var didn't help.
+  3. Precedence chain: nantianmen-conf.json `proxy=custom` → `proxy=direct` → IE-registry system proxy → direct.
+  4. Error surface tightened: `<code> <message>` (was `socket hang up` for everything).
+- **Route switch hides download progress**: navigating away from the Reverse Proxy page and back lost the "downloading" UI even though main was still streaming bytes. Fix: Electron main now keeps `downloadState` in module scope and broadcasts `frpc:download:state` to every window on every transition. `ReverseProxy.vue` subscribes via `onDownloadState` and additionally calls `downloadState()` on remount to rehydrate after a route round-trip — and shows a small "切到其他页面不影响下载" hint so the user knows it's intentional. Trilingual i18n adds `frpc_keep_alive_hint`.
+- New IPC channels: `frpc:cancelDownload` (cancel) + `frpc:downloadState` (query); preload bridge updated.
+
+### Changed — Copy fix
+
+- "FRPC project page" → "FRP project page" (zh/en/ja). frp's official project name is "frp"; `frpc`/`frps` are client/server binary names, not the project name — earlier copy used the executable name in places that should be the project name.
+- "use FRPC to tunnel your local port through a public FRPS" → "use FRP Client to tunnel your local port through a public FRP Server" (zh/en/ja). Same reason.
+
+### Added — Titlebar three-chip indicator (FRPC / Server / version)
+
+- The desktop custom titlebar now shows three independent chips on the right, separated by `border-r border-gray-700/50` hairlines, left to right:
+  - **`FRPC` status** — four states: not-downloaded / disabled (gray) / stopped (amber) / running (emerald).
+  - **`Server` status** — unchanged colors: online (emerald) / offline (red) / version mismatch (amber).
+  - **`Version vX.Y.Z`** — mono font gray, shows the desktop client version.
+- New `frpcStatus` ref + three computed properties (`frpcDotClass` / `frpcTextClass` / `frpcLabel`) plus `refreshFrpcStatus()`. 3-second polling plus a live `frpc:status` IPC hook so the chip updates the instant the user changes state on the Reverse Proxy page.
+- Trilingual i18n adds `frpc_titlebar_hint` (hover tooltip "Open the Reverse Proxy sidebar to manage FRPC") and `version_label` ("版本" / "Version" / "バージョン").
+- **Desktop UI only**: server and CLI have no awareness of this; no cross-process ABI impact.
+
+### Build — v0.5.0 Windows artifacts (SHA-256 anchors for future grep)
+| Artifact | size | SHA-256 |
+|---|---|---|
+| `nantianmen-server-v0.5.0-win-x64.exe` | 11.66 MB | `299a8df633e7415cf5de6ee6c6670781e8684039268d7f4d491bb18090f3281b` |
+| `nantianmen-0.5.0-win-x64.exe` (desktop portable, bundles v0.5.0 server alias) | 79.08 MB | `ae7d1abbba636d848e310d62...` |
+- Server binary built with `go build -ldflags="-s -w"` (stripped symbols) — 5 MB leaner than v0.4.24 (16.92 MB).
+- Desktop size down from v0.4.24 (83.56 MB) to **79.08 MB** (4.5 MB leaner — server dropped 16.93 MB → 11.66 MB). asar picks up the new `electron/frpc.cjs` + `src/views/ReverseProxy.vue`; vite tree-shake absorbs them, no new `node_modules` deps.
+- asar verification passed: FRPC IPC handlers, `providersCache` 5 s TTL, trilingual tray labels, Vue i18n keys all confirmed inside the bundle.
+
+### Added — Tray menu FRPC start/stop + one-click default-model picker
+
+- **Tray menu FRPC enable/disable**: shown only when `~/.cj-nantianmen/frpc/frpc.exe` is detected. Two states: `enabled=true` shows "Start FRPC / Stop FRPC" plus "Disable FRPC" (Disable kills the process and persists `enabled=false`); `enabled=false` shows a single "Enable FRPC" entry (persists `enabled=true` only, doesn't auto-launch). Reuses the existing `frpc.cjs` module exports — no new IPC handler.
+- **Tray "Set default model" submenu**: two-level. Level 1 = providers (alphabetical). Level 2 = every `is_disabled=0` model under that provider (disabled models are filtered out). The current default model gets a `✓ current default` suffix (zh / en / ja). When `input_price` / `output_price` are present, a price tag like `💰 in $X/M  out $Y/M` is appended; missing fields degrade gracefully (the `/providers` endpoint doesn't include pricing — switch to `GET /api/admin/models` if you need it).
+- **Zero server changes**: purely client. Reuses existing `GET /api/admin/providers` (returns nested models with `is_default`/`is_disabled`) and `PUT /api/admin/providers/{id}/models/{modelId}/default` (the server already zeroes other `is_default` flags and there's no chi middleware on the route, so no auth header needed). 5 s TTL cache on providers list; invalidated immediately after a successful default switch.
+- **trayLabels trilingual extension**: zh / en / ja gain 6 keys plus a `priceFmt` function (`frpcEnable / frpcDisable / frpcStart / frpcStop / setDefaultModel / defaultModelCurrent / defaultModelNone / defaultModelErr`). Inline-dict pattern preserved — no new dependencies.
+
+### Added — FRPC enable / disable toggle (independent from "Start with Nantianmen")
+
+- New **`frpc.enabled`** config field: the user's master "should FRPC run?" toggle. Disable = kill the process + persist `enabled=false`; enable = persist `enabled=true` (the process stays in whatever state it was — start it manually if you want it running). Every other field (server_addr / token / ports) is preserved verbatim.
+- **`enabled` and `auto_start` are decoupled**: enable / disable only touches `enabled`, never `auto_start`. `auto_start=true + enabled=false` = configured but deliberately offline; `auto_start=false + enabled=true` = won't auto-launch but can be started manually.
+- **Desktop**: the Reverse Proxy page now has a primary "Enable / Disable" button (in the slot previously occupied by Start/Stop) plus a 3-state status indicator (Disabled grey / Stopped amber / Running green). Start / Stop buttons only appear while `enabled=true`. Clicking Disable calls `frpc.stop()` first, then persists. Trilingual i18n adds `frpc_btn_enable` / `frpc_btn_disable` / `frpc_status_disabled`.
+- **CLI**: new `reverse-proxy enable` and `reverse-proxy disable` subcommands. `disable` stops the process then persists `enabled=false`; `enable` only persists `enabled=true`. `status` now prints `enabled`. `config` accepts `enabled=true|false`. The help line is updated.
+- **Boot behaviour change**: `autoStartIfEnabled()` in the Electron main gains an `if (!c.enabled) return` early-return; legacy configs (without the `enabled` field) default to `enabled=true` for back-compat.
+
+### Added — Public-internet tunneling / FRPC reverse proxy
+
+- **New "Reverse Proxy" sidebar page** in the Desktop UI (path `/reverse-proxy`). The top of the page has an intro + a FRPC GitHub link + a prominent "Download latest FRPC" button + progress bar. After download completes, a 6-field config form appears (FRPS address / port / token, remote port, local port) + an "Start with Nantianmen" toggle + start/stop buttons + status indicator (running pid / stopped) + the binary path. Trilingual i18n (zh / en / ja) gains 17 new keys.
+- **FRPC binary manager**: the "Download" button pulls the platform-appropriate zip / tar.gz from GitHub releases `v0.71.0` (macOS arm64 / x64, Windows amd64 / arm64, Linux amd64 / arm64), then uses the system `tar` (Windows 10 1803+ ships `tar.exe`) to extract `frpc[.exe]` straight into `userData/frpc/`. Download progress is throttled to 200 ms intervals and pushed to the renderer via the IPC channel `frpc:download:progress`.
+- **Process lifecycle**: the Electron main process (`electron/frpc.cjs`) owns spawn / kill. The `before-quit` hook ensures frpc is gracefully stopped when Desktop exits (`taskkill /T /F` kills the whole tree). When `auto_start` is set, frpc is spawned after Desktop boot; failures only emit `console.warn` and never block Desktop startup.
+- **Config persistence**: `server/internal/conf/conf.go` gains a `Frpc *FrpcConfig` field. The Desktop talks to that field via `frpc:conf:get|set` IPC, which reads and writes the same `~/.cj-nantianmen/nantianmen-conf.json` directly — no API call, and every process that reads that file stays in sync automatically.
+- **New CLI subcommand `reverse-proxy`** (`download | start | stop | status | config`). `config` accepts multiple `key=value` pairs (`server_addr`, `server_port`, `token`, `remote_port`, `local_port`, `auto_start`). `status` automatically redacts the token (`ab****23`). Config persists into the CLI's own `~/.cj-nantianmen/config.json` (decoupled from the server's conf, so it works without the server running). The help line now lists `reverse-proxy`.
+- **Architectural isolation**: FRPC is a fully independent child process; zero code touches the server (it just gains one `FrpcConfig` JSON field) or the proxy path (LLM calls never go through the frp tunnel). If frpc crashes, local `127.0.0.1:38271` access is unaffected.
+- **⚠️ Heads-up**: some antivirus products (Defender SmartScreen, 360, AVG, …) flag `frpc.exe` as a potential threat and quarantine it automatically — a known issue with frp, see [issue #3637](https://github.com/fatedier/frp/issues/3637). If you click "Download" and the binary disappears, whitelist `%APPDATA%\cj-nantianmen\frpc\frpc.exe` and click "Download latest FRPC" again.
+
+### Security
+
+- FRPC authenticates to FRPS with a token that is automatically redacted in `status` / `config` output (`ab****cd`). For production deployments we strongly recommend enabling FRPS `tls.force = true` plus an `allowPorts` allowlist.
+
+## [v0.4.24] — 2026-08-11
+
+### Added — Model deletion (Desktop + CLI)
+- **Desktop per-model delete button**: Providers.vue adds a red delete button on the right of every model row. The default model button is disabled (40% opacity + tooltip "Cannot delete the default model"); other models pop a confirmation dialog ("This model will be removed from every API Key's authorized list. Any API Key assigned to this model will automatically fall back to Nantianmen-default"), then call `DELETE /api/admin/providers/{id}/models/{modelId}`. Trilingual i18n (`delete_default_forbidden`) added.
+- **Server delete route**: new `DELETE /api/admin/providers/{id}/models/{modelId}`. Default model returns 400 `cannot delete default model`; hard-delete calls `modelmap.RebuildModelMap()` so `/v1/models` reflects immediately. Existing schema cascades kick in: `api_key_models.model_id ON DELETE CASCADE` removes the model from every API Key's authorized list; `api_keys.assigned_model_id ON DELETE SET NULL` clears any admin override that targeted this model (proxy falls back to Nantianmen-default); `usage_stats` / `communication_log` historical rows are preserved, `model_id` SET NULL has no effect on cost/usage history.
+- **CLI `models` subcommand**: new `models ls <provider-id>` (lists models + capability + ★default/disabled badges) and `models rm <provider-id> <model-id>` (y/N double-confirm). `providers ls` output appends the nested model count (`3 models`) so the operator knows whether to drill down. Help text adds `models`.
+- **CLI subcommand args-slicing bug fix**: `main()` previously passed `os.Args[2:]` to subcommand handlers, which counted flag values (e.g. `--port 40999`) as the sub arg, so `providers ls`, `apikey ls`, etc. saw `sub="40999"` and silently returned (exit 0, no output). Switched to `subIdx` recording the sub's position in os.Args and passing `os.Args[subIdx+1:]` — every subcommand benefits.
+
+### Added — Cost persistence + UI cost column
+- **Price triple + cost column**: `models` gains `input_price` / `output_price` / `cache_hit_price` (REAL NOT NULL DEFAULT 0); `usage_stats` and `communication_log` each gain `cost REAL NOT NULL DEFAULT 0`. `RebuildModelMap` populates prices at startup; `modelmap.Entry` exposes the triple.
+- **Cost computed at proxy end and persisted**: `proxy.go` adds `computeCost(entry, in, out, cached)` using `(uncached_input × input_price + output × output_price + cached × cache_hit_price) / 1M`. Computed value is passed into `stats.Record(...)` / `logEntry` and written to `usage_stats.cost` and `communication_log.cost`. Future price changes do not retroactively rewrite history.
+- **Desktop Logs cost column**: Logs.vue gains a "Cost" column after "Hit%"; `fmtCost` rules: `0/null → −`, `<0.0001 → >¥0.0001`, `≥0.0001 → ¥0.XXXX` (4 decimals, ¥ symbol). Trilingual i18n (`log_cost`) added.
+- **CLI `stats` breakdown gains cost column**: stats subcommand's total line now prints `cost: $X.XX`; the breakdown table gets a `cost` column (7 columns: provider / model / reqs / in / out / cached / cost). New `toF()` helper converts JSON numbers to float64.
+
+### Fixed
+- **FlushBuffer trim misfires wipe communication_log**: in `commlog.go`, `FlushBuffer` ran `TrimToMax(500)` on every flush (10s tick) when `LogRotationEnabled=true && LogRotationMax=0`. Server restart + high-frequency writes caused the oldest rows to be bulk-trimmed — WisUnite (pid=9) 7 rows + other old rows vanished. Fix: remove trim from `FlushBuffer`, move it to an independent `initRotation()` ticker (60s interval), gate changed to `LogRotationEnabled && LogRotationMax > 0`.
+- **`runMigrations` dead code**: legacy `UPDATE models SET deleted_at=datetime('now') WHERE deleted=1` referenced a column that does not exist in the schema; Exec silently swallowed the error. Removed; schema uses `deleted_at` only.
+- **Desktop `log_cost` i18n key missing**: zh/en/ja translations absent; fallback displays Chinese "花费".
+
+### Migration
+- **Existing users**: `runMigrations` auto-adds `cost` columns on startup; new EXE takes effect immediately.
+- **Production v0.4.23 databases**: single `ALTER TABLE` + `UPDATE` transaction to backfill historical cost (joined on `model_id = models.id`) without stopping the server:
+  ```sql
+  ALTER TABLE usage_stats ADD COLUMN cost REAL NOT NULL DEFAULT 0;
+  ALTER TABLE communication_log ADD COLUMN cost REAL NOT NULL DEFAULT 0;
+  UPDATE usage_stats SET cost = ROUND(
+    (input_tokens - cached_tokens) * m.input_price / 1000000.0
+    + output_tokens * m.output_price / 1000000.0
+    + cached_tokens * m.cache_hit_price / 1000000.0, 6)
+  FROM models m WHERE usage_stats.model_id = m.id
+    AND (m.input_price > 0 OR m.output_price > 0 OR m.cache_hit_price > 0);
+  -- Same shape for communication_log. Models with price=0 keep cost=0.
+  ```
+- **WisUnite historical data recovery**: the v0.4.23 trim bug deleted 256 rows of communication_log from the 33-minute window before backup (including all 7 WisUnite rows). After deploying 0.4.24, recovery uses `ATTACH DATABASE '<backup>.db' AS bkp` + INSERT with explicit column list (cost defaults to 0), then reruns the backfill SQL to populate cost. Rows that fell outside the backup window cannot be recovered (WAL tombstone).
+
 ## [v0.4.23] — 2026-08-03
 
 ### Fixed

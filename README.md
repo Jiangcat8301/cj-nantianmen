@@ -115,6 +115,17 @@ admin 客户端：
 CLI / Desktop ──(Bearer M=md5(pwd))──► /api/admin/*
 ```
 
+## 公网穿透（v0.5.0+）
+
+南天门默认仅在 `127.0.0.1:38271` 监听。如需从公网访问，Desktop 与 CLI 已集成 [FRPC](https://github.com/fatedier/frp) 作为独立子进程：
+
+- **Desktop**：侧栏「反向代理」页面 → 首次进入点「下载最新版 FRPC」（自动从 GitHub releases 拉取当前平台对应二进制并解压到 `userData/frpc/`）→ 填写 FRPS 地址 / 端口 / Token / 暴露端口 / 本地端口 → 「启动 FRPC」。
+- **CLI**：`nantianmen reverse-proxy download`、`nantianmen reverse-proxy config key=value ...`、`nantianmen reverse-proxy start | stop | status`。
+
+`auto_start` 开启后，desktop 启动会同步拉起 frpc 子进程；desktop 退出时通过 `taskkill /T /F` 杀整树。FRPC 完全独立 — 它的崩溃不影响本地 38271 访问。
+
+⚠️ 部分杀软（Defender SmartScreen / 360 / AVG 等）会把 `frpc.exe` 标记为潜在威胁并自动 quarantine（frp 已知问题 [issue #3637](https://github.com/fatedier/frp/issues/3637)）。下载后如发现 binary 消失，把 `%APPDATA%\cj-nantianmen\frpc\frpc.exe` 加入白名单后重新点击「下载最新版 FRPC」。生产部署建议 FRPS 配置 `tls.force = true` + `allowPorts` 白名单。
+
 ## API 文档
 
 详细端点列表参见 [docs/api.md](./docs/api.md)。

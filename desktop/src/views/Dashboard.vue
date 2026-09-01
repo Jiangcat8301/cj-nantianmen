@@ -42,6 +42,15 @@
           :class="defaultModel.protocol === 'openai' ? 'bg-blue-500/20 text-blue-300' : 'bg-orange-500/20 text-orange-300'">{{ defaultModel.protocol }}</span>
       </p>
       <p v-else class="text-sm text-gray-500">—</p>
+      <h3 class="text-sm font-semibold text-gray-400 mb-2 mt-4">{{ t('default_embedding_model') }}</h3>
+      <p v-if="defaultEmbeddingModel" class="text-sm">
+        <span class="text-gray-300">{{ defaultEmbeddingModel.provider_name }}</span>
+        <span class="text-gray-600 mx-2">→</span>
+        <code class="text-blue-400 font-mono">{{ defaultEmbeddingModel.model_name }}</code>
+        <span class="ml-2 px-1.5 py-0.5 text-xs rounded font-mono"
+          :class="defaultEmbeddingModel.protocol === 'openai' ? 'bg-blue-500/20 text-blue-300' : 'bg-orange-500/20 text-orange-300'">{{ defaultEmbeddingModel.protocol }}</span>
+      </p>
+      <p v-else class="text-sm text-gray-500">—</p>
     </div>
 
     <!-- Server Endpoints -->
@@ -114,6 +123,7 @@ const todayCost = ref(0)
 // ponytail: v0.3.15 — embedding 调用的今日次数单独展示。蒋老师:token 不计,调用次数要计。
 const todayEmbedReqs = ref(0)
 const defaultModel = ref(null)
+const defaultEmbeddingModel = ref(null)
 const dbSize = ref('—')
 const dbLogCount = ref(0)
 // ponytail: v0.3.15 — when at least one capability='embedding' model is registered, show the /v1/embeddings
@@ -143,8 +153,8 @@ const loadStatus = async () => {
 
 const loadStats = async () => {
   try {
-    const [{ data: providers }, { data: keys }, { data: stats }, { data: dm }] = await Promise.all([
-      api.listProviders(), api.listApiKeys(), api.getStats({ range: 'today' }), api.getDefaultModel(),
+    const [{ data: providers }, { data: keys }, { data: stats }, { data: dm }, { data: dmEmb }] = await Promise.all([
+      api.listProviders(), api.listApiKeys(), api.getStats({ range: 'today' }), api.getDefaultModel(), api.getDefaultEmbeddingModel(),
     ])
     providerCount.value = providers.length
     keyCount.value = keys.length
@@ -159,6 +169,7 @@ const loadStats = async () => {
       .filter(r => r.capability === 'embedding')
       .reduce((s, r) => s + (r.request_count || 0), 0)
     defaultModel.value = dm
+    defaultEmbeddingModel.value = dmEmb
     // ponytail: listProviders returns nested models with capability; check there to avoid
     // a second round-trip (蒋老师: 「顾头不顾尾」批评 — 不再依赖 available-models endpoint).
     hasEmbeddingModel.value = Array.isArray(providers) && providers.some(p =>
