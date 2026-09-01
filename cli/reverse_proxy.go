@@ -320,15 +320,11 @@ func startFrpc() error {
 	cmd := exec.Command(frpcBin(), "-c", frpcTomlPath())
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	// ponytail: process detachment. On Windows we set CREATE_NEW_PROCESS_GROUP so
-	// Ctrl+C doesn't kill frpc when the user hits ^C in their terminal. On
-	// Unix we rely on frpc forking internally; we just don't Wait() below.
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x00000200}
-	}
+	configureSysProcAttr(cmd) // ponytail: build-tagged per OS — Windows sets CREATE_NEW_PROCESS_GROUP, others are no-op
 	if err := cmd.Start(); err != nil {
 		return err
 	}
+	configureSysProcAttr(cmd) // ponytail: platform-specific process flags (Windows: CREATE_NEW_PROCESS_GROUP)
 	os.WriteFile(frpcPidPath(), []byte(strconv.Itoa(cmd.Process.Pid)), 0o600)
 	// don't Wait() — release the process so it survives CLI exit.
 	go func() { cmd.Wait() }()
