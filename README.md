@@ -27,12 +27,12 @@
 >
 > | 产物 | 平台 | 架构 | 大小 | SHA-256 | 下载 |
 > | --- | --- | --- | --- | --- | --- |
-> | Desktop | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-win-x64.exe) |
-> | Server (standalone) | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-win-x64.exe) |
-> | CLI | Windows | x64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-win-x64.exe) |
-> | Desktop | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-mac-arm64.dmg) |
-> | Server (standalone) | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-mac-arm64) |
-> | CLI | macOS | arm64 | — | — | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-mac-arm64) |
+> | Desktop | Windows | x64 | 83.5 MB | `c68ac557891b96f4bc99b8be4695c89bb98934cf44e1d546b4f35f87d40cb0ea` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-win-x64.exe) |
+> | Server (standalone) | Windows | x64 | 17.0 MB | `d2e8cb0d0fd2442480ae34b18ca001314ec5ddfcb30c1a2eb20b08f19906af57` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-win-x64.exe) |
+> | CLI | Windows | x64 | 9.3 MB | `ba3afcda0705007a5cac6681c4e9439c32224dff25c1c028756bbf17d721f534` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-win-x64.exe) |
+> | Desktop | macOS | arm64 | 117.0 MB | `f84ab4b7fd5f3424504b4bdc805bd907464c4fc7bf81823126fc938eb3b3eea2` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-0.5.1-mac-arm64.dmg) |
+> | Server (standalone) | macOS | arm64 | 16.0 MB | `63e0439f090b4ec066a497e5c4d68604b38554f350fd050222bf3d131893171d` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-server-0.5.1-mac-arm64) |
+> | CLI | macOS | arm64 | 8.5 MB | `3f2177d1d607ee857f9e960dccc8f49e2934ac0f0ff19714fa4b59447a97939a` | [下载](https://github.com/Jiangcat8301/cj-nantianmen/releases/download/v0.5.1/nantianmen-cli-0.5.1-mac-arm64) |
 
 ---
 
